@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Stellaegis.Identity.PostgreSQL/Stellaegis.Identity.PostgreSQL.csproj" />
     <Project Path="src/Stellaegis.Identity/Stellaegis.Identity.csproj" />
   </Folder>
   <Folder Name="/tests/">

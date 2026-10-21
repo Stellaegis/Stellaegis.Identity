@@ -8,6 +8,7 @@ alongside them, each under its own license. The table is completed as the packag
 | Component | Used by | License (SPDX) | Project |
 | --- | --- | --- | --- |
 | Stellaegis.Primitives, and Stellaegis.Primitives.Hosting | all packages | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
+| Stellaegis.Primitives.Data | `Stellaegis.Identity.PostgreSQL` | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
 | Otp.NET | `Stellaegis.Identity` | MIT | <https://github.com/kspearrin/Otp.NET> |
 | Npgsql | `Stellaegis.Identity.PostgreSQL` | PostgreSQL | <https://github.com/npgsql/npgsql> |
 | Dapper | `Stellaegis.Identity.PostgreSQL` | Apache-2.0 | <https://github.com/DapperLib/Dapper> |
