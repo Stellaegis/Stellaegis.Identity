@@ -1,0 +1,65 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Stellaegis.Identity.Server.Pages;
+
+/// <summary>The second factor of the person: by authenticator or by e-mail, enabled, or disabled once the password is confirmed.</summary>
+[Authorize]
+internal sealed class AccountMfaModel(MfaService mfa, AccountService account, IdentityTexts texts, IIdentityMailer? mailer = null) : PageModel
+{
+    [BindProperty]
+    public string? Password { get; set; }
+
+    public bool IsEnabled { get; private set; }
+
+    public DateTimeOffset? EnabledAt { get; private set; }
+
+    public string Method { get; private set; } = MfaMethod.Totp;
+
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    {
+        if (this.UserId() is not { } userId)
+            return Forbid();
+        await LoadAsync(userId, cancellationToken);
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostEnableEmailAsync(CancellationToken cancellationToken)
+    {
+        if (this.UserId() is not { } userId)
+            return Forbid();
+        if (mailer is null)
+        {
+            ModelState.AddModelError(string.Empty, texts["Account.Mfa.EmailNoMailer"]);
+            await LoadAsync(userId, cancellationToken);
+            return Page();
+        }
+        await mfa.EnableEmailAsync(userId, cancellationToken);
+        TempData["Notice"] = "Account.Mfa.EmailEnabled";
+        return Redirect("/account/mfa");
+    }
+
+    public async Task<IActionResult> OnPostDisableAsync(CancellationToken cancellationToken)
+    {
+        if (this.UserId() is not { } userId)
+            return Forbid();
+        if (string.IsNullOrEmpty(Password) || !await account.VerifyCurrentPasswordAsync(userId, Password!, cancellationToken))
+        {
+            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
+            await LoadAsync(userId, cancellationToken);
+            return Page();
+        }
+        await mfa.DisableAsync(userId, cancellationToken);
+        TempData["Notice"] = "Account.Mfa.Disabled";
+        return Redirect("/account/mfa");
+    }
+
+    private async Task LoadAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var record = await mfa.GetStatusAsync(userId, cancellationToken);
+        IsEnabled = record?.IsEnabled == true;
+        EnabledAt = record?.EnabledAt;
+        Method = record?.Method ?? MfaMethod.Totp;
+    }
+}

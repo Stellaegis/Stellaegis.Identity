@@ -1,0 +1,38 @@
+@page "/account/mfa/recovery-codes"
+@model AccountRecoveryCodesModel
+@{
+    ViewData["Title"] = T["RecoveryCodes.Title"];
+    Layout = "_AccountLayout";
+}
+
+@if (TempData["Notice"] is string notice)
+{
+    <div class="auth-success" role="status">@T[notice]</div>
+}
+
+@if (Model.Codes.Count > 0)
+{
+    <p class="auth-help"><strong>@T["RecoveryCodes.KeepNow"]</strong> @T["RecoveryCodes.Explain"]</p>
+    <ul class="auth-codes">
+        @foreach (var code in Model.Codes)
+        {
+            <li>@code</li>
+        }
+    </ul>
+    <div class="auth-links">
+        <a href="/account/mfa" class="auth-link">@T["RecoveryCodes.NotedDone"]</a>
+    </div>
+}
+else
+{
+    <p class="auth-help">@T["RecoveryCodes.ShownOnce"]</p>
+    <p>@T.Format("RecoveryCodes.Remaining", Model.Remaining)</p>
+}
+
+@if (Model.MfaEnabled)
+{
+    <form method="post" asp-page-handler="Regenerate">
+        <button class="auth-btn" type="submit">@T["RecoveryCodes.Regenerate"]</button>
+        <p class="auth-help auth-small">@T["RecoveryCodes.RegenerateWarning"]</p>
+    </form>
+}

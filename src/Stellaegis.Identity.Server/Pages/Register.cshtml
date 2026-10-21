@@ -1,0 +1,65 @@
+@page "/register"
+@model RegisterModel
+@{
+    ViewData["Title"] = T["Register.Title"];
+    Layout = "_AuthLayout";
+}
+
+@if (!Model.Open)
+{
+    <h2 class="auth-h2">@T["Register.ClosedHeading"]</h2>
+    <p class="auth-help">@T["Register.ClosedHelp"]</p>
+    <div class="auth-links">
+        <a href="@Links.WithReturnUrl("/login", Model.ReturnUrl)" class="auth-btn auth-btn-secondary">@T["Nav.SignIn"]</a>
+    </div>
+}
+else
+{
+    <h2 class="auth-h2">@T["Register.Heading"]</h2>
+    <p class="auth-help">@T["Register.Help"]</p>
+
+    <form class="auth-form" method="post" autocomplete="on">
+        <div class="auth-field">
+            <label class="auth-label" for="Input_Email">@T["Field.Email"]</label>
+            <input class="auth-input" asp-for="Input.Email" type="email" autocomplete="email" autofocus />
+        </div>
+        <div class="auth-field">
+            <label class="auth-label" for="Input_DisplayName">@T["Field.DisplayName"]</label>
+            <input class="auth-input" asp-for="Input.DisplayName" autocomplete="name" />
+        </div>
+        <div class="auth-field">
+            <label class="auth-label" for="Input_Password">@T["Field.Password"]</label>
+            <input class="auth-input" asp-for="Input.Password" type="password" autocomplete="new-password"
+                   data-min-length="@Model.Policy.MinLength"
+                   data-require-upper="@Model.Policy.RequireUppercase.ToString().ToLowerInvariant()"
+                   data-require-lower="@Model.Policy.RequireLowercase.ToString().ToLowerInvariant()"
+                   data-require-digit="@Model.Policy.RequireDigit.ToString().ToLowerInvariant()"
+                   data-require-special="@Model.Policy.RequireSpecialChar.ToString().ToLowerInvariant()"
+                   data-labels="@string.Join('|', T["Password.Strength.Weak"], T["Password.Strength.Fair"], T["Password.Strength.Strong"], T["Password.Strength.VeryStrong"])" />
+            <div class="pwd-strength" aria-live="polite">
+                <div class="pwd-strength-track"><div class="pwd-strength-fill"></div></div>
+                <div class="pwd-strength-text"></div>
+            </div>
+            <ul class="auth-rules">
+                @foreach (var rule in Model.Rules)
+                {
+                    <li>@rule</li>
+                }
+            </ul>
+        </div>
+        <div class="auth-field">
+            <label class="auth-label" for="Input_ConfirmPassword">@T["Field.ConfirmPassword"]</label>
+            <input class="auth-input" asp-for="Input.ConfirmPassword" type="password" autocomplete="new-password" />
+        </div>
+        <button class="auth-btn" type="submit">@T["Register.Submit"]</button>
+        <partial name="_Errors" />
+    </form>
+
+    <div class="auth-links">
+        <a href="@Links.WithReturnUrl("/login", Model.ReturnUrl)" class="auth-btn auth-btn-secondary">@T["Nav.SignIn"]</a>
+    </div>
+}
+
+@section Scripts {
+    <script src="@IdentityPagesOptions.ContentPath/identity.js"></script>
+}

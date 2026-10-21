@@ -1,0 +1,16 @@
+@page "/account"
+@model AccountIndexModel
+@{
+    ViewData["Title"] = T["Account.Overview"];
+    Layout = "_AccountLayout";
+    var initial = Model.DisplayName.Length > 0 ? Model.DisplayName[..1].ToUpperInvariant() : "?";
+}
+
+<div class="account-profile">
+    <div class="account-avatar" aria-hidden="true">@initial</div>
+    <div>
+        <div class="account-display-name">@Model.DisplayName</div>
+        <div class="account-email">@Model.Email</div>
+    </div>
+</div>
+<p class="auth-help">@T["Account.OverviewHelp"]</p>

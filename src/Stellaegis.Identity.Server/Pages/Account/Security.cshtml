@@ -1,0 +1,47 @@
+@page "/account/security"
+@model AccountSecurityModel
+@{
+    ViewData["Title"] = T["Account.Security.Title"];
+    Layout = "_AccountLayout";
+}
+
+<p class="auth-help">@T["Account.Security.Help"]</p>
+
+@if (Model.Events.Count == 0)
+{
+    <p class="auth-help auth-small">@T["Account.Security.None"]</p>
+}
+else
+{
+    <div class="account-events">
+        @foreach (var evt in Model.Events)
+        {
+            var label = evt.Success ? T["Account.Security.Succeeded"] : evt.FailReason switch
+            {
+                LoginFailureReasons.LockedOut => T["Account.Security.LockedOut"],
+                LoginFailureReasons.InvalidCredentials => T["Account.Security.WrongPassword"],
+                _ => T["Account.Security.Failed"],
+            };
+            var agent = evt.UserAgent is { Length: > 80 } ? evt.UserAgent[..80] + "…" : evt.UserAgent;
+            <div class="account-event @(evt.Success ? "ok" : "ko")">
+                <div class="account-event-head">
+                    <span class="account-event-label">@label</span>
+                    <time datetime="@evt.CreatedAt.ToString("o")">@evt.CreatedAt.ToLocalTime().ToString("g")</time>
+                </div>
+                @if (evt.IpAddress is not null || agent is not null)
+                {
+                    <div class="account-event-meta">
+                        @if (evt.IpAddress is not null)
+                        {
+                            <span>@evt.IpAddress</span>
+                        }
+                        @if (agent is not null)
+                        {
+                            <span>@agent</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
