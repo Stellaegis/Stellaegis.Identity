@@ -51,7 +51,7 @@ await app.Services.VerifyStellaegisDatabasesAsync();   // the installation ran b
 
 app.MapStaticAssets();
 app.UseAuthentication();
-app.UseStellaegisIdentityAdmission();
+app.UseStellaegisActorAdmission();                                    // of Primitives: the blocked accounts, and any other admission
 app.UseAuthorization();
 
 app.MapStellaegisIdentityPages();                                           // /login, /register, /account/…
@@ -177,9 +177,14 @@ registers it from its own registration, since no request context does.
 A resource server refuses the requests of a blocked account at the door, before any route runs.
 `AddStellaegisIdentityAdmission()` keeps the blocked accounts in memory, read from `IBlockedUsersSource` when the
 host starts and then every two minutes (`Stellaegis:Identity:Admission:ReconcileInterval`; zero for a single
-reading); `UseStellaegisIdentityAdmission()`, after `UseAuthentication()`, answers 401 with the code
-`Account.Blocked`. A source that cannot be reached is logged as critical, and the host goes on with what it has;
-no source registered stops the startup.
+reading), and registers them as the `IActorAdmission` of the accounts — the contract of
+`Stellaegis.Primitives.AspNetCore` since 5.1.0, which every module that knows implements, the token issuer for the
+revoked tokens among them. `UseStellaegisActorAdmission()` of Primitives, after `UseAuthentication()`, asks every
+admission registered and answers 401 with the code of the first refusal, `Account.Blocked` for a blocked account;
+a token issuer asks the same question through `IActorAdmissions`, at the authorization and the refresh.
+`UseStellaegisIdentityAdmission()` of the 5.0.0 is kept, deprecated, and enables the same middleware. A source
+that cannot be reached is logged as critical, and the host goes on with what it has; no source registered stops
+the startup.
 
 The source is local, `AddStellaegisLocalBlockedUsersSource()`, in the host that holds the accounts; or HTTP,
 `AddStellaegisIdentityClient(configuration)`, in a resource server apart — `Stellaegis:Identity:Client:BaseUrl` at

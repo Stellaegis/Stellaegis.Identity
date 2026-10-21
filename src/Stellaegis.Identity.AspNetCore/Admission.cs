@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -42,9 +43,11 @@ public sealed class IdentityAdmissionOptions : IValidatableOptions
 /// periodically (<see cref="IdentityAdmissionOptions.ReconcileInterval"/>); kept current in between by the host,
 /// which calls <see cref="Block(string)"/> and <see cref="Unblock(string)"/> from its subscriptions to
 /// <see cref="UserBlockedEvent"/> and <see cref="UserUnblockedEvent"/> — the module subscribes to nothing, the
-/// host connects its bus.
+/// host connects its bus. The <see cref="IActorAdmission"/> of the accounts: registered beside the admissions of
+/// the other modules, asked at the door by <c>UseStellaegisActorAdmission()</c> of Primitives, and by a token
+/// issuer at the authorization and the refresh.
 /// </summary>
-public sealed class BlockedAccounts
+public sealed class BlockedAccounts : IActorAdmission
 {
     private volatile ConcurrentDictionary<string, byte> _blocked = new(StringComparer.Ordinal);
 
@@ -78,6 +81,12 @@ public sealed class BlockedAccounts
 
     /// <summary>The subjects blocked, as a snapshot.</summary>
     public IReadOnlyCollection<string> Subjects => _blocked.Keys.ToList();
+
+    /// <summary>Refuses, with <see cref="IdentityErrors.AccountBlocked"/>, a principal whose subject is blocked at the door.</summary>
+    public ValueTask<Result> AdmitAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
+        => ValueTask.FromResult(Callers.SubjectOf(Guard.NotNull(principal)) is { } subject && IsBlocked(subject)
+            ? Result.Failure(IdentityErrors.AccountBlocked)
+            : Result.Success());
 }
 
 /// <summary>
@@ -182,34 +191,15 @@ internal sealed class BlockedAccountsReconciliation(
     }
 }
 
-/// <summary>
-/// Refuses, with 401 and the code <see cref="IdentityErrors.AccountBlockedCode"/>, a request whose authenticated
-/// subject is blocked at the door — whatever its token or its cookie says. Runs after the authentication and
-/// before the authorization.
-/// </summary>
-internal sealed class IdentityAdmissionMiddleware(RequestDelegate next, BlockedAccounts accounts, ILogger<IdentityAdmissionMiddleware> logger)
-{
-    public async Task InvokeAsync(HttpContext httpContext)
-    {
-        if (Callers.SubjectOf(httpContext.User) is { } subject && accounts.IsBlocked(subject))
-        {
-            logger.LogWarning("Request of the blocked subject {Subject} refused on {Path}", subject, httpContext.Request.Path);
-            httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await httpContext.Response.WriteAsJsonAsync(IdentityErrors.AccountBlocked.ToProblemDetails(), httpContext.RequestAborted).ConfigureAwait(false);
-            return;
-        }
-        await next(httpContext).ConfigureAwait(false);
-    }
-}
-
 /// <summary>Registers and enables the admission of actors on a resource server.</summary>
 public static class AdmissionExtensions
 {
     /// <summary>
     /// Registers the admission of actors: the blocked accounts kept in memory, read from
     /// <see cref="IBlockedUsersSource"/> at startup and then periodically, and its options bound from
-    /// <paramref name="sectionName"/>. The host registers the source that fits it — local or HTTP —, enables the
-    /// middleware with <see cref="UseStellaegisIdentityAdmission"/>, and connects its bus to
+    /// <paramref name="sectionName"/>; and the <see cref="IActorAdmission"/> of the accounts, beside those of the
+    /// other modules. The host registers the source that fits it — local or HTTP —, enables the admission on its
+    /// pipeline with <c>UseStellaegisActorAdmission()</c> of Primitives, and connects its bus to
     /// <see cref="BlockedAccounts"/> so that a block applies without waiting for the next reading.
     /// </summary>
     public static IServiceCollection AddStellaegisIdentityAdmission(this IServiceCollection services, IConfiguration configuration, string sectionName = IdentityAdmissionOptions.SectionName)
@@ -235,13 +225,25 @@ public static class AdmissionExtensions
     {
         services.TryAddSingleton<BlockedAccounts>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, BlockedAccountsReconciliation>());
+        if (!services.Any(descriptor => descriptor.ServiceType == typeof(AdmissionRegistered)))
+        {
+            services.AddSingleton(AdmissionRegistered.Instance);
+            services.AddStellaegisActorAdmission(provider => provider.GetRequiredService<BlockedAccounts>());
+        }
         return services;
     }
 
+    private sealed class AdmissionRegistered
+    {
+        public static readonly AdmissionRegistered Instance = new();
+    }
+
     /// <summary>
-    /// Refuses the requests of the subjects blocked at the door. Call it after <c>UseAuthentication()</c>, so that
-    /// the subject is known, and before <c>UseAuthorization()</c>.
+    /// Refuses the requests of the subjects blocked at the door — what <c>UseStellaegisActorAdmission()</c> of
+    /// Primitives does since 5.1.0 for every admission registered, this one included. Kept for the hosts of the
+    /// 5.0.0; enables the same middleware once, whichever of the two is called.
     /// </summary>
+    [Obsolete("Call UseStellaegisActorAdmission() of Stellaegis.Primitives.AspNetCore: it asks every admission registered, the blocked accounts included.")]
     public static IApplicationBuilder UseStellaegisIdentityAdmission(this IApplicationBuilder app)
     {
         Guard.NotNull(app);
@@ -250,6 +252,6 @@ public static class AdmissionExtensions
             throw new InvalidOperationException(
                 "The admission of actors is enabled, and nothing registered it: call AddStellaegisIdentityAdmission(...) before building the host.");
         }
-        return app.UseMiddleware<IdentityAdmissionMiddleware>();
+        return app.UseStellaegisActorAdmission();
     }
 }

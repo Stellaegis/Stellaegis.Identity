@@ -63,7 +63,7 @@ await app.Services.VerifyStellaegisDatabasesAsync();
 app.UseRequestLocalization();
 app.MapStaticAssets();   // the stylesheet, the scripts and the logo of the pages, under /_content/Stellaegis.Identity.Server
 app.UseAuthentication();
-app.UseStellaegisIdentityAdmission();
+app.UseStellaegisActorAdmission();   // of Primitives: every admission registered, the blocked accounts included
 app.UseAuthorization();
 
 app.MapStellaegisIdentityPages();

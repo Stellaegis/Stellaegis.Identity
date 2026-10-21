@@ -1,9 +1,11 @@
 using System.Net;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Stellaegis.Identity.AspNetCore;
 using Stellaegis.Primitives;
+using Stellaegis.Primitives.AspNetCore;
 
 namespace Stellaegis.Identity.Tests;
 
@@ -11,6 +13,9 @@ namespace Stellaegis.Identity.Tests;
 public sealed class AdmissionTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private static ClaimsPrincipal PrincipalOf(string subject)
+        => new(new ClaimsIdentity([new Claim("sub", subject)], "test"));
 
     private static WebApplication Build(TimeSpan? reconcileInterval = null, bool withSource = true)
     {
@@ -20,7 +25,7 @@ public sealed class AdmissionTests
         builder.Services.AddStellaegisIdentityAdmission(options => options.ReconcileInterval = reconcileInterval ?? TimeSpan.Zero);
         var app = builder.Build();
         app.UseAuthentication();
-        app.UseStellaegisIdentityAdmission();
+        app.UseStellaegisActorAdmission();   // of Primitives: every admission registered, the blocked accounts included
         app.UseAuthorization();
         app.MapGet("/ping", () => "pong").RequireAuthorization();
         return app;
@@ -84,12 +89,30 @@ public sealed class AdmissionTests
     }
 
     [Fact]
-    public void Enabling_the_middleware_without_registering_the_admission_fails()
+    public async Task The_blocked_accounts_are_an_admission_a_token_issuer_asks_apart_from_the_pipeline()
+    {
+        await using var app = Build();
+        var john = await app.CreateAccountAsync("john@acme.test", ct: Ct);
+        await app.StartAsync(Ct);
+        app.Services.GetRequiredService<BlockedAccounts>().Block(john);
+        var admissions = app.Services.GetRequiredService<IActorAdmissions>();
+
+        var refused = await admissions.AdmitAsync(PrincipalOf(john.ToString("N")), Ct);
+        var admitted = await admissions.AdmitAsync(PrincipalOf(Guid.NewGuid().ToString("N")), Ct);
+
+        Assert.Equal(IdentityErrors.AccountBlockedCode, refused.Error!.Code);
+        Assert.True(admitted.IsSuccess);
+        Assert.Single(app.Services.GetServices<IActorAdmission>());
+    }
+
+    [Fact]
+    public void The_former_middleware_still_fails_without_the_registration_and_enables_the_admission_once()
     {
         var builder = WebTestHost.Builder().WithHeaderAuthentication();
         var app = builder.Build();
-
+#pragma warning disable CS0618 // kept for the hosts of the 5.0.0
         var exception = Assert.Throws<InvalidOperationException>(() => app.UseStellaegisIdentityAdmission());
+#pragma warning restore CS0618
 
         Assert.Contains("AddStellaegisIdentityAdmission", exception.Message);
     }

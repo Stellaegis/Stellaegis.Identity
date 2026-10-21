@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [5.1.0] — 2026-10-21
+
+### Added
+
+- `BlockedAccounts` implements `IActorAdmission` of `Stellaegis.Primitives.AspNetCore` 5.1.0, registered by
+  `AddStellaegisIdentityAdmission(...)` beside the admissions of the other modules: `UseStellaegisActorAdmission()`
+  of Primitives refuses a blocked account at the door with `Account.Blocked`, and a token issuer asks the same
+  question through `IActorAdmissions`.
+
+### Deprecated
+
+- `UseStellaegisIdentityAdmission()`: call `UseStellaegisActorAdmission()` of Primitives. The former enables the
+  same middleware, once, whichever of the two is called.
+
+### Changed
+
+- The packages take `Stellaegis.Primitives` 5.1.0.
+
 ## [5.0.0] — 2026-10-21
 
 First release of the packages: the accounts of the Stellaegis framework, extracted and rewritten on
