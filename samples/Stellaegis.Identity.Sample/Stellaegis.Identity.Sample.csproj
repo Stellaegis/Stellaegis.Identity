@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The example host: an enterprise application that holds the accounts of its own people, serves the pages
+       they sign in with, and administers them under the operations of the module. Not a package, never packed. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Stellaegis.Identity.Sample</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <UserSecretsId>stellaegis-identity-sample</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Stellaegis.Identity\Stellaegis.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Stellaegis.Identity.PostgreSQL\Stellaegis.Identity.PostgreSQL.csproj" />
+    <ProjectReference Include="..\..\src\Stellaegis.Identity.AspNetCore\Stellaegis.Identity.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\Stellaegis.Identity.Client\Stellaegis.Identity.Client.csproj" />
+    <ProjectReference Include="..\..\src\Stellaegis.Identity.Server\Stellaegis.Identity.Server.csproj" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+
+</Project>

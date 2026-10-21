@@ -44,6 +44,9 @@ _local/
 /src/*/obj/
 /tests/*/bin/
 /tests/*/obj/
+# The example host, under samples/, builds like the packages and is never packed.
+/samples/*/bin/
+/samples/*/obj/
 
 # ── Packages ───────────────────────────────────────────────────────────────────
 # Written by `dotnet pack` (Directory.Build.props, PackageOutputPath). Published from CI, never committed.

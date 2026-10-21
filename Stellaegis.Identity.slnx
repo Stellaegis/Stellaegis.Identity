@@ -6,6 +6,9 @@
     <Project Path="src/Stellaegis.Identity.Server/Stellaegis.Identity.Server.csproj" />
     <Project Path="src/Stellaegis.Identity/Stellaegis.Identity.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Stellaegis.Identity.Sample/Stellaegis.Identity.Sample.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Stellaegis.Identity.Tests/Stellaegis.Identity.Tests.csproj" />
     <Project Path="tests/Stellaegis.Identity.Tests.HostPages/Stellaegis.Identity.Tests.HostPages.csproj" />
