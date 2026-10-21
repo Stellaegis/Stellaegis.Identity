@@ -9,9 +9,7 @@ alongside them, each under its own license. The table is completed as the packag
 | --- | --- | --- | --- |
 | Stellaegis.Primitives, and Stellaegis.Primitives.Hosting | all packages | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
 | Otp.NET | `Stellaegis.Identity` | MIT | <https://github.com/kspearrin/Otp.NET> |
-| OpenIddict | `Stellaegis.Identity.OpenIddict` | Apache-2.0 | <https://github.com/openiddict/openiddict-core> |
-| Npgsql, Npgsql.EntityFrameworkCore.PostgreSQL | `Stellaegis.Identity.PostgreSQL`, `Stellaegis.Identity.OpenIddict` | PostgreSQL | <https://github.com/npgsql> |
-| EFCore.NamingConventions | `Stellaegis.Identity.OpenIddict` | Apache-2.0 | <https://github.com/efcore/EFCore.NamingConventions> |
+| Npgsql | `Stellaegis.Identity.PostgreSQL` | PostgreSQL | <https://github.com/npgsql/npgsql> |
 | Dapper | `Stellaegis.Identity.PostgreSQL` | Apache-2.0 | <https://github.com/DapperLib/Dapper> |
 | Microsoft.Extensions.\* | all packages | MIT | <https://github.com/dotnet> |
 

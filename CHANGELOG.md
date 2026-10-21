@@ -7,5 +7,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-The first release will be 5.0.0, the version of the Stellaegis family: Identity extracted from the Stellaegis
-framework and rewritten on `Stellaegis.Primitives` 5.0.
+The first release will be 5.0.0, the version of the Stellaegis family: the accounts of the Stellaegis framework
+extracted and rewritten on `Stellaegis.Primitives` 5.0. The OpenID Connect issuer of the framework is extracted
+apart, as `Stellaegis.Issuer`.
