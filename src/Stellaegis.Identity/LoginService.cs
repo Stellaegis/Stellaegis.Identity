@@ -58,7 +58,7 @@ public sealed class LoginService(
 
             if (user is null || !user.IsEnabled)
             {
-                await RecordAsync(Guid.Empty, normalized, false, LoginFailureReasons.InvalidCredentials, ipAddress, userAgent, now, cancellationToken);
+                await RecordAsync(user?.UserUniqueId ?? Guid.Empty, normalized, false, LoginFailureReasons.InvalidCredentials, ipAddress, userAgent, now, cancellationToken);
                 return LoginResult.Failure(IdentityErrors.InvalidCredentials);
             }
 
