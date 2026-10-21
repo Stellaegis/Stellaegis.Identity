@@ -12,10 +12,12 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Npgsql" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Stellaegis.Identity\Stellaegis.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Stellaegis.Identity.PostgreSQL\Stellaegis.Identity.PostgreSQL.csproj" />
   </ItemGroup>
 
   <ItemGroup>
