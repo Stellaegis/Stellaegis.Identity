@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Stellaegis.Identity.AspNetCore</RootNamespace>
+    <PackageId>Stellaegis.Identity.AspNetCore</PackageId>
+    <Description>Stellaegis Identity in an ASP.NET Core host: the cookie a person signs in with, the administration routes of the accounts labelled with their operations, and the admission of actors on a resource server — an account blocked at the door is refused whatever its token says.</Description>
+    <PackageTags>stellaegis;identity;accounts;aspnetcore;cookie;admission</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stellaegis.Identity\Stellaegis.Identity.csproj" />
+    <PackageReference Include="Stellaegis.Primitives.AspNetCore" />
+    <InternalsVisibleTo Include="Stellaegis.Identity.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
