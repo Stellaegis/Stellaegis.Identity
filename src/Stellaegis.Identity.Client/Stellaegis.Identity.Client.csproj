@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Stellaegis.Identity.Client</RootNamespace>
+    <PackageId>Stellaegis.Identity.Client</PackageId>
+    <Description>The HTTP client of Stellaegis.Identity for a resource server apart from the host that holds the accounts: it reads the blocked accounts from the administration routes, so that the admission of actors refuses them there too.</Description>
+    <PackageTags>stellaegis;identity;accounts;client;admission</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stellaegis.Identity\Stellaegis.Identity.csproj" />
+    <PackageReference Include="Stellaegis.Primitives.Hosting" />
+    <InternalsVisibleTo Include="Stellaegis.Identity.Tests" />
+  </ItemGroup>
+
+</Project>
