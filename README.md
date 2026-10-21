@@ -1,8 +1,257 @@
 # Stellaegis.Identity
 
-The accounts of an application assembled on [Stellaegis.Primitives](https://github.com/Stellaegis/Stellaegis.Primitives):
-registration, login, multi-factor authentication, recovery codes, e-mail verification, password reset, the trace of
-logins — and, for any resource server, whether an account is blocked. It issues no token: that is
-`Stellaegis.Issuer`, which takes a user the host has authenticated.
+Stellaegis.Identity holds the accounts of a .NET application assembled on
+[Stellaegis.Primitives](https://github.com/Stellaegis/Stellaegis.Primitives): who a person is, and that they are
+who they say. Registration, login with a lockout, a second factor by authenticator app or by e-mail, recovery
+codes, e-mail verification, password reset, the trace of logins, the administration of accounts — and, for any
+resource server, the one question it asks of the accounts: is this one blocked?
 
-⚠ Being extracted from the Stellaegis framework. Nothing is published yet; the first version will be 5.0.0.
+It issues no token. Turning a signed-in person into tokens is the work of `Stellaegis.Issuer`, which takes the
+person the host authenticated — by the cookie of this package, or otherwise — and never reads the accounts.
+And it decides no right: that is `Stellaegis.Access`. Identity identifies a person, and does nothing else.
+
+The library targets .NET 10 and is released under the MIT license.
+
+## Packages
+
+| Package | Contents | Depends on |
+| --- | --- | --- |
+| `Stellaegis.Identity` | The services — login, registration, account, password reset, e-mail verification, second factor, recovery codes, administration —, the ports of the stores, the in-memory stores, the module and its operations, the events, the passwords, the mailer port | `Stellaegis.Primitives`, `Stellaegis.Primitives.Hosting`, Otp.NET |
+| `Stellaegis.Identity.PostgreSQL` | The stores on PostgreSQL, and the `ident` schema declared as a module database for the installation and the verification | `Stellaegis.Primitives.Data`, Npgsql, Dapper |
+| `Stellaegis.Identity.AspNetCore` | The cookie a person signs in with, the administration routes of the accounts under their operations, and the admission of actors on a resource server | `Stellaegis.Primitives.AspNetCore`, ASP.NET Core |
+| `Stellaegis.Identity.Client` | The HTTP source of the blocked accounts, for a resource server apart from the host that holds the accounts | `Stellaegis.Primitives.Hosting` |
+| `Stellaegis.Identity.Server` | The pages a person signs in and manages their account with, as a Razor class library the host mounts | `Stellaegis.Identity.AspNetCore`, ASP.NET Core |
+
+The five packages share one version, and follow the major version of Stellaegis.Primitives: 5.0.0 runs on
+Primitives 5.0.1.
+
+## A host, in full
+
+An enterprise application — one compartment, the company itself — holding the accounts of its own people. This
+is `samples/Stellaegis.Identity.Sample`, which runs as is on a PostgreSQL server.
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddStellaegisFrame(ApplicationFrame.SingleCompartment("acme"));
+builder.Services.AddStellaegisRequestContext();
+
+builder.Services.AddStellaegisIdentityPostgreSQL(builder.Configuration);   // Stellaegis:Identity:PostgreSQL, Stellaegis:Identity
+builder.Services.AddStellaegisIdentityCookie();
+builder.Services.AddStellaegisIdentityPages(builder.Configuration);        // Stellaegis:Identity:Pages
+builder.Services.AddStellaegisIdentityAdministration();
+builder.Services.AddStellaegisLocalBlockedUsersSource();
+builder.Services.AddStellaegisIdentityAdmission(builder.Configuration);    // Stellaegis:Identity:Admission
+
+builder.Services.AddSingleton<IIdentityMailer, MyMailer>();                 // what the pages send, on the host's messaging
+builder.Services.AddAuthorization(options => { /* one policy per operation of IdentityOperations.All */ });
+
+var app = builder.Build();
+await app.Services.VerifyStellaegisDatabasesAsync();   // the installation ran before, under another role: prove it
+
+app.MapStaticAssets();
+app.UseAuthentication();
+app.UseStellaegisIdentityAdmission();
+app.UseAuthorization();
+
+app.MapStellaegisIdentityPages();                                           // /login, /register, /account/…
+app.MapGroup("/api/admin").MapIdentityAdminEndpoints()
+   .RequireAuthorizationPerOperation(operation => operation.ToString());   // "users.read", "users.write", …
+
+app.Run();
+```
+
+What the host brings is its own: its API and its modules, its rights system answering the policies named after
+the operations, its messaging behind `IIdentityMailer`, its bus behind `IEventPublisher`.
+
+## Installing, then verifying
+
+The accounts live in the schema `ident` of a PostgreSQL database. Two executants, two roles, as everywhere in the
+family: an installer installs, under a role that owns the schema; the application verifies at every startup,
+under its own role, which was granted its data rights and never a DDL right.
+
+```csharp
+await DatabaseLifecycle.InstallAsync([IdentityDatabase.Value], frame, openAsAdministrator, applicationRole: "myapp_app");
+```
+
+The installation creates the schema, applies its scripts once and records each with its checksum, and grants the
+application's role what it needs. It is replayable. The application then verifies — `AddStellaegisDatabaseVerification()`
+in a generic host, `app.Services.VerifyStellaegisDatabasesAsync()` in an ASP.NET Core host — and refuses to start
+when the schema is not installed, or not as the package declares it.
+
+No account is seeded. The first administrator is a gesture of the installation, through the services of the
+module, as the example does:
+
+```sh
+dotnet run -- install --admin-email admin@acme.test --admin-password 'Correct-Horse-9'
+```
+
+The example's `install` verb creates the database and the application's role if missing, installs the schema
+under the administration connection, then calls `AccountAdministrationService.CreateAsync` as the actor
+`job:install`. Run again, it changes nothing.
+
+## The accounts
+
+An account is an `AuthUser`: its identity `UserUniqueId`, a random GUID that its `sub` claim carries and that is
+never reused; its e-mail, normalized and unique among the enabled accounts; its display name; the hash of its
+password; whether it is enabled; its failed logins and its lockout; who created, modified and deleted it, as
+`Actor`s, never a default. A deleted account stays, marked, so that its identity is never given to someone else.
+
+The services do what a person or an administrator does to accounts, and answer a `Result` whose `Error` carries
+a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Account.Blocked`, `Email.Taken`,
+`Password.Rejected`, `Registration.Closed`, and so on, in `IdentityErrors`:
+
+| Service | What it does |
+| --- | --- |
+| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due, and builds the principal — `sub`, `email`, `name` — a host signs in |
+| `RegistrationService` | Creates an account when the registration posture allows it, after the e-mail was proved by a code |
+| `AccountService` | Changes the password, the e-mail, deletes the account, verifies a password |
+| `PasswordResetService` | Issues a reset token sent by e-mail, and consumes it |
+| `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read |
+| `MfaService`, `LoginOtpService` | Enrolls an authenticator app (TOTP) or the e-mail as second factor, checks a code |
+| `RecoveryCodeService` | Issues the recovery codes of a second factor, hashed, and consumes one |
+| `AccountAdministrationService` | What an administrator does: create, block, unblock, delete, reset the failed logins, the second factor or the password; each write names its actor |
+
+The stores are ports, each atomic: `IAuthUserStore`, `IEmailVerificationStore`, `IPasswordResetStore`,
+`ILoginEventStore`, `IMfaStore`, `IRecoveryCodeStore`. `AddStellaegisIdentityInMemory` registers their in-memory
+form, for development and tests; `AddStellaegisIdentityPostgreSQL` the PostgreSQL one.
+
+### Options
+
+One section, `Stellaegis:Identity`, one sub-section per concern, bound by `AddStellaegisIdentity` and validated
+when the host starts:
+
+```text
+Stellaegis:Identity:PasswordHasher:Pepper          required; a secret of the deployment, never in the repository
+Stellaegis:Identity:PasswordHasher:Iterations      310000
+Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a password must mix
+Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5, then a lockout of LockoutDuration, 15 minutes
+Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
+Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
+Stellaegis:Identity:EmailVerification:CodeLength   6 digits, for Lifetime, 15 minutes, MaxAttempts 5
+Stellaegis:Identity:PasswordReset:TokenLifetime    1 hour
+Stellaegis:Identity:Registration:Posture           Closed, Open, or ByInvitation
+```
+
+The posture `Closed` is the default: a host whose people are created by its administration — an enterprise, a
+solution installed for one organization — opens nothing. `Open` lets anyone register. `ByInvitation` refuses
+unless the host says the person was invited, after checking the invitation itself: the accounts know no invitation.
+
+### Events
+
+The module publishes three events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
+with its reason, `UserUnblocked` —, records implementing `IEvent`. It publishes to whatever bus the host
+registered, and nowhere when the host registered none; it subscribes to nothing. A host that wants a block to
+apply at once connects its bus to the admission (below).
+
+## The cookie
+
+`AddStellaegisIdentityCookie()` registers the cookie scheme as the default authentication of the host: the cookie
+`stellaegis_identity`, kept out of scripts, sent on same-site navigations, over HTTPS only, with `/login` for a
+challenge. `CookieSignIn` signs a person in — from the principal `LoginService` built, or by id, refusing a blocked
+account — and out. The pages of `Stellaegis.Identity.Server` use it; a host writing its own login page does the
+same. A host that authenticates its API otherwise, by a bearer token, registers that scheme too and chooses the
+default after this call.
+
+## The administration routes
+
+`MapIdentityAdminEndpoints()` maps the administration of the accounts, relative to the group it is called on,
+under `identity`. The module has no compartment: its routes read no request context, and the actor of a write
+is read from the principal the host authenticated. An account is nobody's resource, so the routes declare they
+load none: the operation each is labelled with is the whole decision, and the host declares who may call it.
+
+| Route | Operation |
+| --- | --- |
+| `GET identity/users?skip=&take=`, `POST identity/users/lookup`, `GET identity/users/{id}` | `users.read` |
+| `POST identity/users`, `POST identity/users/{id}/block`, `/unblock`, `/reset-failed-logins`, `/reset-mfa`, `/change-password` | `users.write` |
+| `DELETE identity/users/{id}` | `users.delete` |
+| `GET identity/security/blocked-users` | `security.read` |
+
+The module declares these four operations, `IdentityOperations.All`, so that the startup check of Primitives
+refuses a route labelled with one the module does not declare, and so that a host harvests its catalogue from the
+declarations. `AddStellaegisIdentityAdministration()` registers that startup check: a module without compartments
+registers it from its own registration, since no request context does.
+
+## The admission of actors
+
+A resource server refuses the requests of a blocked account at the door, before any route runs.
+`AddStellaegisIdentityAdmission()` keeps the blocked accounts in memory, read from `IBlockedUsersSource` when the
+host starts and then every two minutes (`Stellaegis:Identity:Admission:ReconcileInterval`; zero for a single
+reading); `UseStellaegisIdentityAdmission()`, after `UseAuthentication()`, answers 401 with the code
+`Account.Blocked`. A source that cannot be reached is logged as critical, and the host goes on with what it has;
+no source registered stops the startup.
+
+The source is local, `AddStellaegisLocalBlockedUsersSource()`, in the host that holds the accounts; or HTTP,
+`AddStellaegisIdentityClient(configuration)`, in a resource server apart — `Stellaegis:Identity:Client:BaseUrl` at
+the administration routes of the host that holds them, the token for the call coming from an
+`IIdentityClientTokenProvider` the host implements.
+
+A block applies without waiting for the next reading when the host connects its bus: on `UserBlocked`, call
+`BlockedAccounts.Block(userUniqueId)`; on `UserUnblocked`, `Unblock`. In a single process, the example does it
+from its own `IEventPublisher`; with several, from a subscription to `Stellaegis.Backplane`.
+
+## The pages
+
+`Stellaegis.Identity.Server` is a Razor class library: `/login`, `/login/mfa`, `/login/mfa-setup`, `/register`,
+`/verify-email`, `/forgot-password`, `/reset-password`, and under `/account` the overview, the password, the
+e-mail, the second factor and its recovery codes, the sign-in history, the deletion. The host mounts them beside
+what it serves:
+
+```csharp
+builder.Services.AddStellaegisIdentityCookie();
+builder.Services.AddStellaegisIdentityPages(builder.Configuration);        // Stellaegis:Identity:Pages
+builder.Services.AddSingleton<IIdentityMailer, MyMailer>();
+...
+app.MapStaticAssets();                  // the stylesheet, the scripts and the logo, under /_content/Stellaegis.Identity.Server
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapStellaegisIdentityPages();       // the host's MapRazorPages, with the package's pages among them
+```
+
+`MapStaticAssets()` serves the static files of the package from the manifest the build writes, in every
+environment. A host on `UseStaticFiles()` serves them too, but only in `Development` or once published.
+
+### What the pages send
+
+Four messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
+verification code, a login code, a password reset link, and the notice that an e-mail has an account already.
+Without an implementation, a host whose registration is open or whose password reset is enabled refuses to start.
+`AddStellaegisInMemoryIdentityMailer()` keeps the messages in memory, for development and tests.
+
+### Making the pages the host's own
+
+From the lightest gesture to the heaviest, each one leaving the others untouched:
+
+| Gesture | How |
+| --- | --- |
+| The name, the logo, a support link, the culture | `IdentityPagesOptions`: `ApplicationName`, `LogoPath`, `SupportUrl`, `Culture`; also `RedirectRoot`, `DefaultReturnUrl`, `PasswordResetEnabled`, `RateLimitingPolicy` |
+| A text or several | `Texts`, per culture, in the configuration: `Stellaegis:Identity:Pages:Texts:fr:Login.Title = Bienvenue`. The keys are those of `IdentityPagesResources.resx` |
+| The colors, the typography, the spacing | a stylesheet of the host that redefines the CSS variables of `identity.css`, named in `StylesheetPath` — or served at the same path, which wins over the package's |
+| A layout, a page | a file of the host at the same path — `Pages/Shared/_Layout.cshtml`, `_AuthLayout.cshtml`, `_AccountLayout.cshtml`, `Pages/Login.cshtml` — replaces the package's: ASP.NET Core resolves a page in the host first, then in the libraries |
+
+The texts come in English and in French, and the pages follow the light or dark scheme of the device. `Culture`
+fixes one; otherwise the pages follow the culture of the request, which the host's request localization decides.
+
+### What waits between two pages
+
+A login whose password held and awaits its second factor, a registration that awaits its code, a change of
+e-mail that awaits its code: each waits in a cookie of its own, protected by the data protection of the host, out
+of scripts, for ten to fifteen minutes. The registration keeps the password there until the code proves the e-mail.
+
+## Tests
+
+```powershell
+$env:STELLAEGIS_TEST_POSTGRESQL = "Host=127.0.0.1;Username=postgres;Database=postgres"
+dotnet test --solution Stellaegis.Identity.slnx
+```
+
+The PostgreSQL tests create the database `stellaegis_identity_tests` on that server if it does not exist,
+install the schema as an installer does, under that connection, and run under an ordinary role they create,
+`stellaegis_identity_app`. Without the variable they are skipped. The publishing workflow runs them against a
+PostgreSQL service and fails on a skipped test.
+
+## License
+
+MIT — see [LICENSE](https://github.com/Stellaegis/Stellaegis.Identity/blob/main/LICENSE). The packages depend on
+third-party components listed in
+[THIRD-PARTY-NOTICES.md](https://github.com/Stellaegis/Stellaegis.Identity/blob/main/THIRD-PARTY-NOTICES.md).
