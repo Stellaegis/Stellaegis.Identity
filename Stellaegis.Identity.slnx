@@ -8,5 +8,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Stellaegis.Identity.Tests/Stellaegis.Identity.Tests.csproj" />
+    <Project Path="tests/Stellaegis.Identity.Tests.HostPages/Stellaegis.Identity.Tests.HostPages.csproj" />
   </Folder>
 </Solution>
