@@ -54,7 +54,9 @@
 }
 
 .stellaegis-identity * { box-sizing: border-box; }
-.stellaegis-identity a { color: var(--si-accent); }
+/* A link is accent-colored, unless it is a button: an <a class="auth-btn"> keeps the button's colors, whatever
+   the specificity of this rule. */
+.stellaegis-identity a:not(.auth-btn) { color: var(--si-accent); }
 
 /* ── The card ──────────────────────────────────────────────────────────────── */
 .auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }

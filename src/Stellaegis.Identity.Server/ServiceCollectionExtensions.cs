@@ -29,7 +29,7 @@ public static class IdentityPagesServiceCollectionExtensions
     /// builder.Services.AddStellaegisIdentityPages(builder.Configuration);
     /// builder.Services.AddSingleton&lt;IIdentityMailer, MyMailer&gt;();   // what the pages send
     /// ...
-    /// app.UseStaticFiles();
+    /// app.MapStaticAssets();   // the stylesheet, the scripts and the logo of the pages
     /// app.UseAuthentication();
     /// app.UseAuthorization();
     /// app.MapStellaegisIdentityPages();

@@ -14,11 +14,15 @@ builder.Services.AddStellaegisIdentityPages(builder.Configuration);        // St
 builder.Services.AddSingleton<IIdentityMailer, MyMailer>();                 // what the pages send
 
 var app = builder.Build();
-app.UseStaticFiles();                   // the stylesheet and the scripts, under /_content/Stellaegis.Identity.Server
+app.MapStaticAssets();                  // the stylesheet, the scripts and the logo, under /_content/Stellaegis.Identity.Server
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapStellaegisIdentityPages();       // the host's MapRazorPages, with the package's pages among them
 ```
+
+`MapStaticAssets()` serves the static files of the package from the manifest the build writes, in every
+environment. A host on `UseStaticFiles()` serves them too, but only in `Development` or once published: the static
+web assets of a referenced library are not copied to the output of a plain build.
 
 ## What the pages send
 
