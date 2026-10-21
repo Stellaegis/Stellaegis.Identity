@@ -1,4 +1,8 @@
 <Solution>
-  <Folder Name="/src/" />
-  <Folder Name="/tests/" />
+  <Folder Name="/src/">
+    <Project Path="src/Stellaegis.Identity/Stellaegis.Identity.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Stellaegis.Identity.Tests/Stellaegis.Identity.Tests.csproj" />
+  </Folder>
 </Solution>
