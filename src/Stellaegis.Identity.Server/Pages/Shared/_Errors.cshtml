@@ -1,0 +1,10 @@
+@* The errors of the model state, under a form: the ones with no field first, then the fields'. *@
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="auth-errors" role="alert">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}

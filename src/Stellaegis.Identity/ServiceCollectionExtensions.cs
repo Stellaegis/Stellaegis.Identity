@@ -63,6 +63,20 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Registers the mailer that keeps what it is asked to send, <see cref="InMemoryIdentityMailer"/>, for
+    /// development and tests: nothing leaves the process. A host implements <see cref="IIdentityMailer"/> on its
+    /// own messaging instead. Not registered by the in-memory stores, so that a host does not start on it by
+    /// mistake.
+    /// </summary>
+    public static IServiceCollection AddStellaegisInMemoryIdentityMailer(this IServiceCollection services)
+    {
+        Guard.NotNull(services);
+        services.TryAddSingleton<InMemoryIdentityMailer>();
+        services.TryAddSingleton<IIdentityMailer>(provider => provider.GetRequiredService<InMemoryIdentityMailer>());
+        return services;
+    }
+
     private static IServiceCollection AddInMemoryStores(this IServiceCollection services)
     {
         Guard.NotNull(services);

@@ -1,0 +1,10 @@
+@* The QR code an authenticator scans, and the key for a manual entry. *@
+@model MfaEnrollment
+@if (!string.IsNullOrEmpty(Model.OtpAuthUri))
+{
+    <div class="auth-qr" data-qr="@Model.OtpAuthUri" aria-label="@T["MfaSetup.Qr"]"></div>
+    <details class="auth-details">
+        <summary>@T["MfaSetup.ManualKey"]</summary>
+        <code class="auth-secret">@Model.SecretKey</code>
+    </details>
+}

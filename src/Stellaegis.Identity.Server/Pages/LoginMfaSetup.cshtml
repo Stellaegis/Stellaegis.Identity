@@ -1,0 +1,43 @@
+@page "/login/mfa-setup"
+@model LoginMfaSetupModel
+@{
+    ViewData["Title"] = T["MfaSetup.Title"];
+    Layout = "_AuthLayout";
+}
+
+@if (Model.ShowCodes)
+{
+    <h2 class="auth-h2">@T["RecoveryCodes.Heading"]</h2>
+    <p class="auth-help"><strong>@T["RecoveryCodes.KeepNow"]</strong> @T["RecoveryCodes.Explain"]</p>
+    <ul class="auth-codes">
+        @foreach (var code in Model.Codes)
+        {
+            <li>@code</li>
+        }
+    </ul>
+    <form method="post" asp-page-handler="Continue">
+        <button class="auth-btn" type="submit">@T["RecoveryCodes.Noted"]</button>
+    </form>
+}
+else
+{
+    <h2 class="auth-h2">@T["MfaSetup.RequiredHeading"]</h2>
+    <p class="auth-help">@T["MfaSetup.RequiredHelp"]</p>
+    <partial name="_MfaEnrollment" model="Model.Enrollment" />
+    <form class="auth-form" method="post" autocomplete="off">
+        <div class="auth-field">
+            <label class="auth-label" for="Code">@T["Field.AppCode"]</label>
+            <input class="auth-input auth-input-code" asp-for="Code" type="text" inputmode="numeric" autocomplete="one-time-code" autofocus />
+        </div>
+        <button class="auth-btn" type="submit">@T["MfaSetup.ConfirmAndSignIn"]</button>
+        <partial name="_Errors" />
+    </form>
+    <div class="auth-links">
+        <a href="/login" class="auth-link">@T["Nav.BackToLogin"]</a>
+    </div>
+}
+
+@section Scripts {
+    <script src="@IdentityPagesOptions.ContentPath/qrcode.min.js"></script>
+    <script src="@IdentityPagesOptions.ContentPath/identity.js"></script>
+}

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Stellaegis.Identity.Server</RootNamespace>
+    <PackageId>Stellaegis.Identity.Server</PackageId>
+    <Description>The pages a person signs in and manages their account with — login, second factor, registration, e-mail verification, password reset, the account — as a Razor class library any ASP.NET Core host mounts beside what it serves. Texts in English and French, a stylesheet on CSS variables, and every page replaceable by the host.</Description>
+    <PackageTags>stellaegis;identity;accounts;login;razor;pages</PackageTags>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <StaticWebAssetBasePath>_content/Stellaegis.Identity.Server</StaticWebAssetBasePath>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stellaegis.Identity\Stellaegis.Identity.csproj" />
+    <ProjectReference Include="..\Stellaegis.Identity.AspNetCore\Stellaegis.Identity.AspNetCore.csproj" />
+    <PackageReference Include="Stellaegis.Primitives.AspNetCore" />
+    <InternalsVisibleTo Include="Stellaegis.Identity.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The default logo of the pages: a shield, drawn in the current text color so that it reads on any background.
+     A host names its own in Stellaegis:Identity:Pages:LogoPath. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M24 5 L39 10 V22 C39 32 32 39 24 43 C16 39 9 32 9 22 V10 Z" />
+  <path d="M17 24 L22 29 L31 18" />
+</svg>

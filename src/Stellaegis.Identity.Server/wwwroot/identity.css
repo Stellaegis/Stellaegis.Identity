@@ -1,0 +1,156 @@
+/* Stellaegis.Identity.Server — the pages a person signs in and manages their account with.
+
+   Everything that gives the pages their look is a variable below. A host restyles them by serving a stylesheet of
+   its own that redefines these variables — named in Stellaegis:Identity:Pages:StylesheetPath, or served at the
+   same path as this file, which wins over the package's — without touching a page. */
+
+.stellaegis-identity {
+    --si-bg: #f6f7f9;
+    --si-surface: #ffffff;
+    --si-border: #d9dde3;
+    --si-text: #1f2328;
+    --si-muted: #636c76;
+    --si-accent: #2f5f8f;
+    --si-accent-hover: #244b72;
+    --si-accent-text: #ffffff;
+    --si-danger: #a4262c;
+    --si-danger-bg: #fdf3f3;
+    --si-success: #1f6f3a;
+    --si-success-bg: #eef8f1;
+    --si-warning: #8a5a00;
+    --si-warning-bg: #fff8e6;
+    --si-radius: 8px;
+    --si-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --si-font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --si-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --si-card-width: 420px;
+    --si-sidebar-width: 240px;
+    margin: 0;
+    background: var(--si-bg);
+    color: var(--si-text);
+    font-family: var(--si-font);
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+@media (prefers-color-scheme: dark) {
+    .stellaegis-identity {
+        --si-bg: #1b1f24;
+        --si-surface: #242930;
+        --si-border: #3a414b;
+        --si-text: #e6e9ee;
+        --si-muted: #a2abb6;
+        --si-accent: #6ea8dc;
+        --si-accent-hover: #8fbce6;
+        --si-accent-text: #0f1419;
+        --si-danger: #f08a8e;
+        --si-danger-bg: #3a1f21;
+        --si-success: #7cd49a;
+        --si-success-bg: #1d3326;
+        --si-warning: #f0c36b;
+        --si-warning-bg: #3a3017;
+        --si-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+}
+
+.stellaegis-identity * { box-sizing: border-box; }
+.stellaegis-identity a { color: var(--si-accent); }
+
+/* ── The card ──────────────────────────────────────────────────────────────── */
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.auth-card {
+    width: 100%; max-width: var(--si-card-width); background: var(--si-surface);
+    border: 1px solid var(--si-border); border-radius: var(--si-radius); box-shadow: var(--si-shadow);
+}
+.auth-card-header { display: flex; align-items: center; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--si-border); }
+.auth-logo { width: 40px; height: 40px; }
+.auth-brand-title { font-weight: 600; font-size: 17px; }
+.auth-brand-subtitle { font-size: 13px; color: var(--si-muted); }
+.auth-card-body { padding: 24px; }
+.auth-footer { display: flex; justify-content: space-between; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--si-border); font-size: 12px; color: var(--si-muted); }
+.auth-h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+.auth-help { margin: 0 0 16px; color: var(--si-muted); }
+.auth-small { font-size: 13px; }
+
+/* ── Forms ─────────────────────────────────────────────────────────────────── */
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-label { font-size: 13px; font-weight: 600; }
+.auth-input {
+    width: 100%; padding: 10px 12px; font: inherit; color: var(--si-text); background: var(--si-surface);
+    border: 1px solid var(--si-border); border-radius: var(--si-radius);
+}
+.auth-input:focus { outline: 2px solid var(--si-accent); outline-offset: 1px; border-color: var(--si-accent); }
+.auth-input-code { letter-spacing: 6px; font-size: 22px; text-align: center; font-family: var(--si-mono); }
+.auth-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+.auth-check { display: inline-flex; align-items: center; gap: 8px; color: var(--si-muted); }
+.auth-btn {
+    display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 10px 16px;
+    font: inherit; font-weight: 600; color: var(--si-accent-text); background: var(--si-accent);
+    border: 1px solid transparent; border-radius: var(--si-radius); cursor: pointer; text-decoration: none;
+}
+.auth-btn:hover { background: var(--si-accent-hover); }
+.auth-btn-secondary { color: var(--si-accent); background: transparent; border-color: var(--si-border); }
+.auth-btn-secondary:hover { background: var(--si-bg); }
+.auth-btn-danger { color: #ffffff; background: var(--si-danger); }
+.auth-btn-danger:hover { filter: brightness(0.9); background: var(--si-danger); }
+.auth-link { background: none; border: none; padding: 0; font: inherit; color: var(--si-accent); cursor: pointer; text-decoration: underline; }
+.auth-links { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 18px; }
+.auth-links form { width: 100%; }
+.auth-errors { padding: 10px 12px; color: var(--si-danger); background: var(--si-danger-bg); border: 1px solid var(--si-danger); border-radius: var(--si-radius); font-size: 14px; }
+.auth-success { padding: 10px 12px; margin-bottom: 14px; color: var(--si-success); background: var(--si-success-bg); border: 1px solid var(--si-success); border-radius: var(--si-radius); font-size: 14px; }
+.auth-warning { padding: 10px 12px; margin-bottom: 14px; color: var(--si-warning); background: var(--si-warning-bg); border: 1px solid var(--si-warning); border-radius: var(--si-radius); font-size: 14px; }
+.auth-rules { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--si-muted); }
+.auth-codes { list-style: none; margin: 0 0 16px; padding: 14px; columns: 2; column-gap: 24px; border: 1px solid var(--si-border); border-radius: var(--si-radius); font-family: var(--si-mono); font-size: 15px; letter-spacing: 2px; }
+.auth-codes li { padding: 3px 0; break-inside: avoid; }
+.auth-qr { display: inline-block; margin-bottom: 16px; padding: 12px; background: #ffffff; border: 1px solid var(--si-border); border-radius: var(--si-radius); }
+.auth-details { margin-bottom: 16px; font-size: 13px; color: var(--si-muted); }
+.auth-details summary { cursor: pointer; }
+.auth-secret { display: block; margin-top: 8px; font-family: var(--si-mono); letter-spacing: 3px; word-break: break-all; color: var(--si-text); }
+.auth-choices { display: grid; gap: 14px; }
+.auth-choice { padding: 16px; border: 1px solid var(--si-border); border-radius: var(--si-radius); }
+.auth-choice-title { font-weight: 600; margin-bottom: 4px; }
+.auth-choice .auth-btn { width: auto; }
+
+/* The strength meter of a new password. */
+.pwd-strength { display: flex; align-items: center; gap: 10px; min-height: 18px; font-size: 12px; }
+.pwd-strength-track { flex: 1; height: 6px; background: var(--si-border); border-radius: 3px; overflow: hidden; }
+.pwd-strength-fill { width: 0; height: 100%; transition: width 0.2s; }
+
+/* ── The account ───────────────────────────────────────────────────────────── */
+.account-layout { min-height: 100vh; display: flex; flex-direction: column; }
+.account-topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: var(--si-surface); border-bottom: 1px solid var(--si-border); }
+.account-topbar-brand { display: flex; align-items: center; gap: 10px; }
+.account-topbar-logo { width: 28px; height: 28px; }
+.account-topbar-name { font-weight: 600; }
+.account-topbar-sub { color: var(--si-muted); font-size: 13px; }
+.account-topbar-user { font-size: 13px; color: var(--si-muted); }
+.account-body { flex: 1; display: flex; }
+.account-sidebar { width: var(--si-sidebar-width); padding: 16px 12px; background: var(--si-surface); border-right: 1px solid var(--si-border); display: flex; flex-direction: column; gap: 14px; }
+.account-nav-group-title { padding: 4px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--si-muted); }
+.account-nav-item { display: block; padding: 8px 10px; border-radius: var(--si-radius); color: var(--si-text); text-decoration: none; }
+.account-nav-item:hover { background: var(--si-bg); }
+.account-nav-item.active { background: var(--si-bg); font-weight: 600; color: var(--si-accent); }
+.account-nav-item.danger { color: var(--si-danger); }
+.account-sidebar-footer { margin-top: auto; }
+.account-logout-btn { width: 100%; padding: 8px 10px; font: inherit; color: var(--si-text); background: transparent; border: 1px solid var(--si-border); border-radius: var(--si-radius); cursor: pointer; }
+.account-content { flex: 1; padding: 24px; max-width: 760px; }
+.account-page-title { margin: 0 0 16px; font-size: 22px; font-weight: 600; }
+.account-profile { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.account-avatar { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: var(--si-accent); color: var(--si-accent-text); font-weight: 600; font-size: 20px; }
+.account-display-name { font-weight: 600; }
+.account-email { color: var(--si-muted); font-size: 13px; }
+.account-events { display: flex; flex-direction: column; gap: 6px; }
+.account-event { padding: 10px 14px; border: 1px solid var(--si-border); border-radius: var(--si-radius); }
+.account-event-head { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.account-event-label { font-weight: 600; }
+.account-event.ok .account-event-label { color: var(--si-success); }
+.account-event.ko .account-event-label { color: var(--si-danger); }
+.account-event time { color: var(--si-muted); font-size: 12px; }
+.account-event-meta { margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--si-muted); word-break: break-all; }
+
+@media (max-width: 720px) {
+    .account-body { flex-direction: column; }
+    .account-sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--si-border); }
+    .auth-codes { columns: 1; }
+}

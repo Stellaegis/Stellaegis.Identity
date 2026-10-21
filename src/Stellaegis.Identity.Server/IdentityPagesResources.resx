@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Account.Delete.Explain" xml:space="preserve">
+    <value>Your account is disabled at once and every session ends. Contact an administrator to restore it.</value>
+  </data>
+  <data name="Account.Delete.Irreversible" xml:space="preserve">
+    <value>This cannot be undone.</value>
+  </data>
+  <data name="Account.Delete.Submit" xml:space="preserve">
+    <value>Delete my account</value>
+  </data>
+  <data name="Account.Delete.Title" xml:space="preserve">
+    <value>Delete the account</value>
+  </data>
+  <data name="Account.Email.CodeSent" xml:space="preserve">
+    <value>A code was sent to {0}. Enter it to confirm the new e-mail.</value>
+  </data>
+  <data name="Account.Email.Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="Account.Email.Current" xml:space="preserve">
+    <value>Current e-mail: {0}</value>
+  </data>
+  <data name="Account.Email.NoMailer" xml:space="preserve">
+    <value>The e-mail cannot be changed here: no mail is sent by this host.</value>
+  </data>
+  <data name="Account.Email.SendCode" xml:space="preserve">
+    <value>Send the verification code</value>
+  </data>
+  <data name="Account.Email.StartOver" xml:space="preserve">
+    <value>Start over</value>
+  </data>
+  <data name="Account.Email.Title" xml:space="preserve">
+    <value>Change the e-mail</value>
+  </data>
+  <data name="Account.Logout" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Account.Mfa.ActiveApp" xml:space="preserve">
+    <value>Enabled, by authenticator app</value>
+  </data>
+  <data name="Account.Mfa.ActiveEmail" xml:space="preserve">
+    <value>Enabled, by e-mail</value>
+  </data>
+  <data name="Account.Mfa.AppEnabled" xml:space="preserve">
+    <value>Two-step verification is enabled.</value>
+  </data>
+  <data name="Account.Mfa.AppHelp" xml:space="preserve">
+    <value>Codes generated on your phone by Google Authenticator, Authy, Bitwarden, 1Password… Works offline.</value>
+  </data>
+  <data name="Account.Mfa.AppSetup" xml:space="preserve">
+    <value>Set up</value>
+  </data>
+  <data name="Account.Mfa.AppTitle" xml:space="preserve">
+    <value>Authenticator app</value>
+  </data>
+  <data name="Account.Mfa.Disable" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="Account.Mfa.DisableHelp" xml:space="preserve">
+    <value>To disable two-step verification, confirm your password.</value>
+  </data>
+  <data name="Account.Mfa.Disabled" xml:space="preserve">
+    <value>Two-step verification is disabled.</value>
+  </data>
+  <data name="Account.Mfa.EmailEnable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="Account.Mfa.EmailEnabled" xml:space="preserve">
+    <value>Two-step verification by e-mail is enabled.</value>
+  </data>
+  <data name="Account.Mfa.EmailHelp" xml:space="preserve">
+    <value>A code is sent to your e-mail at each sign-in.</value>
+  </data>
+  <data name="Account.Mfa.EmailNoMailer" xml:space="preserve">
+    <value>The code by e-mail is not available: no mail is sent by this host.</value>
+  </data>
+  <data name="Account.Mfa.EmailTitle" xml:space="preserve">
+    <value>Code by e-mail</value>
+  </data>
+  <data name="Account.Mfa.Explain" xml:space="preserve">
+    <value>Two-step verification adds a layer: besides your password, a one-time code is asked at each sign-in.</value>
+  </data>
+  <data name="Account.Mfa.Since" xml:space="preserve">
+    <value>since {0:g}</value>
+  </data>
+  <data name="Account.Mfa.Title" xml:space="preserve">
+    <value>Two-step verification</value>
+  </data>
+  <data name="Account.Nav.Account" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="Account.Nav.Delete" xml:space="preserve">
+    <value>Delete the account</value>
+  </data>
+  <data name="Account.Nav.Email" xml:space="preserve">
+    <value>E-mail</value>
+  </data>
+  <data name="Account.Nav.Logins" xml:space="preserve">
+    <value>Sign-in history</value>
+  </data>
+  <data name="Account.Nav.Mfa" xml:space="preserve">
+    <value>Two-step verification</value>
+  </data>
+  <data name="Account.Nav.Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Account.Nav.Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Account.Nav.Profile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="Account.Nav.RecoveryCodes" xml:space="preserve">
+    <value>Recovery codes</value>
+  </data>
+  <data name="Account.Nav.Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Account.Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Account.OverviewHelp" xml:space="preserve">
+    <value>Use the menu to manage your profile, your security and your account.</value>
+  </data>
+  <data name="Account.Password.Changed" xml:space="preserve">
+    <value>Your password is changed.</value>
+  </data>
+  <data name="Account.Password.Submit" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Account.Password.Title" xml:space="preserve">
+    <value>Change the password</value>
+  </data>
+  <data name="Account.Security.Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="Account.Security.Help" xml:space="preserve">
+    <value>The last 20 attempts to sign in to your account.</value>
+  </data>
+  <data name="Account.Security.LockedOut" xml:space="preserve">
+    <value>Account locked</value>
+  </data>
+  <data name="Account.Security.None" xml:space="preserve">
+    <value>No attempt recorded.</value>
+  </data>
+  <data name="Account.Security.Succeeded" xml:space="preserve">
+    <value>Signed in</value>
+  </data>
+  <data name="Account.Security.Title" xml:space="preserve">
+    <value>Sign-in history</value>
+  </data>
+  <data name="Account.Security.WrongPassword" xml:space="preserve">
+    <value>Wrong password</value>
+  </data>
+  <data name="Account.Title" xml:space="preserve">
+    <value>My account</value>
+  </data>
+  <data name="Error.Account.Blocked" xml:space="preserve">
+    <value>This account is blocked.</value>
+  </data>
+  <data name="Error.Account.LockedOut" xml:space="preserve">
+    <value>Too many failed attempts: the account is locked for a while. Try again later.</value>
+  </data>
+  <data name="Error.Account.NotFound" xml:space="preserve">
+    <value>The account was not found.</value>
+  </data>
+  <data name="Error.Credentials.Invalid" xml:space="preserve">
+    <value>Wrong e-mail or password.</value>
+  </data>
+  <data name="Error.Email.AlreadyVerified" xml:space="preserve">
+    <value>The e-mail is verified already.</value>
+  </data>
+  <data name="Error.Email.NotVerified" xml:space="preserve">
+    <value>The e-mail is not verified.</value>
+  </data>
+  <data name="Error.Email.Same" xml:space="preserve">
+    <value>This is already your e-mail.</value>
+  </data>
+  <data name="Error.Email.Taken" xml:space="preserve">
+    <value>Another account has this e-mail.</value>
+  </data>
+  <data name="Error.Mfa.Invalid" xml:space="preserve">
+    <value>Wrong code.</value>
+  </data>
+  <data name="Error.Mfa.NotPending" xml:space="preserve">
+    <value>No two-step verification is being set up.</value>
+  </data>
+  <data name="Error.Password.InvalidCurrent" xml:space="preserve">
+    <value>The current password is wrong.</value>
+  </data>
+  <data name="Error.Password.Rejected" xml:space="preserve">
+    <value>The password does not meet the rules.</value>
+  </data>
+  <data name="Error.PasswordReset.Expired" xml:space="preserve">
+    <value>This link has expired. Ask for a new one.</value>
+  </data>
+  <data name="Error.PasswordReset.Invalid" xml:space="preserve">
+    <value>This link is invalid or already used.</value>
+  </data>
+  <data name="Error.Registration.ByInvitation" xml:space="preserve">
+    <value>Registration is by invitation.</value>
+  </data>
+  <data name="Error.Registration.Closed" xml:space="preserve">
+    <value>Registration is closed.</value>
+  </data>
+  <data name="Error.Verification.Expired" xml:space="preserve">
+    <value>The code has expired. Ask for a new one.</value>
+  </data>
+  <data name="Error.Verification.Invalid" xml:space="preserve">
+    <value>Wrong code.</value>
+  </data>
+  <data name="Error.Verification.NotPending" xml:space="preserve">
+    <value>No verification is pending. Start over.</value>
+  </data>
+  <data name="Error.Verification.TooManyAttempts" xml:space="preserve">
+    <value>Too many wrong codes. Ask for a new one.</value>
+  </data>
+  <data name="Field.AppCode" xml:space="preserve">
+    <value>Code shown by your authenticator</value>
+  </data>
+  <data name="Field.Code" xml:space="preserve">
+    <value>Verification code</value>
+  </data>
+  <data name="Field.Code.Required" xml:space="preserve">
+    <value>Enter the code.</value>
+  </data>
+  <data name="Field.ConfirmPassword" xml:space="preserve">
+    <value>Confirm the password</value>
+  </data>
+  <data name="Field.ConfirmPassword.Mismatch" xml:space="preserve">
+    <value>The passwords do not match.</value>
+  </data>
+  <data name="Field.ConfirmWithPassword" xml:space="preserve">
+    <value>Confirm with your password</value>
+  </data>
+  <data name="Field.CurrentPassword" xml:space="preserve">
+    <value>Current password</value>
+  </data>
+  <data name="Field.CurrentPassword.Required" xml:space="preserve">
+    <value>Enter your current password.</value>
+  </data>
+  <data name="Field.DisplayName" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Field.DisplayName.Invalid" xml:space="preserve">
+    <value>The display name has 2 to 100 characters.</value>
+  </data>
+  <data name="Field.Email" xml:space="preserve">
+    <value>E-mail</value>
+  </data>
+  <data name="Field.Email.Invalid" xml:space="preserve">
+    <value>Enter a valid e-mail.</value>
+  </data>
+  <data name="Field.NewEmail" xml:space="preserve">
+    <value>New e-mail</value>
+  </data>
+  <data name="Field.NewPassword" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="Field.Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Field.Password.Wrong" xml:space="preserve">
+    <value>Wrong password.</value>
+  </data>
+  <data name="Forgot.Heading" xml:space="preserve">
+    <value>Reset your password</value>
+  </data>
+  <data name="Forgot.Help" xml:space="preserve">
+    <value>Enter your e-mail. If an account has it, you will receive a link to reset your password.</value>
+  </data>
+  <data name="Forgot.SentHeading" xml:space="preserve">
+    <value>Check your mailbox</value>
+  </data>
+  <data name="Forgot.SentHelp" xml:space="preserve">
+    <value>If an account has this e-mail, a message with a reset link is on its way. The link works for {0} hour(s).</value>
+  </data>
+  <data name="Forgot.SentSpam" xml:space="preserve">
+    <value>Nothing after a few minutes? Check your spam folder.</value>
+  </data>
+  <data name="Forgot.Submit" xml:space="preserve">
+    <value>Send the link</value>
+  </data>
+  <data name="Forgot.Title" xml:space="preserve">
+    <value>Forgot password</value>
+  </data>
+  <data name="Layout.Secure" xml:space="preserve">
+    <value>Encrypted connection (HTTPS).</value>
+  </data>
+  <data name="Layout.Support" xml:space="preserve">
+    <value>Need help?</value>
+  </data>
+  <data name="Login.AccountDeleted" xml:space="preserve">
+    <value>Your account is deleted.</value>
+  </data>
+  <data name="Login.CodeNotSent" xml:space="preserve">
+    <value>The login code could not be sent. Contact your administrator.</value>
+  </data>
+  <data name="Login.EmailChanged" xml:space="preserve">
+    <value>Your e-mail is changed. Sign in again with the new one.</value>
+  </data>
+  <data name="Login.Forgot" xml:space="preserve">
+    <value>Forgot your password?</value>
+  </data>
+  <data name="Login.Heading" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Login.Help" xml:space="preserve">
+    <value>Enter your e-mail and your password.</value>
+  </data>
+  <data name="Login.Register" xml:space="preserve">
+    <value>Create an account</value>
+  </data>
+  <data name="Login.Registered" xml:space="preserve">
+    <value>Your account is created. You can sign in.</value>
+  </data>
+  <data name="Login.RememberMe" xml:space="preserve">
+    <value>Keep me signed in</value>
+  </data>
+  <data name="Login.Required" xml:space="preserve">
+    <value>Enter your e-mail and your password.</value>
+  </data>
+  <data name="Login.Submit" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Login.Title" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Mfa.CodeInvalid" xml:space="preserve">
+    <value>Wrong or expired code. Try again.</value>
+  </data>
+  <data name="Mfa.CodeRequired" xml:space="preserve">
+    <value>Enter the code.</value>
+  </data>
+  <data name="Mfa.Heading" xml:space="preserve">
+    <value>Verification code</value>
+  </data>
+  <data name="Mfa.HelpApp" xml:space="preserve">
+    <value>Enter the code shown by your authenticator app.</value>
+  </data>
+  <data name="Mfa.HelpEmail" xml:space="preserve">
+    <value>A code was sent to your e-mail. Enter it below.</value>
+  </data>
+  <data name="Mfa.RecoveryHint" xml:space="preserve">
+    <value>Authenticator unavailable? Enter one of your recovery codes instead.</value>
+  </data>
+  <data name="Mfa.Submit" xml:space="preserve">
+    <value>Verify</value>
+  </data>
+  <data name="Mfa.Title" xml:space="preserve">
+    <value>Two-step verification</value>
+  </data>
+  <data name="MfaSetup.CodeInvalid" xml:space="preserve">
+    <value>Wrong code. Check the time of your phone and try again.</value>
+  </data>
+  <data name="MfaSetup.Confirm" xml:space="preserve">
+    <value>Confirm and enable</value>
+  </data>
+  <data name="MfaSetup.ConfirmAndSignIn" xml:space="preserve">
+    <value>Confirm and sign in</value>
+  </data>
+  <data name="MfaSetup.Help" xml:space="preserve">
+    <value>Scan this QR code with your authenticator app (Google Authenticator, Authy, Bitwarden, 1Password…), then enter the code it shows.</value>
+  </data>
+  <data name="MfaSetup.ManualKey" xml:space="preserve">
+    <value>Enter the key by hand</value>
+  </data>
+  <data name="MfaSetup.Qr" xml:space="preserve">
+    <value>QR code to scan</value>
+  </data>
+  <data name="MfaSetup.RequiredHeading" xml:space="preserve">
+    <value>Two-step verification is required</value>
+  </data>
+  <data name="MfaSetup.RequiredHelp" xml:space="preserve">
+    <value>Two-step verification is required here. Scan this QR code with your authenticator app, then enter the code it shows to finish signing in.</value>
+  </data>
+  <data name="MfaSetup.Title" xml:space="preserve">
+    <value>Set up two-step verification</value>
+  </data>
+  <data name="Nav.BackToLogin" xml:space="preserve">
+    <value>Back to sign in</value>
+  </data>
+  <data name="Nav.SignIn" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Password.Rule.Digit" xml:space="preserve">
+    <value>A digit.</value>
+  </data>
+  <data name="Password.Rule.Lowercase" xml:space="preserve">
+    <value>A lowercase letter.</value>
+  </data>
+  <data name="Password.Rule.MaxLength" xml:space="preserve">
+    <value>At most {0} characters.</value>
+  </data>
+  <data name="Password.Rule.MinLength" xml:space="preserve">
+    <value>At least {0} characters.</value>
+  </data>
+  <data name="Password.Rule.Special" xml:space="preserve">
+    <value>A character that is neither a letter nor a digit.</value>
+  </data>
+  <data name="Password.Rule.Uppercase" xml:space="preserve">
+    <value>An uppercase letter.</value>
+  </data>
+  <data name="Password.Strength.Fair" xml:space="preserve">
+    <value>Fair</value>
+  </data>
+  <data name="Password.Strength.Strong" xml:space="preserve">
+    <value>Strong</value>
+  </data>
+  <data name="Password.Strength.VeryStrong" xml:space="preserve">
+    <value>Very strong</value>
+  </data>
+  <data name="Password.Strength.Weak" xml:space="preserve">
+    <value>Weak</value>
+  </data>
+  <data name="RecoveryCodes.Explain" xml:space="preserve">
+    <value>Each works once and lets you sign in when your authenticator is unavailable. They will never be shown again.</value>
+  </data>
+  <data name="RecoveryCodes.Heading" xml:space="preserve">
+    <value>Your recovery codes</value>
+  </data>
+  <data name="RecoveryCodes.KeepNow" xml:space="preserve">
+    <value>Keep these recovery codes now.</value>
+  </data>
+  <data name="RecoveryCodes.Noted" xml:space="preserve">
+    <value>I kept my codes — continue</value>
+  </data>
+  <data name="RecoveryCodes.NotedDone" xml:space="preserve">
+    <value>I kept my codes — done</value>
+  </data>
+  <data name="RecoveryCodes.Regenerate" xml:space="preserve">
+    <value>Generate new codes</value>
+  </data>
+  <data name="RecoveryCodes.RegenerateWarning" xml:space="preserve">
+    <value>A new set voids the previous codes at once.</value>
+  </data>
+  <data name="RecoveryCodes.Remaining" xml:space="preserve">
+    <value>Recovery codes left: {0}</value>
+  </data>
+  <data name="RecoveryCodes.ShownOnce" xml:space="preserve">
+    <value>Recovery codes let you sign in when your authenticator is unavailable. They are shown only when generated.</value>
+  </data>
+  <data name="RecoveryCodes.Title" xml:space="preserve">
+    <value>Recovery codes</value>
+  </data>
+  <data name="Register.ClosedHeading" xml:space="preserve">
+    <value>Registration is closed</value>
+  </data>
+  <data name="Register.ClosedHelp" xml:space="preserve">
+    <value>Accounts are created by an administrator. Sign in with the one you were given.</value>
+  </data>
+  <data name="Register.Heading" xml:space="preserve">
+    <value>Create an account</value>
+  </data>
+  <data name="Register.Help" xml:space="preserve">
+    <value>Enter your details to create your account.</value>
+  </data>
+  <data name="Register.Submit" xml:space="preserve">
+    <value>Create my account</value>
+  </data>
+  <data name="Register.Title" xml:space="preserve">
+    <value>Create an account</value>
+  </data>
+  <data name="Reset.AskAgain" xml:space="preserve">
+    <value>Ask for a new one.</value>
+  </data>
+  <data name="Reset.DoneHeading" xml:space="preserve">
+    <value>Password changed</value>
+  </data>
+  <data name="Reset.DoneHelp" xml:space="preserve">
+    <value>Your password is reset. You can sign in with the new one.</value>
+  </data>
+  <data name="Reset.Heading" xml:space="preserve">
+    <value>Choose a new password</value>
+  </data>
+  <data name="Reset.InvalidHeading" xml:space="preserve">
+    <value>Invalid link</value>
+  </data>
+  <data name="Reset.InvalidHelp" xml:space="preserve">
+    <value>This link is invalid, expired or already used.</value>
+  </data>
+  <data name="Reset.Submit" xml:space="preserve">
+    <value>Save the password</value>
+  </data>
+  <data name="Reset.Title" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="VerifyEmail.ChangeDetails" xml:space="preserve">
+    <value>Change my details</value>
+  </data>
+  <data name="VerifyEmail.Heading" xml:space="preserve">
+    <value>Verify your e-mail</value>
+  </data>
+  <data name="VerifyEmail.Help" xml:space="preserve">
+    <value>A code was sent to {0}. Enter it below to create your account.</value>
+  </data>
+  <data name="VerifyEmail.Resend" xml:space="preserve">
+    <value>Send the code again</value>
+  </data>
+  <data name="VerifyEmail.Resent" xml:space="preserve">
+    <value>A new code was sent.</value>
+  </data>
+  <data name="VerifyEmail.SendFailed" xml:space="preserve">
+    <value>The code could not be sent. Use Send the code again below.</value>
+  </data>
+  <data name="VerifyEmail.Submit" xml:space="preserve">
+    <value>Verify and create the account</value>
+  </data>
+  <data name="VerifyEmail.Title" xml:space="preserve">
+    <value>Verify your e-mail</value>
+  </data>
+</root>

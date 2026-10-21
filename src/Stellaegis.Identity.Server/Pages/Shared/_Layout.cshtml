@@ -1,0 +1,23 @@
+@*
+    The shell of every page: the document, its stylesheet and its title. A host replaces it by placing its own
+    Pages/Shared/_Layout.cshtml; the two layouts below it — _AuthLayout for the card, _AccountLayout for the
+    account — render inside it.
+*@
+@{
+    var o = PagesOptions.Value;
+}
+<!DOCTYPE html>
+<html lang="@System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>@ViewData["Title"] · @o.ApplicationName</title>
+    <link rel="stylesheet" href="@o.StylesheetPath" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="stellaegis-identity">
+    @RenderBody()
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

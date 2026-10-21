@@ -1,0 +1,39 @@
+@*
+    The card a person signs in, registers or resets a password in: the logo and the name of the application
+    above, the page in the middle, the support link below.
+*@
+@{
+    Layout = "_Layout";
+    var o = PagesOptions.Value;
+}
+<main class="auth-page" role="main">
+    <section class="auth-card" aria-label="@ViewData["Title"]">
+        <header class="auth-card-header">
+            @if (!string.IsNullOrEmpty(o.LogoPath))
+            {
+                <img class="auth-logo" src="@o.LogoPath" alt="" />
+            }
+            <div class="auth-brand">
+                <div class="auth-brand-title">@o.ApplicationName</div>
+                <div class="auth-brand-subtitle">@ViewData["Title"]</div>
+            </div>
+        </header>
+        <div class="auth-card-body">
+            @RenderBody()
+        </div>
+        <footer class="auth-footer">
+            <span>@T["Layout.Secure"]</span>
+            @if (!string.IsNullOrEmpty(o.SupportUrl))
+            {
+                <a class="auth-link" href="@o.SupportUrl">@T["Layout.Support"]</a>
+            }
+        </footer>
+    </section>
+</main>
+
+@section Styles {
+    @await RenderSectionAsync("Styles", required: false)
+}
+@section Scripts {
+    @await RenderSectionAsync("Scripts", required: false)
+}
