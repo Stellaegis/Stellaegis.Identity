@@ -57,7 +57,7 @@ internal static class WebTestHost
     public static async Task<Guid> CreateAccountAsync(this WebApplication app, string email, string password = "Correct-Horse-9", CancellationToken ct = default)
     {
         using var scope = app.Services.CreateScope();
-        var created = await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().CreateAsync(email, "Jane", TokenDelivery.Hand, Actor.Parse("admin"), ct);
+        var created = await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().CreateAsync(email, "Jane", TokenDelivery.Email, Actor.Parse("admin"), ct);
         Assert.True(created.IsSuccess, created.Error?.ToString());
         var activated = await scope.ServiceProvider.GetRequiredService<ActivationService>().ActivateAsync(created.Value.ActivationToken, password, ct);
         Assert.True(activated.IsSuccess, activated.Error?.ToString());

@@ -544,4 +544,13 @@
   <data name="Error.Activation.Invalid" xml:space="preserve">
     <value>This link is invalid or already used.</value>
   </data>
+  <data name="Account.Email.Verified" xml:space="preserve">
+    <value>This address is verified.</value>
+  </data>
+  <data name="Account.Email.Unverified" xml:space="preserve">
+    <value>This address was never verified: a forgotten password cannot be reset by e-mail until it is.</value>
+  </data>
+  <data name="Account.Email.Verify" xml:space="preserve">
+    <value>Verify the address</value>
+  </data>
 </root>

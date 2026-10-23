@@ -53,6 +53,7 @@ public sealed class RegistrationService(
             DisplayName = Guard.NotWhiteSpace(displayName).Trim(),
             PasswordHash = hasher.Hash(password),
             IsEnabled = true,
+            EmailVerified = true,
             CreatedAt = now,
             CreatedBy = self,
             ModifiedAt = now,

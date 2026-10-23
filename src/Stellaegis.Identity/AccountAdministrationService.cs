@@ -51,6 +51,7 @@ public sealed class AccountAdministrationService(
             DisplayName = Guard.NotWhiteSpace(displayName).Trim(),
             PasswordHash = null,
             IsEnabled = true,
+            EmailVerified = false,
             CreatedAt = now,
             CreatedBy = actor,
             ModifiedAt = now,
@@ -96,6 +97,9 @@ public sealed class AccountAdministrationService(
             return Result.Failure<IssuedToken>(IdentityErrors.AccountBlocked);
         if (!user.IsActivated)
             return Result.Failure<IssuedToken>(IdentityErrors.AccountNotActivated);
+        // A reset link by e-mail to an address never proven could reach whoever holds a mistyped one.
+        if (delivery == TokenDelivery.Email && !user.EmailVerified)
+            return Result.Failure<IssuedToken>(IdentityErrors.EmailNotVerified);
         var token = await tokens.IssueAsync(user, AccountTokenPurpose.PasswordReset, delivery, actor, clock.GetUtcNow(), options.Value.PasswordReset.TokenLifetime, null, cancellationToken);
         logger.LogInformation("Password reset of {UserUniqueId} issued by {Actor}", userUniqueId, actor);
         return Result.Success(new IssuedToken(user.Email, token));

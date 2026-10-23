@@ -216,6 +216,45 @@ public sealed class AdministrationTests
         Assert.True((await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Succeeded);
         var activated = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(created.Value.UserUniqueId))!;
         Assert.Equal(activated.AsActor(), activated.ModifiedBy);   // the person chose it, nobody else
+        Assert.True(activated.EmailVerified);   // the link reached the address the system mailed it to
+    }
+
+    [Fact]
+    public async Task A_link_handed_over_proves_nothing_and_no_reset_is_mailed_to_an_address_never_proven()
+    {
+        using var host = new TestHost();
+        var administration = host.Get<AccountAdministrationService>();
+        var created = (await administration.CreateAsync("jane@acme.test", "Jane", TokenDelivery.Hand, Admin)).Value;
+        Assert.True((await host.Get<ActivationService>().ActivateAsync(created.ActivationToken, "Correct-Horse-9")).IsSuccess);
+        var users = host.Get<IAuthUserStore>();
+        Assert.False((await users.GetByUniqueIdAsync(created.UserUniqueId))!.EmailVerified);
+
+        // The address may be mistyped: whoever holds it would receive the reset link.
+        Assert.Null(await host.Get<PasswordResetService>().RequestResetAsync("jane@acme.test"));
+        Assert.Equal(IdentityErrors.EmailNotVerified, (await administration.IssuePasswordResetAsync(created.UserUniqueId, TokenDelivery.Email, Admin)).Error);
+
+        // Handed over, the reset works, and proves the address no more.
+        var byHand = await administration.IssuePasswordResetAsync(created.UserUniqueId, TokenDelivery.Hand, Admin);
+        Assert.True((await host.Get<PasswordResetService>().ResetPasswordAsync(byHand.Value.Token, "New-Horse-10")).IsSuccess);
+        Assert.False((await users.GetByUniqueIdAsync(created.UserUniqueId))!.EmailVerified);
+    }
+
+    [Fact]
+    public async Task The_current_address_is_proven_by_a_code_and_then_receives_the_reset()
+    {
+        using var host = new TestHost();
+        var created = (await host.Get<AccountAdministrationService>().CreateAsync("jane@acme.test", "Jane", TokenDelivery.Hand, Admin)).Value;
+        await host.Get<ActivationService>().ActivateAsync(created.ActivationToken, "Correct-Horse-9");
+        var account = host.Get<AccountService>();
+
+        var code = await account.RequestEmailVerificationAsync(created.UserUniqueId);
+        Assert.True(code.IsSuccess);
+        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await account.ConfirmEmailVerificationAsync(created.UserUniqueId, "000000" == code.Value ? "111111" : "000000")).Error);
+        Assert.True((await account.ConfirmEmailVerificationAsync(created.UserUniqueId, code.Value)).IsSuccess);
+
+        Assert.True((await host.Get<IAuthUserStore>().GetByUniqueIdAsync(created.UserUniqueId))!.EmailVerified);
+        Assert.Equal(IdentityErrors.EmailAlreadyVerified, (await account.RequestEmailVerificationAsync(created.UserUniqueId)).Error);
+        Assert.NotNull(await host.Get<PasswordResetService>().RequestResetAsync("jane@acme.test"));
     }
 
     [Fact]

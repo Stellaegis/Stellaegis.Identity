@@ -59,9 +59,11 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         Assert.Equal(Actor.Parse("admin"), byId.CreatedBy);
         Assert.Equal(_clock.Now, byId.CreatedAt);
         Assert.Null(byId.DeletedBy);
+        Assert.False(byId.EmailVerified);
         Assert.Equal(user.UserUniqueId, byEmail!.UserUniqueId);
 
         byId.DisplayName = "Jane Doe";
+        byId.EmailVerified = true;
         byId.FailedLoginCount = 2;
         byId.BlockedUntil = _clock.Now.AddMinutes(15);
         byId.LastLogin = _clock.Now;
@@ -70,6 +72,7 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         var updated = await Users.GetByUniqueIdAsync(user.UserUniqueId, Ct);
         Assert.Equal("Jane Doe", updated!.DisplayName);
         Assert.Equal(2, updated.FailedLoginCount);
+        Assert.True(updated.EmailVerified);
         Assert.Equal(_clock.Now.AddMinutes(15), updated.BlockedUntil);
         Assert.Equal(byId.AsActor(), updated.ModifiedBy);
 

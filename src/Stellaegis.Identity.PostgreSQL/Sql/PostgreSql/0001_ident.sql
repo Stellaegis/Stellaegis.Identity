@@ -24,6 +24,7 @@ create table ident.users (
   display_name         varchar(200)  not null,
   password_hash        varchar(2000),          -- null while the account waits for its activation
   is_enabled           boolean       not null,
+  email_verified       boolean       not null,
 
   -- Lockout after failed logins; not a block at the door.
   failed_login_count   integer       not null default 0,
@@ -53,6 +54,7 @@ create table ident.users (
 comment on table  ident.users                is 'The accounts: who can sign in, with which e-mail and which password. The second factor and the recovery codes are kept apart.';
 comment on column ident.users.user_unique_id is 'The identity of the account, which its sub claim carries. Never reused: a deleted account stays, marked.';
 comment on column ident.users.email          is 'Lowercase and trimmed by the module before it reaches the store. Unique among the accounts, deleted ones included.';
+comment on column ident.users.email_verified is 'Whether the e-mail was proven: a code, or a link the system sent there. While it was not, no reset link is sent to it.';
 comment on column ident.users.created_by     is 'The actor who created the account: the person themselves, or an administrator. Never a default.';
 comment on column ident.users.deleted_by     is 'The actor who deleted the account; null while it is not deleted.';
 

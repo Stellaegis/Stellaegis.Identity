@@ -75,11 +75,44 @@ public sealed class AccountService(
             return Result.Failure(IdentityErrors.AccountNotFound);
 
         user.Email = normalized;
+        user.EmailVerified = true;
         user.ModifiedAt = clock.GetUtcNow();
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
         await emailVerification.CleanupAsync(normalized, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed", userUniqueId);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Starts the verification of the account's current e-mail, never proven, by issuing a code the host sends there.
+    /// </summary>
+    public async Task<Result<string>> RequestEmailVerificationAsync(Guid userUniqueId, string? ipAddress = null, CancellationToken cancellationToken = default)
+    {
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+        if (user is null || !user.IsEnabled)
+            return Result.Failure<string>(IdentityErrors.AccountNotFound);
+        if (user.EmailVerified)
+            return Result.Failure<string>(IdentityErrors.EmailAlreadyVerified);
+        await emailVerification.CleanupAsync(user.Email, cancellationToken);
+        return await emailVerification.RequestVerificationAsync(user.Email, ipAddress, cancellationToken);
+    }
+
+    /// <summary>Marks the account's current e-mail verified once <paramref name="code"/> proves it.</summary>
+    public async Task<Result> ConfirmEmailVerificationAsync(Guid userUniqueId, string? code, CancellationToken cancellationToken = default)
+    {
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+        if (user is null || !user.IsEnabled)
+            return Result.Failure(IdentityErrors.AccountNotFound);
+        var verified = await emailVerification.VerifyCodeAsync(user.Email, code, cancellationToken);
+        if (verified.IsFailure)
+            return verified;
+        user.EmailVerified = true;
+        user.ModifiedAt = clock.GetUtcNow();
+        user.ModifiedBy = user.AsActor();
+        await users.UpdateAsync(user, cancellationToken);
+        await emailVerification.CleanupAsync(user.Email, cancellationToken);
+        logger.LogInformation("E-mail of {UserUniqueId} verified", userUniqueId);
         return Result.Success();
     }
 

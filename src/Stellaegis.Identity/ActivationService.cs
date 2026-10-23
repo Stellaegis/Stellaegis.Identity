@@ -46,6 +46,7 @@ public sealed class ActivationService(
             return Result.Failure(IdentityErrors.InvalidActivationToken);
 
         user.PasswordHash = hasher.Hash(password);
+        user.EmailVerified |= stored.Delivery == TokenDelivery.Email;   // the link reached the address the system sent it to
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);

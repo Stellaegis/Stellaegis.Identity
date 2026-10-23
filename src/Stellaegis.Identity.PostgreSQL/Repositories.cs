@@ -9,7 +9,7 @@ namespace Stellaegis.Identity.PostgreSQL;
 internal sealed class UserRepository(DbConnection connection, Func<DbTransaction?> transaction)
 {
     private const string Columns =
-        "user_unique_id, email, display_name, password_hash, is_enabled, failed_login_count, failed_login_last, " +
+        "user_unique_id, email, display_name, password_hash, is_enabled, email_verified, failed_login_count, failed_login_last, " +
         "blocked_until, created_at, created_by, modified_at, modified_by, last_login, is_deleted, deleted_at, deleted_by";
 
     static UserRepository()
@@ -72,12 +72,12 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         => connection.ExecuteAsync(new CommandDefinition(
             """
             insert into ident.users (
-                user_unique_id, email, display_name, password_hash, is_enabled,
+                user_unique_id, email, display_name, password_hash, is_enabled, email_verified,
                 failed_login_count, failed_login_last, blocked_until,
                 created_at, created_by, modified_at, modified_by, last_login,
                 is_deleted, deleted_at, deleted_by)
             values (
-                @UserUniqueId, @Email, @DisplayName, @PasswordHash, @IsEnabled,
+                @UserUniqueId, @Email, @DisplayName, @PasswordHash, @IsEnabled, @EmailVerified,
                 @FailedLoginCount, @FailedLoginLast, @BlockedUntil,
                 @CreatedAt, @CreatedBy, @ModifiedAt, @ModifiedBy, @LastLogin,
                 @IsDeleted, @DeletedAt, @DeletedBy)
@@ -93,6 +93,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
                 display_name = @DisplayName,
                 password_hash = @PasswordHash,
                 is_enabled = @IsEnabled,
+                email_verified = @EmailVerified,
                 failed_login_count = @FailedLoginCount,
                 failed_login_last = @FailedLoginLast,
                 blocked_until = @BlockedUntil,
@@ -125,6 +126,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         public string DisplayName { get; set; } = "";
         public string? PasswordHash { get; set; }
         public bool IsEnabled { get; set; }
+        public bool EmailVerified { get; set; }
         public int FailedLoginCount { get; set; }
         public DateTimeOffset? FailedLoginLast { get; set; }
         public DateTimeOffset? BlockedUntil { get; set; }
@@ -144,6 +146,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             DisplayName = user.DisplayName,
             PasswordHash = user.PasswordHash,
             IsEnabled = user.IsEnabled,
+            EmailVerified = user.EmailVerified,
             FailedLoginCount = user.FailedLoginCount,
             FailedLoginLast = user.FailedLoginLast,
             BlockedUntil = user.BlockedUntil,
@@ -164,6 +167,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             DisplayName = DisplayName,
             PasswordHash = PasswordHash,
             IsEnabled = IsEnabled,
+            EmailVerified = EmailVerified,
             FailedLoginCount = FailedLoginCount,
             FailedLoginLast = FailedLoginLast,
             BlockedUntil = BlockedUntil,

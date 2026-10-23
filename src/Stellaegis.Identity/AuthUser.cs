@@ -24,6 +24,14 @@ public sealed class AuthUser
     /// </remarks>
     public string? PasswordHash { get; set; }
 
+    /// <summary>
+    /// Whether the e-mail is proven to reach the person: by the code of a registration or of a change of address, by
+    /// a link the system sent there. A link handed over by an administrator proves nothing. While it is not, no
+    /// link is sent there by e-mail to reset the password: a mistyped address would hand the account to whoever
+    /// holds it.
+    /// </summary>
+    public bool EmailVerified { get; set; }
+
     /// <summary>Whether the account has a password: created by its person, or activated.</summary>
     public bool IsActivated => PasswordHash is not null;
 

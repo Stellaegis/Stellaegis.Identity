@@ -311,6 +311,32 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task An_address_never_proven_is_verified_from_the_account_page_by_a_code()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        using (var scope = app.Services.CreateScope())
+        {
+            var created = await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().CreateAsync(Email, "Jane", TokenDelivery.Hand, Stellaegis.Primitives.Actor.Parse("admin"), Ct);
+            await scope.ServiceProvider.GetRequiredService<ActivationService>().ActivateAsync(created.Value.ActivationToken, Password, Ct);
+        }
+        var browser = new Browser(app);
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+
+        await browser.GetAsync("/account/email", Ct);
+        Assert.Contains("This address was never verified", browser.Html);
+
+        var asked = await browser.PostFormAsync("/account/email", new Dictionary<string, string>(), Ct, postPath: "/account/email?handler=Verify");
+        Assert.Equal("/account/email", asked.Headers.Location!.ToString());
+        var mail = app.Mailer().LastTo(Email)!;
+        Assert.Equal(InMemoryIdentityMailer.VerificationCode, mail.Kind);
+
+        var confirmed = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["Code"] = mail.Code! }, Ct, postPath: "/account/email?handler=Confirm");
+        Assert.Equal("/account/email", confirmed.Headers.Location!.ToString());   // still signed in: the address did not change
+        await browser.GetAsync("/account/email", Ct);
+        Assert.Contains("This address is verified.", browser.Html);
+    }
+
+    [Fact]
     public async Task The_account_pages_change_the_password_and_enroll_an_authenticator()
     {
         await using var app = await PagesTestHost.StartAsync(Ct);

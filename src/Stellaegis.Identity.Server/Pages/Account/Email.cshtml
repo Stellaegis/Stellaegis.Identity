@@ -25,6 +25,17 @@
 else
 {
     <p class="auth-help">@T.Format("Account.Email.Current", Model.CurrentEmail)</p>
+    @if (Model.CurrentVerified)
+    {
+        <p class="auth-help">@T["Account.Email.Verified"]</p>
+    }
+    else
+    {
+        <p class="auth-help">@T["Account.Email.Unverified"]</p>
+        <form class="auth-form" method="post" asp-page-handler="Verify">
+            <button class="auth-btn auth-btn-secondary" type="submit">@T["Account.Email.Verify"]</button>
+        </form>
+    }
     <form class="auth-form" method="post" autocomplete="off">
         <div class="auth-field">
             <label class="auth-label" for="NewEmail">@T["Field.NewEmail"]</label>

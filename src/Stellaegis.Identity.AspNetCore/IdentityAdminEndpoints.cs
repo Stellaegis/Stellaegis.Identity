@@ -231,6 +231,7 @@ public static class IdentityAdminEndpoints
 /// <param name="DisplayName">Its display name.</param>
 /// <param name="IsEnabled">Whether it is enabled; a disabled account is blocked at the door.</param>
 /// <param name="IsActivated">Whether it has a password; an account created by an administrator waits for its activation.</param>
+/// <param name="EmailVerified">Whether its e-mail was proven; a reset link is not mailed to an address that was not.</param>
 /// <param name="MfaEnabled">Whether a second factor is required at login.</param>
 /// <param name="BlockedUntil">Until when a lockout holds, or <see langword="null"/>.</param>
 /// <param name="FailedLoginCount">How many logins failed since the last success.</param>
@@ -243,6 +244,7 @@ public sealed record AccountSummary(
     string DisplayName,
     bool IsEnabled,
     bool IsActivated,
+    bool EmailVerified,
     bool MfaEnabled,
     DateTimeOffset? BlockedUntil,
     int FailedLoginCount,
@@ -251,7 +253,7 @@ public sealed record AccountSummary(
     DateTimeOffset ModifiedAt)
 {
     internal static AccountSummary Of(AuthUser user, bool mfaEnabled) => new(
-        user.UserUniqueId, user.Email, user.DisplayName, user.IsEnabled, user.IsActivated, mfaEnabled,
+        user.UserUniqueId, user.Email, user.DisplayName, user.IsEnabled, user.IsActivated, user.EmailVerified, mfaEnabled,
         user.BlockedUntil, user.FailedLoginCount, user.LastLogin, user.CreatedAt, user.ModifiedAt);
 }
 

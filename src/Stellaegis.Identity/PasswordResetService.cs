@@ -16,8 +16,9 @@ public sealed class PasswordResetService(
 {
     /// <summary>
     /// Issues a reset token for the account of <paramref name="email"/>, which the host puts in a link and sends
-    /// there; <see langword="null"/> when no enabled account has that e-mail. The caller shows the same message
-    /// either way, so that the answer does not say which e-mails have an account. A newer token revokes the
+    /// there; <see langword="null"/> when no enabled account has that e-mail, or when the e-mail of the account was
+    /// never proven — a mistyped address would hand the account to whoever holds it. The caller shows the same
+    /// message either way, so that the answer does not say which e-mails have an account. A newer token revokes the
     /// previous ones; only its hash is kept.
     /// </summary>
     public async Task<string?> RequestResetAsync(string email, string? ipAddress = null, CancellationToken cancellationToken = default)
@@ -26,6 +27,11 @@ public sealed class PasswordResetService(
         var user = await users.GetByEmailAsync(normalized, cancellationToken);
         if (user is null || !user.IsEnabled)
             return null;
+        if (!user.EmailVerified)
+        {
+            logger.LogWarning("Password reset of {UserUniqueId} not sent: its e-mail was never verified", user.UserUniqueId);
+            return null;
+        }
         var token = await tokens.IssueAsync(
             user, AccountTokenPurpose.PasswordReset, TokenDelivery.Email, user.AsActor(),
             clock.GetUtcNow(), options.Value.PasswordReset.TokenLifetime, ipAddress, cancellationToken);
@@ -62,6 +68,7 @@ public sealed class PasswordResetService(
             return Result.Failure(IdentityErrors.InvalidResetToken);
 
         user.PasswordHash = hasher.Hash(newPassword);
+        user.EmailVerified |= stored.Delivery == TokenDelivery.Email;   // the link reached the address the system sent it to
         user.FailedLoginCount = 0;
         user.BlockedUntil = null;
         user.ModifiedAt = now;
