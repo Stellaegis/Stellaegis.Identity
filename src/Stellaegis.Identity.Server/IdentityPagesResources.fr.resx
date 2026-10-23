@@ -202,9 +202,6 @@
   <data name="Error.PasswordReset.Invalid" xml:space="preserve">
     <value>Ce lien est invalide ou a déjà été utilisé.</value>
   </data>
-  <data name="Error.Registration.ByInvitation" xml:space="preserve">
-    <value>L'inscription se fait sur invitation.</value>
-  </data>
   <data name="Error.Registration.Closed" xml:space="preserve">
     <value>Les inscriptions sont fermées.</value>
   </data>

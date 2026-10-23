@@ -125,7 +125,7 @@ public sealed class PagesTests
     [Fact]
     public async Task A_closed_registration_shows_it_and_creates_nothing()
     {
-        await using var app = await PagesTestHost.StartAsync(Ct, identity: o => o.Registration.Posture = RegistrationPosture.Closed);
+        await using var app = await PagesTestHost.StartAsync(Ct, identity: o => o.SelfRegistration = SelfRegistration.Closed);
         var browser = new Browser(app);
 
         var page = await browser.GetAsync("/register", Ct);
@@ -299,10 +299,10 @@ public sealed class PagesTests
     {
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => PagesTestHost.StartAsync(Ct, mailer: false));
         Assert.Contains(nameof(IIdentityMailer), exception.Message);
-        Assert.Contains("registration is Open", exception.Message);
+        Assert.Contains("self-registration is open", exception.Message);
 
         await using var app = await PagesTestHost.StartAsync(Ct, mailer: false,
-            identity: o => o.Registration.Posture = RegistrationPosture.Closed,
+            identity: o => o.SelfRegistration = SelfRegistration.Closed,
             pages: o => o.PasswordResetEnabled = false);
         var browser = new Browser(app);
         Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/login", Ct)).StatusCode);

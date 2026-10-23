@@ -189,7 +189,7 @@ public sealed class AdministrationTests
     [Fact]
     public async Task An_account_is_created_without_a_password_and_its_person_activates_it()
     {
-        using var host = new TestHost(o => o.Registration.Posture = RegistrationPosture.Closed);
+        using var host = new TestHost(o => o.SelfRegistration = SelfRegistration.Closed);
         var administration = host.Get<AccountAdministrationService>();
         var activation = host.Get<ActivationService>();
 

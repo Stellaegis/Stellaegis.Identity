@@ -45,7 +45,7 @@ internal sealed class TestHost : IDisposable
             options.PasswordHasher.Pepper = Pepper;
             options.PasswordHasher.Iterations = 1000;   // fast; the count does not change what is tested
             options.LoginPolicy.MinResponseTime = TimeSpan.Zero;
-            options.Registration.Posture = RegistrationPosture.Open;
+            options.SelfRegistration = SelfRegistration.Open;
             configure?.Invoke(options);
         });
         services.AddStellaegisLocalBlockedUsersSource();

@@ -73,8 +73,6 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="RegistrationClosed"/>: the application does not take registrations.</summary>
     public const string RegistrationClosedCode = "Registration.Closed";
 
-    /// <summary>The code of <see cref="RegistrationByInvitation"/>: the application takes registrations on invitation only.</summary>
-    public const string RegistrationByInvitationCode = "Registration.ByInvitation";
 
     /// <summary>The code of <see cref="MfaNotPending"/>: no second factor is being set up.</summary>
     public const string MfaNotPendingCode = "Mfa.NotPending";
@@ -166,9 +164,6 @@ public static class IdentityErrors
     public static Error RegistrationClosed { get; } =
         Error.Forbidden(RegistrationClosedCode, "This application does not take registrations.");
 
-    /// <summary>The application takes registrations on invitation only.</summary>
-    public static Error RegistrationByInvitation { get; } =
-        Error.Forbidden(RegistrationByInvitationCode, "This application takes registrations on invitation only.");
 
     /// <summary>No second factor is being set up.</summary>
     public static Error MfaNotPending { get; } =

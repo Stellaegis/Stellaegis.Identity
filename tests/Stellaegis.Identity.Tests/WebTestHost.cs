@@ -34,7 +34,7 @@ internal static class WebTestHost
             options.PasswordHasher.Pepper = Pepper;
             options.PasswordHasher.Iterations = 1000;
             options.LoginPolicy.MinResponseTime = TimeSpan.Zero;
-            options.Registration.Posture = RegistrationPosture.Open;
+            options.SelfRegistration = SelfRegistration.Open;
         });
         builder.Services.AddStellaegisLocalBlockedUsersSource();
         return builder;

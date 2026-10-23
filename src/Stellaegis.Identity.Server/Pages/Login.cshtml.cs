@@ -29,7 +29,7 @@ internal sealed class LoginModel(
 
     public string? ReturnUrl { get; private set; }
 
-    public bool RegistrationOpen => identity.Value.Registration.Posture == RegistrationPosture.Open;
+    public bool RegistrationOpen => identity.Value.SelfRegistration == SelfRegistration.Open;
 
     public bool PasswordResetEnabled => pages.Value.PasswordResetEnabled;
 

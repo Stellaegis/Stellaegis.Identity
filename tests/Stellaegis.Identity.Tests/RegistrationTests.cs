@@ -20,7 +20,7 @@ public sealed class ServiceRegistrationTests
             ("Stellaegis:Identity:PasswordHasher:Pepper", "p"),
             ("Stellaegis:Identity:PasswordHasher:Iterations", "2000"),
             ("Stellaegis:Identity:LoginPolicy:MaxFailedAttempts", "3"),
-            ("Stellaegis:Identity:Registration:Posture", "Open"),
+            ("Stellaegis:Identity:SelfRegistration", "Open"),
             ("Stellaegis:Identity:EmailVerification:CodeLength", "8"));
         using var provider = new ServiceCollection().AddStellaegisIdentityInMemory(configuration).BuildServiceProvider();
 
@@ -28,9 +28,9 @@ public sealed class ServiceRegistrationTests
         Assert.Equal("p", options.PasswordHasher.Pepper);
         Assert.Equal(2000, options.PasswordHasher.Iterations);
         Assert.Equal(3, options.LoginPolicy.MaxFailedAttempts);
-        Assert.Equal(RegistrationPosture.Open, options.Registration.Posture);
+        Assert.Equal(SelfRegistration.Open, options.SelfRegistration);
         Assert.Equal(8, options.EmailVerification.CodeLength);
-        Assert.Equal(RegistrationPosture.Closed, new IdentityOptions().Registration.Posture);
+        Assert.Equal(SelfRegistration.Closed, new IdentityOptions().SelfRegistration);
     }
 
     [Fact]
@@ -139,14 +139,12 @@ public sealed class RegistrationTests
     }
 
     [Fact]
-    public async Task The_posture_closes_the_registration_or_opens_it_on_invitation()
+    public async Task A_closed_self_registration_creates_nothing_even_for_a_verified_email()
     {
-        using var closed = new TestHost(o => o.Registration.Posture = RegistrationPosture.Closed);
-        Assert.Equal(IdentityErrors.RegistrationClosed, (await closed.Get<RegistrationService>().CreateAccountAsync("jane@acme.test", "Jane", "Correct-Horse-9")).Error);
+        using var closed = new TestHost(o => o.SelfRegistration = SelfRegistration.Closed);
+        await VerifyAsync(closed, "jane@acme.test");
 
-        using var invited = new TestHost(o => o.Registration.Posture = RegistrationPosture.ByInvitation);
-        await VerifyAsync(invited, "jane@acme.test");
-        Assert.Equal(IdentityErrors.RegistrationByInvitation, (await invited.Get<RegistrationService>().CreateAccountAsync("jane@acme.test", "Jane", "Correct-Horse-9")).Error);
-        Assert.True((await invited.Get<RegistrationService>().CreateAccountAsync("jane@acme.test", "Jane", "Correct-Horse-9", invited: true)).IsSuccess);
+        Assert.Equal(IdentityErrors.RegistrationClosed, (await closed.Get<RegistrationService>().CreateAccountAsync("jane@acme.test", "Jane", "Correct-Horse-9")).Error);
+        Assert.Equal(0, await closed.Get<IAuthUserStore>().CountAsync());
     }
 }

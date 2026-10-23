@@ -6,7 +6,7 @@ namespace Stellaegis.Identity;
 
 /// <summary>
 /// A person creating their own account, once their e-mail is verified and when the
-/// <see cref="RegistrationOptions.Posture"/> allows it. An administrator creating an account goes through
+/// <see cref="IdentityOptions.SelfRegistration"/> allows it. An administrator creating an account goes through
 /// <see cref="AccountAdministrationService"/>, whatever the posture.
 /// </summary>
 public sealed class RegistrationService(
@@ -20,19 +20,14 @@ public sealed class RegistrationService(
     ILogger<RegistrationService> logger)
 {
     /// <summary>
-    /// Creates the account of <paramref name="email"/>, whose ownership was verified, and returns its id. The
-    /// account is its own creator. <paramref name="invited"/> says the host has checked an invitation, which the
-    /// <see cref="RegistrationPosture.ByInvitation"/> posture requires.
+    /// Creates the account of <paramref name="email"/>, whose ownership was verified, and returns its id, when the
+    /// application takes registrations (<see cref="IdentityOptions.SelfRegistration"/>). The account is its own
+    /// creator.
     /// </summary>
-    public async Task<Result<Guid>> CreateAccountAsync(string email, string displayName, string password, bool invited = false, CancellationToken cancellationToken = default)
+    public async Task<Result<Guid>> CreateAccountAsync(string email, string displayName, string password, CancellationToken cancellationToken = default)
     {
-        switch (options.Value.Registration.Posture)
-        {
-            case RegistrationPosture.Closed:
-                return Result.Failure<Guid>(IdentityErrors.RegistrationClosed);
-            case RegistrationPosture.ByInvitation when !invited:
-                return Result.Failure<Guid>(IdentityErrors.RegistrationByInvitation);
-        }
+        if (options.Value.SelfRegistration != SelfRegistration.Open)
+            return Result.Failure<Guid>(IdentityErrors.RegistrationClosed);
 
         var normalized = Emails.Normalize(email);
         if (!await emailVerification.IsEmailVerifiedAsync(normalized, cancellationToken))

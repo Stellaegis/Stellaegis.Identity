@@ -91,8 +91,8 @@ public static class IdentityPagesEndpointRouteBuilderExtensions
         if (endpoints.ServiceProvider.GetService<IIdentityMailer>() is null)
         {
             var needs = new List<string>();
-            if (identity.Registration.Posture != RegistrationPosture.Closed)
-                needs.Add($"the registration is {identity.Registration.Posture}");
+            if (identity.SelfRegistration == SelfRegistration.Open)
+                needs.Add("the self-registration is open");
             if (options.PasswordResetEnabled)
                 needs.Add("the password reset is enabled");
             if (needs.Count > 0)

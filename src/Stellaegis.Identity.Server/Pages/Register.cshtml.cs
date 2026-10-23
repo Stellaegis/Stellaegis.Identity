@@ -26,7 +26,7 @@ internal sealed class RegisterModel(
 
     public string? ReturnUrl { get; private set; }
 
-    public bool Open => identity.Value.Registration.Posture == RegistrationPosture.Open;
+    public bool Open => identity.Value.SelfRegistration == SelfRegistration.Open;
 
     public PasswordPolicy Policy => passwords.Policy;
 

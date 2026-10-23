@@ -9,7 +9,7 @@ namespace Stellaegis.Identity;
 /// <code>
 /// Stellaegis:Identity:PasswordHasher:Pepper = …          (required, from a secret store)
 /// Stellaegis:Identity:LoginPolicy:MaxFailedAttempts = 5
-/// Stellaegis:Identity:Registration:Posture = Closed
+/// Stellaegis:Identity:SelfRegistration = Closed
 /// </code>
 /// </summary>
 public sealed class IdentityOptions : IValidatableOptions
@@ -35,8 +35,12 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>The links sent to reset a password.</summary>
     public PasswordResetOptions PasswordReset { get; set; } = new();
 
-    /// <summary>Whether people register themselves.</summary>
-    public RegistrationOptions Registration { get; set; } = new();
+    /// <summary>
+    /// Whether anyone with a verified e-mail creates their account. <see cref="SelfRegistration.Closed"/> unless set:
+    /// an administrator creates every account. An invitation is no posture: it exists when the host connects the
+    /// port that answers it.
+    /// </summary>
+    public SelfRegistration SelfRegistration { get; set; } = SelfRegistration.Closed;
 
     /// <summary>The links that activate an account an administrator created.</summary>
     public ActivationOptions Activation { get; set; } = new();
@@ -225,22 +229,12 @@ public sealed class LinkOptions : IValidatableOptions
     }
 }
 
-/// <summary>Whether people register themselves.</summary>
-public enum RegistrationPosture
+/// <summary>Whether anyone with a verified e-mail creates their account.</summary>
+public enum SelfRegistration
 {
-    /// <summary>Nobody registers: an administrator creates every account. The posture of an enterprise installation.</summary>
+    /// <summary>Nobody registers alone: an administrator creates every account. The posture of an enterprise installation.</summary>
     Closed,
 
-    /// <summary>A person registers when the host has checked an invitation; the module itself knows no invitation.</summary>
-    ByInvitation,
-
-    /// <summary>Anyone with a verified e-mail registers.</summary>
+    /// <summary>Anyone with a verified e-mail registers. Being registered grants nothing (n° 1).</summary>
     Open,
-}
-
-/// <summary>Whether people register themselves. Closed unless set.</summary>
-public sealed class RegistrationOptions
-{
-    /// <summary>The posture. <see cref="RegistrationPosture.Closed"/> unless set.</summary>
-    public RegistrationPosture Posture { get; set; } = RegistrationPosture.Closed;
 }
