@@ -19,6 +19,12 @@ public interface IIdentityMailer
     Task SendPasswordResetLinkAsync(string email, Uri link, TimeSpan lifetime, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sends the <paramref name="link"/> by which the person of <paramref name="email"/> chooses the first password
+    /// of the account an administrator created; the link works for <paramref name="lifetime"/>.
+    /// </summary>
+    Task SendActivationLinkAsync(string email, Uri link, TimeSpan lifetime, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Tells <paramref name="email"/> that someone tried to register it while it has an account already. Sent so
     /// that a registration answers the same way whether the e-mail is known or not; the owner learns of the
     /// attempt, the stranger learns nothing.

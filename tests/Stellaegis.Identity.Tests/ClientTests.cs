@@ -23,6 +23,7 @@ public sealed class ClientTests
     {
         var builder = WebTestHost.Builder().WithHeaderAuthentication();
         builder.Services.AddStellaegisIdentityAdministration();
+        builder.Services.AddStellaegisInMemoryIdentityMailer();
         var app = builder.Build();
         app.UseAuthentication();
         app.UseAuthorization();

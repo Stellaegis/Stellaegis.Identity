@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Stellaegis.Identity.AspNetCore;
 
 namespace Stellaegis.Identity.Server.Pages;
 
@@ -48,7 +49,7 @@ internal sealed class ForgotPasswordModel(
         var email = Emails.Normalize(Email!);
         if (await reset.RequestResetAsync(email, this.ClientAddress(), cancellationToken) is { } token)
         {
-            var link = new Uri($"{Request.Scheme}://{Request.Host}{Request.PathBase}/reset-password?token={Uri.EscapeDataString(token)}");
+            var link = IdentityLinks.Of(identity.Value.Links, Request, IdentityLinks.ResetPasswordPath, token);
             try
             {
                 await mailer.SendPasswordResetLinkAsync(email, link, identity.Value.PasswordReset.TokenLifetime, cancellationToken);

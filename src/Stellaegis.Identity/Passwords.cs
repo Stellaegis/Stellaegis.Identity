@@ -38,7 +38,7 @@ public sealed class PasswordHasher
     }
 
     /// <summary>Whether <paramref name="password"/> is the one <paramref name="stored"/> was made from. <see langword="false"/> on a hash of another form.</summary>
-    public bool Verify(string password, string stored)
+    public bool Verify(string password, string? stored)
     {
         if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(stored))
             return false;

@@ -225,6 +225,39 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task An_account_created_by_an_administrator_is_activated_by_its_link_and_then_signs_in()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        string token;
+        using (var scope = app.Services.CreateScope())
+            token = (await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().CreateAsync(Email, "Jane", TokenDelivery.Hand, Stellaegis.Primitives.Actor.Parse("admin"), Ct)).Value.ActivationToken;
+        var browser = new Browser(app);
+        var path = $"/activate?token={Uri.EscapeDataString(token)}";
+
+        // Opened ahead by a scanner, the link still works; the page names nobody, and sends no referrer.
+        var preview = await browser.GetAsync(path, Ct);
+        Assert.Equal("no-referrer", preview.Headers.GetValues("Referrer-Policy").Single());
+        Assert.DoesNotContain(Email, browser.Html);
+        await browser.GetAsync(path, Ct);
+        Assert.Contains("Input_NewPassword", browser.Html);
+
+        var activated = await browser.PostFormAsync(path, new Dictionary<string, string>
+        {
+            ["Token"] = token,
+            ["Input.NewPassword"] = Password,
+            ["Input.ConfirmPassword"] = Password,
+        }, Ct);
+        Assert.Equal("/activate?done=true", activated.Headers.Location!.ToString());
+
+        await browser.GetAsync(path, Ct);
+        Assert.Contains("Invalid link", browser.Html);
+
+        var signedIn = await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+        Assert.Equal(HttpStatusCode.Redirect, signedIn.StatusCode);
+        Assert.True(browser.HasCookie(IdentityCookie.CookieName));
+    }
+
+    [Fact]
     public async Task A_page_of_the_host_at_the_same_path_wins_over_the_package_s()
     {
         await using var app = await PagesTestHost.StartAsync(Ct, hostPagesFirst: true);

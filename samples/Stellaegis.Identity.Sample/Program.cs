@@ -3,9 +3,10 @@
 // with, administers the accounts over HTTP under the operations of the module, and refuses a blocked account at
 // the door.
 //
-//   dotnet run -- install --admin-email admin@acme.test --admin-password 'Correct-Horse-9'
+//   dotnet run -- install --admin-email admin@acme.test
 //       creates the database and the application's role if missing, installs the ident schema under the
-//       administration connection, and creates the first administrator — the one gesture of the installation.
+//       administration connection, and creates the first administrator without a password — the one gesture of
+//       the installation —, printing the link that activates it.
 //   dotnet run
 //       verifies the installation under the application's role, then serves.
 //

@@ -1,5 +1,7 @@
 using System.Data.Common;
+using Microsoft.Extensions.Options;
 using Npgsql;
+using Stellaegis.Identity.AspNetCore;
 using Stellaegis.Identity.PostgreSQL;
 using Stellaegis.Primitives;
 using Stellaegis.Primitives.Data;
@@ -10,10 +12,12 @@ namespace Stellaegis.Identity.Sample;
 /// <summary>
 /// The installation of the example, apart from the application and under another role: the database and the
 /// application's role created if missing, the <c>ident</c> schema installed by the life cycle of Primitives under
-/// the administration connection, and the first administrator created by the services of the module. Run again,
-/// it changes nothing: the scripts are recorded, the administrator exists.
+/// the administration connection, and the first administrator created by the services of the module, without a
+/// password: the installation prints its activation link, which the installer opens once the application runs, and
+/// chooses the password there — no password goes through the command line, its history or the list of processes.
+/// Run again, it changes nothing but a new link for an administrator still waiting for the activation.
 /// <code>
-/// dotnet run -- install --admin-email admin@acme.test --admin-password 'Correct-Horse-9' [--display-name Admin]
+/// dotnet run -- install --admin-email admin@acme.test [--display-name Admin]
 /// </code>
 /// </summary>
 public static class Install
@@ -21,11 +25,10 @@ public static class Install
     public static async Task<int> RunAsync(string[] args)
     {
         var email = Argument(args, "--admin-email");
-        var password = Argument(args, "--admin-password");
         var displayName = Argument(args, "--display-name") ?? "Administrator";
-        if (email is null || password is null)
+        if (email is null)
         {
-            Console.Error.WriteLine("usage: install --admin-email <email> --admin-password <password> [--display-name <name>]");
+            Console.Error.WriteLine("usage: install --admin-email <email> [--display-name <name>]");
             return 2;
         }
 
@@ -83,23 +86,43 @@ public static class Install
             Console.WriteLine($"Already applied: {skipped}");
 
         // 3. The first administrator, by the services of the module, under the application's role, as the
-        // administration routes would: the installation is the one actor that creates an account by itself.
+        // administration routes would: the installation is the one actor that creates an account by itself. The
+        // account has no password; its activation link is handed to the installer, here, this once.
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddStellaegisFrame(SampleFrame.Value);
         services.AddStellaegisIdentityPostgreSQL(configuration);
         await using var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
-        var created = await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>()
-            .CreateAsync(email, displayName, password, Actor.Job("install"));
+        var links = provider.GetRequiredService<IOptions<IdentityOptions>>().Value.Links;
+        var administration = scope.ServiceProvider.GetRequiredService<AccountAdministrationService>();
+        var installedBy = Actor.Job("install");
+
+        string? token = null;
+        var created = await administration.CreateAsync(email, displayName, TokenDelivery.Hand, installedBy);
         if (created.IsSuccess)
-            Console.WriteLine($"Administrator {email} created, {created.Value:N}.");
+        {
+            Console.WriteLine($"Administrator {email} created, {created.Value.UserUniqueId:N}.");
+            token = created.Value.ActivationToken;
+        }
         else if (created.Error?.Code == IdentityErrors.EmailTakenCode)
-            Console.WriteLine($"Administrator {email} exists already.");
+        {
+            var existing = await scope.ServiceProvider.GetRequiredService<IAuthUserStore>().GetByEmailAsync(Emails.Normalize(email));
+            if (existing is { IsActivated: false })
+                token = (await administration.IssueActivationAsync(existing.UserUniqueId, TokenDelivery.Hand, installedBy)).Value?.Token;
+            else
+                Console.WriteLine($"Administrator {email} exists already, and is active.");
+        }
         else
         {
             Console.Error.WriteLine($"The administrator was not created: {created.Error}");
             return 1;
+        }
+
+        if (token is not null)
+        {
+            Console.WriteLine("Open this link once the application runs, and choose the administrator's password there:");
+            Console.WriteLine(IdentityLinks.Of(links, null, IdentityLinks.ActivatePath, token));
         }
         return 0;
     }

@@ -123,7 +123,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         public Guid UserUniqueId { get; set; }
         public string Email { get; set; } = "";
         public string DisplayName { get; set; } = "";
-        public string PasswordHash { get; set; } = "";
+        public string? PasswordHash { get; set; }
         public bool IsEnabled { get; set; }
         public int FailedLoginCount { get; set; }
         public DateTimeOffset? FailedLoginLast { get; set; }

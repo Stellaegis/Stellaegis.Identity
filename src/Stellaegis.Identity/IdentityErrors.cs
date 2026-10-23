@@ -58,6 +58,18 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="ResetTokenExpired"/>: the reset link is too old.</summary>
     public const string ResetTokenExpiredCode = "PasswordReset.Expired";
 
+    /// <summary>The code of <see cref="InvalidActivationToken"/>: the activation link is unknown, used, or for an account active or disabled.</summary>
+    public const string InvalidActivationTokenCode = "Activation.Invalid";
+
+    /// <summary>The code of <see cref="ActivationTokenExpired"/>: the activation link is too old.</summary>
+    public const string ActivationTokenExpiredCode = "Activation.Expired";
+
+    /// <summary>The code of <see cref="AccountAlreadyActivated"/>: the account has a password already.</summary>
+    public const string AccountAlreadyActivatedCode = "Account.AlreadyActivated";
+
+    /// <summary>The code of <see cref="AccountNotActivated"/>: the account waits for its activation.</summary>
+    public const string AccountNotActivatedCode = "Account.NotActivated";
+
     /// <summary>The code of <see cref="RegistrationClosed"/>: the application does not take registrations.</summary>
     public const string RegistrationClosedCode = "Registration.Closed";
 
@@ -133,6 +145,22 @@ public static class IdentityErrors
     /// <summary>The reset link is too old.</summary>
     public static Error ResetTokenExpired { get; } =
         Error.PreconditionFailed(ResetTokenExpiredCode, "This password reset link has expired. Request a new one.");
+
+    /// <summary>The activation link is unknown, used, or for an account active or disabled.</summary>
+    public static Error InvalidActivationToken { get; } =
+        Error.NotFound(InvalidActivationTokenCode, "This activation link is invalid or has already been used.");
+
+    /// <summary>The activation link is too old.</summary>
+    public static Error ActivationTokenExpired { get; } =
+        Error.PreconditionFailed(ActivationTokenExpiredCode, "This activation link has expired. Ask the administrator for a new one.");
+
+    /// <summary>The account has a password already: a reset, not an activation.</summary>
+    public static Error AccountAlreadyActivated { get; } =
+        Error.Conflict(AccountAlreadyActivatedCode, "This account is active already.");
+
+    /// <summary>The account waits for its activation: an activation, not a reset.</summary>
+    public static Error AccountNotActivated { get; } =
+        Error.Conflict(AccountNotActivatedCode, "This account waits for its activation.");
 
     /// <summary>The application does not take registrations.</summary>
     public static Error RegistrationClosed { get; } =

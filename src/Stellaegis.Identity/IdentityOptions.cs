@@ -38,13 +38,21 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>Whether people register themselves.</summary>
     public RegistrationOptions Registration { get; set; } = new();
 
+    /// <summary>The links that activate an account an administrator created.</summary>
+    public ActivationOptions Activation { get; set; } = new();
+
+    /// <summary>How the links an account receives are written and delivered.</summary>
+    public LinkOptions Links { get; set; } = new();
+
     /// <inheritdoc/>
     public string? FindError()
         => Prefix(nameof(PasswordHasher), PasswordHasher.FindError())
         ?? Prefix(nameof(PasswordPolicy), PasswordPolicy.FindError())
         ?? Prefix(nameof(LoginPolicy), LoginPolicy.FindError())
         ?? Prefix(nameof(EmailVerification), EmailVerification.FindError())
-        ?? Prefix(nameof(PasswordReset), PasswordReset.FindError());
+        ?? Prefix(nameof(PasswordReset), PasswordReset.FindError())
+        ?? Prefix(nameof(Activation), Activation.FindError())
+        ?? Prefix(nameof(Links), Links.FindError());
 
     private static string? Prefix(string section, string? error) => error is null ? null : $"{section}: {error}";
 }
@@ -174,6 +182,47 @@ public sealed class PasswordResetOptions : IValidatableOptions
 
     /// <inheritdoc/>
     public string? FindError() => TokenLifetime <= TimeSpan.Zero ? $"{nameof(TokenLifetime)} must be positive." : null;
+}
+
+/// <summary>The links that activate an account an administrator created, without a password.</summary>
+public sealed class ActivationOptions : IValidatableOptions
+{
+    /// <summary>How long an activation link works. Seven days unless set.</summary>
+    public TimeSpan TokenLifetime { get; set; } = TimeSpan.FromDays(7);
+
+    /// <inheritdoc/>
+    public string? FindError() => TokenLifetime <= TimeSpan.Zero ? $"{nameof(TokenLifetime)} must be positive." : null;
+}
+
+/// <summary>How the links an account receives — a reset, an activation — are written and delivered.</summary>
+public sealed class LinkOptions : IValidatableOptions
+{
+    /// <summary>
+    /// The address the pages are reached at, <c>https://id.acme.example</c>, which the links start with. The address
+    /// of the request that issues a link unless set: set it when the pages are served by another host, or behind a
+    /// proxy that rewrites the address. An installation that runs outside a request needs it.
+    /// </summary>
+    public string? PublicBaseUrl { get; set; }
+
+    /// <summary>
+    /// Whether an administrator may receive a link to hand it over by the means of their choice, rather than have it
+    /// sent by e-mail — for an installation without a mail server, or a person reached otherwise. Such a link proves
+    /// nothing about the address. No unless set: handing links over is an opening the host declares.
+    /// </summary>
+    public bool HandDelivery { get; set; }
+
+    /// <summary>The base the links start with, without its trailing slash, or <see langword="null"/> when none is set.</summary>
+    public Uri? PublicBase => string.IsNullOrWhiteSpace(PublicBaseUrl) ? null : new Uri(PublicBaseUrl.TrimEnd('/'), UriKind.Absolute);
+
+    /// <inheritdoc/>
+    public string? FindError()
+    {
+        if (string.IsNullOrWhiteSpace(PublicBaseUrl))
+            return null;
+        return Uri.TryCreate(PublicBaseUrl, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+            ? null
+            : $"{nameof(PublicBaseUrl)} must be an absolute http or https address.";
+    }
 }
 
 /// <summary>Whether people register themselves.</summary>

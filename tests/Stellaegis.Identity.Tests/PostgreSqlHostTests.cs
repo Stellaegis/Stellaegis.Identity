@@ -94,17 +94,19 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
         await host.StartAsync(Ct);
         using var scope = host.Services.CreateScope();
         var email = $"{Guid.NewGuid():N}@acme.test";
-        var created = await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().CreateAsync(email, "Jane", "Correct-Horse-9", Actor.Parse("admin"), Ct);
+        var created = await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().CreateAsync(email, "Jane", TokenDelivery.Hand, Actor.Parse("admin"), Ct);
         Assert.True(created.IsSuccess, created.Error?.ToString());
+        var activated = await scope.ServiceProvider.GetRequiredService<ActivationService>().ActivateAsync(created.Value.ActivationToken, "Correct-Horse-9", Ct);
+        Assert.True(activated.IsSuccess, activated.Error?.ToString());
 
         var login = scope.ServiceProvider.GetRequiredService<LoginService>();
         var result = await login.AuthenticateAsync(email, "Correct-Horse-9", cancellationToken: Ct);
         Assert.Equal(LoginStep.Succeeded, result.Step);
-        Assert.Equal(created.Value.ToString("N"), result.Principal!.FindFirst("sub")!.Value);
+        Assert.Equal(created.Value.UserUniqueId.ToString("N"), result.Principal!.FindFirst("sub")!.Value);
 
-        Assert.True((await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().BlockAsync(created.Value, Actor.Parse("admin"), Ct)).IsSuccess);
+        Assert.True((await scope.ServiceProvider.GetRequiredService<AccountAdministrationService>().BlockAsync(created.Value.UserUniqueId, Actor.Parse("admin"), Ct)).IsSuccess);
         Assert.Equal(LoginStep.Failed, (await login.AuthenticateAsync(email, "Correct-Horse-9", cancellationToken: Ct)).Step);
-        Assert.Contains(created.Value.ToString("N"), await scope.ServiceProvider.GetRequiredService<IBlockedUsersSource>().GetBlockedSubjectsAsync(Ct));
+        Assert.Contains(created.Value.UserUniqueId.ToString("N"), await scope.ServiceProvider.GetRequiredService<IBlockedUsersSource>().GetBlockedSubjectsAsync(Ct));
         await host.StopAsync(Ct);
     }
 }

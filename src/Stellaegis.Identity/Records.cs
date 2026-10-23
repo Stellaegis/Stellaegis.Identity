@@ -35,6 +35,9 @@ public static class LoginFailureReasons
 
     /// <summary>The account is locked after too many failed logins.</summary>
     public const string LockedOut = "LOCKED_OUT";
+
+    /// <summary>The account waits for its activation: it has no password yet. The person is told only that the credentials are invalid.</summary>
+    public const string NotActivated = "NOT_ACTIVATED";
 }
 
 /// <summary>What an account token authorizes, once.</summary>

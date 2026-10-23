@@ -22,7 +22,7 @@ create table ident.users (
   user_unique_id       uuid          not null,
   email                varchar(320)  not null,
   display_name         varchar(200)  not null,
-  password_hash        varchar(2000) not null,
+  password_hash        varchar(2000),          -- null while the account waits for its activation
   is_enabled           boolean       not null,
 
   -- Lockout after failed logins; not a block at the door.

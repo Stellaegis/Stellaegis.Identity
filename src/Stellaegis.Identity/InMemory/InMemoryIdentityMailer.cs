@@ -24,6 +24,9 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
     /// <summary>The kind of a password reset link.</summary>
     public const string PasswordResetLink = "password_reset_link";
 
+    /// <summary>The kind of an activation link.</summary>
+    public const string ActivationLink = "activation_link";
+
     /// <summary>The kind of the notice that an e-mail has an account already.</summary>
     public const string AccountAlreadyExists = "account_already_exists";
 
@@ -53,6 +56,13 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
     public Task SendPasswordResetLinkAsync(string email, Uri link, TimeSpan lifetime, CancellationToken cancellationToken = default)
     {
         _sent.Enqueue(new IdentityMail(PasswordResetLink, email, null, link));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task SendActivationLinkAsync(string email, Uri link, TimeSpan lifetime, CancellationToken cancellationToken = default)
+    {
+        _sent.Enqueue(new IdentityMail(ActivationLink, email, null, link));
         return Task.CompletedTask;
     }
 

@@ -99,7 +99,7 @@ public sealed class PasswordResetTests
         var token = (await reset.RequestResetAsync("jane@acme.test"))!;
 
         Assert.Equal(43, token.Length);   // 32 bytes, base64url
-        var stored = Assert.Single(host.Get<Stellaegis.Identity.InMemory.InMemoryIdentityData>().AccountTokens.Values);
+        var stored = Assert.Single(host.Get<Stellaegis.Identity.InMemory.InMemoryIdentityData>().AccountTokens.Values, t => t.Purpose == AccountTokenPurpose.PasswordReset);
         Assert.Equal(AccountTokens.Hash(token), stored.TokenHash);
         Assert.DoesNotContain(token, stored.TokenHash);
         Assert.Equal(TokenDelivery.Email, stored.Delivery);
@@ -187,21 +187,68 @@ public sealed class AdministrationTests
     private static readonly Actor Admin = Actor.Parse("admin");
 
     [Fact]
-    public async Task Creating_an_account_needs_a_free_email_and_a_good_password_and_names_its_creator()
+    public async Task An_account_is_created_without_a_password_and_its_person_activates_it()
     {
         using var host = new TestHost(o => o.Registration.Posture = RegistrationPosture.Closed);
         var administration = host.Get<AccountAdministrationService>();
+        var activation = host.Get<ActivationService>();
 
-        Assert.Equal(IdentityErrors.PasswordRejectedCode, (await administration.CreateAsync("jane@acme.test", "Jane", "weak", Admin)).Error!.Code);
-        var created = await administration.CreateAsync("Jane@Acme.test", "Jane", "Correct-Horse-9", Admin);
+        var created = await administration.CreateAsync("Jane@Acme.test", "Jane", TokenDelivery.Email, Admin);
         Assert.True(created.IsSuccess);
-        Assert.Equal(IdentityErrors.EmailTaken, (await administration.CreateAsync("jane@acme.test", "Jane", "Correct-Horse-9", Admin)).Error);
+        Assert.Equal("jane@acme.test", created.Value.Email);
+        Assert.Equal(IdentityErrors.EmailTaken, (await administration.CreateAsync("jane@acme.test", "Jane", TokenDelivery.Email, Admin)).Error);
 
-        var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(created.Value))!;
+        var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(created.Value.UserUniqueId))!;
+        Assert.Null(user.PasswordHash);
+        Assert.False(user.IsActivated);
         Assert.Equal(Admin, user.CreatedBy);
-        Assert.NotEqual(Guid.Empty, user.UserUniqueId);
-        Assert.Equal(created.Value, Assert.IsType<UserRegisteredEvent>(Assert.Single(host.Events.Events)).UserUniqueId);
-        Assert.Equal(1, await host.Get<IAuthUserStore>().CountAsync());
+        Assert.Equal(created.Value.UserUniqueId, Assert.IsType<UserRegisteredEvent>(Assert.Single(host.Events.Events)).UserUniqueId);
+        var token = Assert.Single(host.Get<Stellaegis.Identity.InMemory.InMemoryIdentityData>().AccountTokens.Values);
+        Assert.Equal((AccountTokenPurpose.Activation, TokenDelivery.Email, Admin), (token.Purpose, token.Delivery, token.CreatedBy));
+
+        // The account does not sign in until its person chose the password by the link.
+        Assert.False((await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Succeeded);
+        Assert.True(await activation.ValidateTokenAsync(created.Value.ActivationToken));
+        Assert.Equal(IdentityErrors.PasswordRejectedCode, (await activation.ActivateAsync(created.Value.ActivationToken, "weak")).Error!.Code);
+        Assert.True((await activation.ActivateAsync(created.Value.ActivationToken, "Correct-Horse-9")).IsSuccess);
+        Assert.Equal(IdentityErrors.InvalidActivationToken, (await activation.ActivateAsync(created.Value.ActivationToken, "Correct-Horse-9")).Error);
+
+        Assert.True((await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Succeeded);
+        var activated = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(created.Value.UserUniqueId))!;
+        Assert.Equal(activated.AsActor(), activated.ModifiedBy);   // the person chose it, nobody else
+    }
+
+    [Fact]
+    public async Task An_activation_link_expires_is_issued_again_and_a_reset_is_only_for_an_active_account()
+    {
+        using var host = new TestHost();
+        var administration = host.Get<AccountAdministrationService>();
+        var activation = host.Get<ActivationService>();
+        var created = (await administration.CreateAsync("jane@acme.test", "Jane", TokenDelivery.Hand, Admin)).Value;
+
+        host.Clock.Advance(TimeSpan.FromDays(8));
+        Assert.Equal(IdentityErrors.ActivationTokenExpired, (await activation.ActivateAsync(created.ActivationToken, "Correct-Horse-9")).Error);
+        Assert.Equal(IdentityErrors.AccountNotActivated, (await administration.IssuePasswordResetAsync(created.UserUniqueId, TokenDelivery.Hand, Admin)).Error);
+
+        var again = await administration.IssueActivationAsync(created.UserUniqueId, TokenDelivery.Hand, Admin);
+        Assert.True(again.IsSuccess);
+        Assert.True((await activation.ActivateAsync(again.Value.Token, "Correct-Horse-9")).IsSuccess);
+        Assert.Equal(IdentityErrors.AccountAlreadyActivated, (await administration.IssueActivationAsync(created.UserUniqueId, TokenDelivery.Hand, Admin)).Error);
+        Assert.Equal(IdentityErrors.AccountNotFound, (await administration.IssueActivationAsync(Guid.NewGuid(), TokenDelivery.Hand, Admin)).Error);
+    }
+
+    [Fact]
+    public async Task An_account_waiting_for_its_activation_is_refused_at_login_as_anyone_is_and_the_trace_says_why()
+    {
+        using var host = new TestHost();
+        var created = (await host.Get<AccountAdministrationService>().CreateAsync("jane@acme.test", "Jane", TokenDelivery.Hand, Admin)).Value;
+
+        var refused = await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "anything-at-all");
+
+        Assert.Equal(IdentityErrors.InvalidCredentials, refused.Error);
+        var trace = Assert.Single(await host.Get<ILoginEventStore>().GetRecentAsync(created.UserUniqueId));
+        Assert.Equal(LoginFailureReasons.NotActivated, trace.FailReason);
+        Assert.Equal(0, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(created.UserUniqueId))!.FailedLoginCount);
     }
 
     [Fact]
@@ -260,9 +307,13 @@ public sealed class AdministrationTests
         Assert.False(await host.Get<MfaService>().IsEnabledAsync(id));
         Assert.Equal(0, await host.Get<RecoveryCodeService>().CountRemainingAsync(id));
 
-        Assert.True((await administration.ChangePasswordAsync(id, "New-Horse-10", Admin)).IsSuccess);
+        // The administrator issues a reset link; the person chooses the new password.
+        var reset = await administration.IssuePasswordResetAsync(id, TokenDelivery.Hand, Admin);
+        Assert.True(reset.IsSuccess);
+        Assert.True((await host.Get<PasswordResetService>().ResetPasswordAsync(reset.Value.Token, "New-Horse-10")).IsSuccess);
         Assert.True((await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "New-Horse-10")).Succeeded);
-        Assert.Equal(Admin, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.ModifiedBy);
+        var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!;
+        Assert.Equal(user.AsActor(), user.ModifiedBy);
     }
 }
 

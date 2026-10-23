@@ -514,4 +514,34 @@
   <data name="VerifyEmail.Title" xml:space="preserve">
     <value>Verify your e-mail</value>
   </data>
+  <data name="Activate.DoneHeading" xml:space="preserve">
+    <value>Account activated</value>
+  </data>
+  <data name="Activate.DoneHelp" xml:space="preserve">
+    <value>The password is saved: the account is ready to sign in.</value>
+  </data>
+  <data name="Activate.Heading" xml:space="preserve">
+    <value>Choose the password</value>
+  </data>
+  <data name="Activate.Help" xml:space="preserve">
+    <value>This account was created by an administrator. Choosing its password activates it: nobody else knows it.</value>
+  </data>
+  <data name="Activate.InvalidHeading" xml:space="preserve">
+    <value>Invalid link</value>
+  </data>
+  <data name="Activate.InvalidHelp" xml:space="preserve">
+    <value>This link is invalid, expired or already used. A new link comes from the person who created the account.</value>
+  </data>
+  <data name="Activate.Submit" xml:space="preserve">
+    <value>Activate the account</value>
+  </data>
+  <data name="Activate.Title" xml:space="preserve">
+    <value>Activate the account</value>
+  </data>
+  <data name="Error.Activation.Expired" xml:space="preserve">
+    <value>This link has expired. A new link comes from the person who created the account.</value>
+  </data>
+  <data name="Error.Activation.Invalid" xml:space="preserve">
+    <value>This link is invalid or already used.</value>
+  </data>
 </root>

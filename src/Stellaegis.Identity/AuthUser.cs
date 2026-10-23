@@ -18,7 +18,14 @@ public sealed class AuthUser
     public string DisplayName { get; set; } = "";
 
     /// <summary>The password, as <see cref="PasswordHasher"/> stores it: <c>pbkdf2_sha256$iterations$salt$hash</c>.</summary>
-    public string PasswordHash { get; set; } = "";
+    /// <remarks>
+    /// <see langword="null"/> while the account waits for its activation: an administrator created it without a
+    /// password, and the person chooses one by the link they received. Such an account does not sign in.
+    /// </remarks>
+    public string? PasswordHash { get; set; }
+
+    /// <summary>Whether the account has a password: created by its person, or activated.</summary>
+    public bool IsActivated => PasswordHash is not null;
 
     /// <summary>Whether the person may sign in. An administrator disables an account; a disabled account is blocked at the door.</summary>
     public bool IsEnabled { get; set; }

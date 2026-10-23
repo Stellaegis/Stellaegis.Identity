@@ -514,4 +514,34 @@
   <data name="VerifyEmail.Title" xml:space="preserve">
     <value>Vérification de l'e-mail</value>
   </data>
+  <data name="Activate.DoneHeading" xml:space="preserve">
+    <value>Compte activé</value>
+  </data>
+  <data name="Activate.DoneHelp" xml:space="preserve">
+    <value>Le mot de passe est enregistré : le compte est prêt pour la connexion.</value>
+  </data>
+  <data name="Activate.Heading" xml:space="preserve">
+    <value>Choisir le mot de passe</value>
+  </data>
+  <data name="Activate.Help" xml:space="preserve">
+    <value>Ce compte a été créé par un administrateur. Le choix de son mot de passe l'active : personne d'autre ne le connaît.</value>
+  </data>
+  <data name="Activate.InvalidHeading" xml:space="preserve">
+    <value>Lien invalide</value>
+  </data>
+  <data name="Activate.InvalidHelp" xml:space="preserve">
+    <value>Ce lien est invalide, a expiré ou a déjà été utilisé. Un nouveau lien s'obtient auprès de la personne qui a créé le compte.</value>
+  </data>
+  <data name="Activate.Submit" xml:space="preserve">
+    <value>Activer le compte</value>
+  </data>
+  <data name="Activate.Title" xml:space="preserve">
+    <value>Activer le compte</value>
+  </data>
+  <data name="Error.Activation.Expired" xml:space="preserve">
+    <value>Ce lien a expiré. Un nouveau lien s'obtient auprès de la personne qui a créé le compte.</value>
+  </data>
+  <data name="Error.Activation.Invalid" xml:space="preserve">
+    <value>Ce lien est invalide ou a déjà été utilisé.</value>
+  </data>
 </root>

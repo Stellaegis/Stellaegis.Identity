@@ -62,6 +62,14 @@ public sealed class LoginService(
                 return LoginResult.Failure(IdentityErrors.InvalidCredentials);
             }
 
+            // An account without a password is refused for that reason, not only because the dummy hash fails; the
+            // person is told what anyone is told, so that the answer does not say an account waits at this address.
+            if (!user.IsActivated)
+            {
+                await RecordAsync(user.UserUniqueId, normalized, false, LoginFailureReasons.NotActivated, ipAddress, userAgent, now, cancellationToken);
+                return LoginResult.Failure(IdentityErrors.InvalidCredentials);
+            }
+
             if (user.BlockedUntil is { } until && until > now)
             {
                 logger.LogWarning("Login refused for {Email}: locked until {Until}", user.Email, until);

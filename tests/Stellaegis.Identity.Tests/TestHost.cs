@@ -66,10 +66,12 @@ internal sealed class TestHost : IDisposable
     /// <summary>An enabled account, created by the administration, whose id is returned.</summary>
     public async Task<Guid> CreateUserAsync(string email = "jane@acme.test", string password = "Correct-Horse-9", string displayName = "Jane")
     {
-        var result = await Get<AccountAdministrationService>().CreateAsync(email, displayName, password, Actor.Parse("admin"));
+        var result = await Get<AccountAdministrationService>().CreateAsync(email, displayName, TokenDelivery.Hand, Actor.Parse("admin"));
         Assert.True(result.IsSuccess, result.Error?.ToString());
+        var activated = await Get<ActivationService>().ActivateAsync(result.Value.ActivationToken, password);
+        Assert.True(activated.IsSuccess, activated.Error?.ToString());
         Events.Events.Clear();
-        return result.Value;
+        return result.Value.UserUniqueId;
     }
 
     public void Dispose()

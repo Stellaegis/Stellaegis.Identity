@@ -1,21 +1,27 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Stellaegis.Primitives;
 
 namespace Stellaegis.Identity;
 
 /// <summary>
 /// What an administrator — or the installation — does to accounts: creating one, blocking and unblocking,
-/// deleting, resetting the failed logins, the second factor or the password. Each write names the actor who
-/// made it; none depends on the registration posture. The routes of <c>Stellaegis.Identity.AspNetCore</c> call
-/// it under the operations of <see cref="IdentityOperations"/>.
+/// deleting, resetting the failed logins or the second factor, issuing the link of an activation or of a reset.
+/// Each write names the actor who made it; none depends on the registration posture. The routes of
+/// <c>Stellaegis.Identity.AspNetCore</c> call it under the operations of <see cref="IdentityOperations"/>.
 /// </summary>
+/// <remarks>
+/// An administrator never chooses nor learns a password: an account is created without one, and its person chooses
+/// it by an activation link; a forgotten password is reset by a link too. The link is sent by e-mail, or handed over
+/// when the host declares it — the token is returned, and its delivery recorded, for the caller to do either.
+/// </remarks>
 public sealed class AccountAdministrationService(
     IAuthUserStore users,
     IMfaStore mfa,
     IRecoveryCodeStore recoveryCodes,
-    PasswordHasher hasher,
-    PasswordStrengthEvaluator passwords,
+    IAccountTokenStore tokens,
     IEventPublisher events,
+    IOptions<IdentityOptions> options,
     TimeProvider clock,
     ILogger<AccountAdministrationService> logger)
 {
@@ -25,34 +31,74 @@ public sealed class AccountAdministrationService(
     /// <summary>The <see cref="UserBlockedEvent.Reason"/> of an account deleted.</summary>
     public const string DeletedReason = "deleted";
 
-    /// <summary>Creates an enabled account, by <paramref name="actor"/>, and returns its id.</summary>
-    public async Task<Result<Guid>> CreateAsync(string email, string displayName, string password, Actor actor, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Creates an enabled account without a password, by <paramref name="actor"/>, and issues its activation token,
+    /// delivered by <paramref name="delivery"/>: the caller sends its link by e-mail, or hands it over. The account
+    /// does not sign in until its person chose a password by that link.
+    /// </summary>
+    public async Task<Result<PendingAccount>> CreateAsync(string email, string displayName, TokenDelivery delivery, Actor actor, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(actor);
         var normalized = Emails.Normalize(email);
         if (await users.GetByEmailAsync(normalized, cancellationToken) is not null)
-            return Result.Failure<Guid>(IdentityErrors.EmailTaken);
-        var violations = passwords.Violations(password);
-        if (violations.Count > 0)
-            return Result.Failure<Guid>(IdentityErrors.PasswordRejected(violations));
+            return Result.Failure<PendingAccount>(IdentityErrors.EmailTaken);
 
-        var id = Guid.NewGuid();
         var now = clock.GetUtcNow();
-        await users.CreateAsync(new AuthUser
+        var user = new AuthUser
         {
-            UserUniqueId = id,
+            UserUniqueId = Guid.NewGuid(),
             Email = normalized,
             DisplayName = Guard.NotWhiteSpace(displayName).Trim(),
-            PasswordHash = hasher.Hash(password),
+            PasswordHash = null,
             IsEnabled = true,
             CreatedAt = now,
             CreatedBy = actor,
             ModifiedAt = now,
             ModifiedBy = actor,
-        }, cancellationToken);
-        await events.PublishAsync(new UserRegisteredEvent { OccurredAt = now, UserUniqueId = id, Email = normalized, DisplayName = displayName.Trim() }, cancellationToken);
-        logger.LogInformation("Account {UserUniqueId} created by {Actor}", id, actor);
-        return Result.Success(id);
+        };
+        await users.CreateAsync(user, cancellationToken);
+        var token = await tokens.IssueAsync(user, AccountTokenPurpose.Activation, delivery, actor, now, options.Value.Activation.TokenLifetime, null, cancellationToken);
+        await events.PublishAsync(new UserRegisteredEvent { OccurredAt = now, UserUniqueId = user.UserUniqueId, Email = normalized, DisplayName = user.DisplayName }, cancellationToken);
+        logger.LogInformation("Account {UserUniqueId} created by {Actor}, waiting for its activation", user.UserUniqueId, actor);
+        return Result.Success(new PendingAccount(user.UserUniqueId, normalized, token));
+    }
+
+    /// <summary>
+    /// Issues a new activation token for an account that still waits for its activation — the first link expired,
+    /// or went astray —, revoking the previous one.
+    /// </summary>
+    public async Task<Result<IssuedToken>> IssueActivationAsync(Guid userUniqueId, TokenDelivery delivery, Actor actor, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(actor);
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+        if (user is null || user.IsDeleted)
+            return Result.Failure<IssuedToken>(IdentityErrors.AccountNotFound);
+        if (!user.IsEnabled)
+            return Result.Failure<IssuedToken>(IdentityErrors.AccountBlocked);
+        if (user.IsActivated)
+            return Result.Failure<IssuedToken>(IdentityErrors.AccountAlreadyActivated);
+        var token = await tokens.IssueAsync(user, AccountTokenPurpose.Activation, delivery, actor, clock.GetUtcNow(), options.Value.Activation.TokenLifetime, null, cancellationToken);
+        logger.LogInformation("Activation of {UserUniqueId} issued again by {Actor}", userUniqueId, actor);
+        return Result.Success(new IssuedToken(user.Email, token));
+    }
+
+    /// <summary>
+    /// Issues a password reset token for an active account, by <paramref name="actor"/>, revoking the previous one:
+    /// the person chooses the new password by its link. The administrator never sets it.
+    /// </summary>
+    public async Task<Result<IssuedToken>> IssuePasswordResetAsync(Guid userUniqueId, TokenDelivery delivery, Actor actor, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(actor);
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+        if (user is null || user.IsDeleted)
+            return Result.Failure<IssuedToken>(IdentityErrors.AccountNotFound);
+        if (!user.IsEnabled)
+            return Result.Failure<IssuedToken>(IdentityErrors.AccountBlocked);
+        if (!user.IsActivated)
+            return Result.Failure<IssuedToken>(IdentityErrors.AccountNotActivated);
+        var token = await tokens.IssueAsync(user, AccountTokenPurpose.PasswordReset, delivery, actor, clock.GetUtcNow(), options.Value.PasswordReset.TokenLifetime, null, cancellationToken);
+        logger.LogInformation("Password reset of {UserUniqueId} issued by {Actor}", userUniqueId, actor);
+        return Result.Success(new IssuedToken(user.Email, token));
     }
 
     /// <summary>Disables the account: it is blocked at the door from now on. Already disabled, nothing changes.</summary>
@@ -135,27 +181,18 @@ public sealed class AccountAdministrationService(
         logger.LogInformation("Second factor of {UserUniqueId} reset by {Actor}", userUniqueId, actor);
         return Result.Success();
     }
-
-    /// <summary>Sets a new password without the current one; a lockout in progress ends with it.</summary>
-    public async Task<Result> ChangePasswordAsync(Guid userUniqueId, string newPassword, Actor actor, CancellationToken cancellationToken = default)
-    {
-        Guard.NotNull(actor);
-        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        if (user is null)
-            return Result.Failure(IdentityErrors.AccountNotFound);
-        var violations = passwords.Violations(newPassword);
-        if (violations.Count > 0)
-            return Result.Failure(IdentityErrors.PasswordRejected(violations));
-        user.PasswordHash = hasher.Hash(newPassword);
-        user.FailedLoginCount = 0;
-        user.BlockedUntil = null;
-        user.ModifiedAt = clock.GetUtcNow();
-        user.ModifiedBy = actor;
-        await users.UpdateAsync(user, cancellationToken);
-        logger.LogInformation("Password of {UserUniqueId} changed by {Actor}", userUniqueId, actor);
-        return Result.Success();
-    }
 }
+
+/// <summary>An account just created, waiting for its activation, and the token of its activation link.</summary>
+/// <param name="UserUniqueId">The identity of the account.</param>
+/// <param name="Email">Its e-mail, normalized, where an e-mailed link goes.</param>
+/// <param name="ActivationToken">The token, in clear this once: only its hash is kept.</param>
+public sealed record PendingAccount(Guid UserUniqueId, string Email, string ActivationToken);
+
+/// <summary>A token issued for an account, and where an e-mailed link goes.</summary>
+/// <param name="Email">The e-mail of the account.</param>
+/// <param name="Token">The token, in clear this once: only its hash is kept.</param>
+public sealed record IssuedToken(string Email, string Token);
 
 /// <summary>The blocked accounts read from the local <see cref="IAuthUserStore"/>, for a host that holds the accounts.</summary>
 internal sealed class LocalBlockedUsersSource(IAuthUserStore users) : IBlockedUsersSource

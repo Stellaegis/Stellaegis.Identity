@@ -26,21 +26,9 @@ public sealed class PasswordResetService(
         var user = await users.GetByEmailAsync(normalized, cancellationToken);
         if (user is null || !user.IsEnabled)
             return null;
-        var now = clock.GetUtcNow();
-        var (token, hash) = AccountTokens.New();
-        await tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, now, cancellationToken);
-        await tokens.CreateAsync(new AccountToken
-        {
-            TokenHash = hash,
-            UserUniqueId = user.UserUniqueId,
-            Purpose = AccountTokenPurpose.PasswordReset,
-            Delivery = TokenDelivery.Email,
-            Email = normalized,
-            CreatedAt = now,
-            CreatedBy = user.AsActor(),
-            ExpiresAt = now.Add(options.Value.PasswordReset.TokenLifetime),
-            IpAddress = ipAddress,
-        }, cancellationToken);
+        var token = await tokens.IssueAsync(
+            user, AccountTokenPurpose.PasswordReset, TokenDelivery.Email, user.AsActor(),
+            clock.GetUtcNow(), options.Value.PasswordReset.TokenLifetime, ipAddress, cancellationToken);
         logger.LogInformation("Password reset requested for {UserUniqueId}", user.UserUniqueId);
         return token;
     }

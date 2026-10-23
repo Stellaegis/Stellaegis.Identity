@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Stellaegis.Primitives;
 using Stellaegis.Primitives.AspNetCore;
 
@@ -24,11 +25,19 @@ namespace Stellaegis.Identity.AspNetCore;
 ///   <item><c>GET identity/users?skip=&amp;take=</c> — a page of the accounts, <c>users.read</c></item>
 ///   <item><c>POST identity/users/lookup</c> — the accounts with those ids, <c>users.read</c></item>
 ///   <item><c>GET identity/users/{id}</c> — one account, <c>users.read</c>; 404 with the code <c>Account.NotFound</c></item>
-///   <item><c>POST identity/users</c> — create an account, <c>users.write</c>; 201 with its id</item>
-///   <item><c>POST identity/users/{id}/block</c>, <c>/unblock</c>, <c>/reset-failed-logins</c>, <c>/reset-mfa</c>, <c>/change-password</c> — <c>users.write</c></item>
+///   <item><c>POST identity/users</c> — create an account without a password, <c>users.write</c>; 201 with its id, and its activation link when handed over</item>
+///   <item><c>POST identity/users/{id}/activation</c> — a new activation link for an account that waits for it, <c>users.write</c></item>
+///   <item><c>POST identity/users/{id}/password-reset</c> — a reset link for an active account, <c>users.write</c>: the administrator never sets a password</item>
+///   <item><c>POST identity/users/{id}/block</c>, <c>/unblock</c>, <c>/reset-failed-logins</c>, <c>/reset-mfa</c> — <c>users.write</c></item>
 ///   <item><c>DELETE identity/users/{id}</c> — delete an account, <c>users.delete</c></item>
 ///   <item><c>GET identity/security/blocked-users</c> — the subjects blocked at the door, <c>security.read</c></item>
 /// </list>
+/// <para>
+/// A link is sent by e-mail through the host's <see cref="IIdentityMailer"/> — <c>"delivery": "email"</c>, the
+/// default —, or returned once in the answer for the administrator to hand it over — <c>"delivery": "hand"</c>,
+/// when the host declares <see cref="LinkOptions.HandDelivery"/>. A host with neither a mailer nor the hand
+/// delivery could activate nobody: mapping the routes refuses it.
+/// </para>
 /// <para>The routes carry no name, so the module can be mapped several times in one host.</para>
 /// </remarks>
 /// <example>
@@ -61,6 +70,7 @@ public static class IdentityAdminEndpoints
     /// </summary>
     /// <param name="endpoints">The builder to map the routes on — the application, or a route group.</param>
     /// <returns>The group holding the routes, for the host's authorization and further conventions.</returns>
+    /// <exception cref="InvalidOperationException">The host has neither an <see cref="IIdentityMailer"/> nor the hand delivery declared.</exception>
     public static RouteGroupBuilder MapIdentityAdminEndpoints(this IEndpointRouteBuilder endpoints)
     {
         Guard.NotNull(endpoints);
@@ -68,6 +78,14 @@ public static class IdentityAdminEndpoints
             .BelongsTo<IdentityModule>()
             .LoadsNoResource()
             .AddErrorTranslation();
+
+        var hasMailer = endpoints.ServiceProvider.GetService<IServiceProviderIsService>()?.IsService(typeof(IIdentityMailer)) ?? false;
+        if (!hasMailer && !endpoints.ServiceProvider.GetRequiredService<IOptions<IdentityOptions>>().Value.Links.HandDelivery)
+        {
+            throw new InvalidOperationException(
+                $"The administration of the accounts creates them without a password, and their activation link is sent by an {nameof(IIdentityMailer)} "
+                + $"or handed over: register a mailer, or declare {IdentityOptions.SectionName}:{nameof(IdentityOptions.Links)}:{nameof(LinkOptions.HandDelivery)}.");
+        }
 
         var users = group.MapGroup("/users");
 
@@ -102,18 +120,57 @@ public static class IdentityAdminEndpoints
             .Produces<AccountSummary>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        users.MapPost("/", async (CreateAccountRequest request, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
+        users.MapPost("/", async (CreateAccountRequest request, HttpContext http, AccountAdministrationService accounts, IOptions<IdentityOptions> options, CancellationToken ct) =>
             {
-                if (request is null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.DisplayName) || string.IsNullOrWhiteSpace(request.Password))
-                    return Result.Failure(Error.Validation("Account.Invalid", "An account has an e-mail, a display name and a password.")).ToHttpResult();
-                var created = await accounts.CreateAsync(request.Email, request.DisplayName, request.Password, Callers.ActorOf(http), ct);
-                return created.IsSuccess
-                    ? Results.Created((string?)null, new AccountCreated(created.Value))
-                    : created.ToHttpResult();
+                if (request is null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.DisplayName))
+                    return Result.Failure(Error.Validation("Account.Invalid", "An account has an e-mail and a display name; its person chooses its password.")).ToHttpResult();
+                var delivery = Delivery.Of(request.Delivery, http, options.Value);
+                if (delivery.IsFailure)
+                    return delivery.ToHttpResult();
+                var created = await accounts.CreateAsync(request.Email, request.DisplayName, delivery.Value, Callers.ActorOf(http), ct);
+                if (created.IsFailure)
+                    return created.ToHttpResult();
+                var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ActivatePath, created.Value.Email, created.Value.ActivationToken, options.Value.Activation.TokenLifetime, ct);
+                return Results.Created((string?)null, new AccountCreated(created.Value.UserUniqueId, link));
             })
             .WithMetadata(IdentityOperations.UsersWrite)
             .Produces<AccountCreated>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        users.MapPost("/{id:guid}/activation", async (Guid id, IssueLinkRequest? request, HttpContext http, AccountAdministrationService accounts, IOptions<IdentityOptions> options, CancellationToken ct) =>
+            {
+                var delivery = Delivery.Of(request?.Delivery, http, options.Value);
+                if (delivery.IsFailure)
+                    return delivery.ToHttpResult();
+                var issued = await accounts.IssueActivationAsync(id, delivery.Value, Callers.ActorOf(http), ct);
+                if (issued.IsFailure)
+                    return issued.ToHttpResult();
+                var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ActivatePath, issued.Value.Email, issued.Value.Token, options.Value.Activation.TokenLifetime, ct);
+                return Results.Ok(new IssuedLink(link));
+            })
+            .WithMetadata(IdentityOperations.UsersWrite)
+            .Produces<IssuedLink>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        users.MapPost("/{id:guid}/password-reset", async (Guid id, IssueLinkRequest? request, HttpContext http, AccountAdministrationService accounts, IOptions<IdentityOptions> options, CancellationToken ct) =>
+            {
+                var delivery = Delivery.Of(request?.Delivery, http, options.Value);
+                if (delivery.IsFailure)
+                    return delivery.ToHttpResult();
+                var issued = await accounts.IssuePasswordResetAsync(id, delivery.Value, Callers.ActorOf(http), ct);
+                if (issued.IsFailure)
+                    return issued.ToHttpResult();
+                var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ResetPasswordPath, issued.Value.Email, issued.Value.Token, options.Value.PasswordReset.TokenLifetime, ct);
+                return Results.Ok(new IssuedLink(link));
+            })
+            .WithMetadata(IdentityOperations.UsersWrite)
+            .Produces<IssuedLink>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         users.MapPost("/{id:guid}/block", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
@@ -138,17 +195,6 @@ public static class IdentityAdminEndpoints
                 (await accounts.ResetMfaAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
             .WithMetadata(IdentityOperations.UsersWrite)
             .Produces(StatusCodes.Status204NoContent)
-            .ProducesProblem(StatusCodes.Status404NotFound);
-
-        users.MapPost("/{id:guid}/change-password", async (Guid id, ChangePasswordRequest request, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
-            {
-                if (request is null || string.IsNullOrWhiteSpace(request.NewPassword))
-                    return Result.Failure(Error.Validation("Password.Required", "A new password is required.")).ToHttpResult();
-                return (await accounts.ChangePasswordAsync(id, request.NewPassword, Callers.ActorOf(http), ct)).ToHttpResult();
-            })
-            .WithMetadata(IdentityOperations.UsersWrite)
-            .Produces(StatusCodes.Status204NoContent)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         users.MapDelete("/{id:guid}", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
@@ -184,6 +230,7 @@ public static class IdentityAdminEndpoints
 /// <param name="Email">Its e-mail, normalized.</param>
 /// <param name="DisplayName">Its display name.</param>
 /// <param name="IsEnabled">Whether it is enabled; a disabled account is blocked at the door.</param>
+/// <param name="IsActivated">Whether it has a password; an account created by an administrator waits for its activation.</param>
 /// <param name="MfaEnabled">Whether a second factor is required at login.</param>
 /// <param name="BlockedUntil">Until when a lockout holds, or <see langword="null"/>.</param>
 /// <param name="FailedLoginCount">How many logins failed since the last success.</param>
@@ -195,6 +242,7 @@ public sealed record AccountSummary(
     string Email,
     string DisplayName,
     bool IsEnabled,
+    bool IsActivated,
     bool MfaEnabled,
     DateTimeOffset? BlockedUntil,
     int FailedLoginCount,
@@ -203,7 +251,7 @@ public sealed record AccountSummary(
     DateTimeOffset ModifiedAt)
 {
     internal static AccountSummary Of(AuthUser user, bool mfaEnabled) => new(
-        user.UserUniqueId, user.Email, user.DisplayName, user.IsEnabled, mfaEnabled,
+        user.UserUniqueId, user.Email, user.DisplayName, user.IsEnabled, user.IsActivated, mfaEnabled,
         user.BlockedUntil, user.FailedLoginCount, user.LastLogin, user.CreatedAt, user.ModifiedAt);
 }
 
@@ -220,16 +268,64 @@ public sealed record AccountList(IReadOnlyList<AccountSummary> Items);
 /// <param name="UserUniqueIds">Their ids.</param>
 public sealed record LookupAccountsRequest(Guid[]? UserUniqueIds);
 
-/// <summary>An account to create, enabled.</summary>
+/// <summary>An account to create, enabled, without a password: its person chooses it by the activation link.</summary>
 /// <param name="Email">Its e-mail.</param>
 /// <param name="DisplayName">Its display name.</param>
-/// <param name="Password">Its password, which the policy of the host checks.</param>
-public sealed record CreateAccountRequest(string? Email, string? DisplayName, string? Password);
+/// <param name="Delivery">How the activation link reaches the person: <c>email</c>, the default, or <c>hand</c>, when the host declares it.</param>
+public sealed record CreateAccountRequest(string? Email, string? DisplayName, string? Delivery = null);
 
 /// <summary>The account just created.</summary>
 /// <param name="UserUniqueId">Its id.</param>
-public sealed record AccountCreated(Guid UserUniqueId);
+/// <param name="ActivationLink">The activation link, to hand over, when it was asked by hand; shown this once.</param>
+public sealed record AccountCreated(Guid UserUniqueId, Uri? ActivationLink = null);
 
-/// <summary>A new password set by an administrator, without the current one.</summary>
-/// <param name="NewPassword">The new password.</param>
-public sealed record ChangePasswordRequest(string? NewPassword);
+/// <summary>How a link issued by an administrator reaches the person.</summary>
+/// <param name="Delivery"><c>email</c>, the default, or <c>hand</c>, when the host declares it.</param>
+public sealed record IssueLinkRequest(string? Delivery = null);
+
+/// <summary>A link issued by an administrator.</summary>
+/// <param name="Link">The link, to hand over, when it was asked by hand; shown this once. <see langword="null"/> when it was sent by e-mail.</param>
+public sealed record IssuedLink(Uri? Link);
+
+/// <summary>How the administration delivers the links it issues.</summary>
+internal static class Delivery
+{
+    /// <summary>The code of the error answered when the link cannot travel the way asked.</summary>
+    public const string UnavailableCode = "Delivery.Unavailable";
+
+    /// <summary>
+    /// The delivery <paramref name="value"/> names — <c>email</c> unless given —, when the host can do it: a mailer for
+    /// <c>email</c>, the hand delivery declared for <c>hand</c>.
+    /// </summary>
+    public static Result<TokenDelivery> Of(string? value, HttpContext http, IdentityOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "email", StringComparison.OrdinalIgnoreCase))
+        {
+            return http.RequestServices.GetService<IIdentityMailer>() is null
+                ? Result.Failure<TokenDelivery>(Error.Conflict(UnavailableCode, "No mail is sent by this host: ask for the link by hand, if the host allows it."))
+                : Result.Success(TokenDelivery.Email);
+        }
+        if (string.Equals(value, "hand", StringComparison.OrdinalIgnoreCase))
+        {
+            return options.Links.HandDelivery
+                ? Result.Success(TokenDelivery.Hand)
+                : Result.Failure<TokenDelivery>(Error.Forbidden(UnavailableCode, "This host does not hand links over: they are sent by e-mail."));
+        }
+        return Result.Failure<TokenDelivery>(Error.Validation(UnavailableCode, "The delivery is email or hand."));
+    }
+
+    /// <summary>Sends the link of <paramref name="token"/> by e-mail and returns nothing, or returns it to be handed over.</summary>
+    public static async Task<Uri?> DeliverAsync(
+        HttpContext http, IdentityOptions options, TokenDelivery delivery, string path, string email, string token, TimeSpan lifetime, CancellationToken ct)
+    {
+        var link = IdentityLinks.Of(options.Links, http.Request, path, token);
+        if (delivery == TokenDelivery.Hand)
+            return link;
+        var mailer = http.RequestServices.GetRequiredService<IIdentityMailer>();
+        if (path == IdentityLinks.ActivatePath)
+            await mailer.SendActivationLinkAsync(email, link, lifetime, ct);
+        else
+            await mailer.SendPasswordResetLinkAsync(email, link, lifetime, ct);
+        return null;
+    }
+}
