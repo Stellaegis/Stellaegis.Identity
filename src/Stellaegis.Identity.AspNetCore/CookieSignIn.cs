@@ -84,10 +84,15 @@ public sealed class CookieSignIn(LoginService login)
     /// factor, for instance. Fails with <see cref="IdentityErrors.AccountBlocked"/> when the account is gone or
     /// blocked at the door since.
     /// </summary>
-    public async Task<Result> SignInAsync(HttpContext httpContext, Guid userUniqueId, bool persistent = false, CancellationToken cancellationToken = default)
+    /// <param name="httpContext">The request.</param>
+    /// <param name="userUniqueId">The account.</param>
+    /// <param name="methods">How the person proved who they are, <see cref="AuthenticationMethods"/>: the session's <c>amr</c>.</param>
+    /// <param name="persistent">Whether the cookie outlives the browser session.</param>
+    /// <param name="cancellationToken">Cancels the sign-in.</param>
+    public async Task<Result> SignInAsync(HttpContext httpContext, Guid userUniqueId, IReadOnlyCollection<string> methods, bool persistent = false, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(httpContext);
-        var principal = await login.CreatePrincipalAsync(userUniqueId, IdentityCookie.Scheme, cancellationToken);
+        var principal = await login.CreatePrincipalAsync(userUniqueId, methods, IdentityCookie.Scheme, cancellationToken);
         if (principal is null)
             return Result.Failure(IdentityErrors.AccountBlocked);
         await SignInAsync(httpContext, principal, persistent);

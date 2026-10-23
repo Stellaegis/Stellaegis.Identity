@@ -107,7 +107,7 @@ public sealed class LoginService(
             }
 
             logger.LogInformation("Login of {Email}", user.Email);
-            return LoginResult.Success(BuildPrincipal(user, authenticationType));
+            return LoginResult.Success(BuildPrincipal(user, AuthenticationMethods.PasswordOnly, authenticationType));
         }
         finally
         {
@@ -119,25 +119,29 @@ public sealed class LoginService(
 
     /// <summary>
     /// The principal of an account whose credentials were verified already — after the one-time code of a second
-    /// factor, for instance —, or <see langword="null"/> when the account is gone or disabled since.
+    /// factor, for instance —, saying by <paramref name="methods"/> how (<see cref="AuthenticationMethods"/>), or
+    /// <see langword="null"/> when the account is gone or disabled since.
     /// </summary>
-    public async Task<ClaimsPrincipal?> CreatePrincipalAsync(Guid userUniqueId, string authenticationType = DefaultAuthenticationType, CancellationToken cancellationToken = default)
+    public async Task<ClaimsPrincipal?> CreatePrincipalAsync(
+        Guid userUniqueId, IReadOnlyCollection<string> methods, string authenticationType = DefaultAuthenticationType, CancellationToken cancellationToken = default)
     {
+        Guard.Satisfies(Guard.NotNull(methods), m => m.Count > 0, "A principal says how the person proved who they are.");
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        return user is null || user.IsBlockedAtDoor ? null : BuildPrincipal(user, authenticationType);
+        return user is null || user.IsBlockedAtDoor ? null : BuildPrincipal(user, methods, authenticationType);
     }
 
-    private static ClaimsPrincipal BuildPrincipal(AuthUser user, string authenticationType)
+    private static ClaimsPrincipal BuildPrincipal(AuthUser user, IReadOnlyCollection<string> methods, string authenticationType)
     {
         Guard.NotWhiteSpace(authenticationType);
         var subject = user.Subject;
-        Claim[] claims =
+        List<Claim> claims =
         [
             new(ClaimTypes.NameIdentifier, subject),
             new("sub", subject),
             new("email", user.Email),
             new("name", user.DisplayName),
         ];
+        claims.AddRange(methods.Select(method => new Claim(AuthenticationMethods.ClaimType, method)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType));
     }
 

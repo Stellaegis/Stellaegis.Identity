@@ -42,19 +42,21 @@ internal sealed class LoginMfaModel(
             return Page();
         }
 
-        var valid = ByEmail
-            ? loginCodes.Validate(state.UserUniqueId, Code)
-            : await mfa.ValidateCodeAsync(state.UserUniqueId, Code!, cancellationToken);
-        if (!valid)
-            valid = await recoveryCodes.TryConsumeAsync(state.UserUniqueId, Code, cancellationToken);
-        if (!valid)
+        var methods = (ByEmail
+                ? loginCodes.Validate(state.UserUniqueId, Code)
+                : await mfa.ValidateCodeAsync(state.UserUniqueId, Code!, cancellationToken))
+            ? AuthenticationMethods.PasswordAndCode
+            : await recoveryCodes.TryConsumeAsync(state.UserUniqueId, Code, cancellationToken)
+                ? AuthenticationMethods.PasswordAndRecoveryCode
+                : null;
+        if (methods is null)
         {
             ModelState.AddModelError(nameof(Code), texts["Mfa.CodeInvalid"]);
             return Page();
         }
 
         pending.Clear(HttpContext, PendingStates.Mfa);
-        var signedIn = await signIn.SignInAsync(HttpContext, state.UserUniqueId, cancellationToken: cancellationToken);
+        var signedIn = await signIn.SignInAsync(HttpContext, state.UserUniqueId, methods, cancellationToken: cancellationToken);
         if (signedIn.IsFailure)
             return Redirect(IdentityCookie.LoginPath);
         return LocalRedirect(state.ReturnUrl.Length > 0 ? state.ReturnUrl : pages.Value.DefaultReturnUrl);

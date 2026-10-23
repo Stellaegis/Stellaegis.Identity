@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Stellaegis.Identity.AspNetCore;
@@ -38,6 +39,8 @@ internal static class PagesTestHost
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapStellaegisIdentityPages();
+        // How the signed-in person proved who they are, as the session says it.
+        app.MapGet("/test/amr", (HttpContext http) => string.Join(' ', http.User.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value))).RequireAuthorization();
         await app.StartAsync(ct);
         return app;
     }

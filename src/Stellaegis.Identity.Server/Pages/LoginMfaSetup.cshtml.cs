@@ -68,7 +68,8 @@ internal sealed class LoginMfaSetupModel(
             return Redirect("/login/mfa-setup");
 
         pending.Clear(HttpContext, PendingStates.MfaSetup);
-        var signedIn = await signIn.SignInAsync(HttpContext, state.UserUniqueId, cancellationToken: cancellationToken);
+        // The authenticator was just enrolled by a code it generated: a second factor used for this login.
+        var signedIn = await signIn.SignInAsync(HttpContext, state.UserUniqueId, AuthenticationMethods.PasswordAndCode, cancellationToken: cancellationToken);
         if (signedIn.IsFailure)
             return Redirect(IdentityCookie.LoginPath);
         return LocalRedirect(state.ReturnUrl.Length > 0 ? state.ReturnUrl : pages.Value.DefaultReturnUrl);

@@ -111,6 +111,18 @@ public sealed class PagesTests
         Assert.Equal(HttpStatusCode.Redirect, done.StatusCode);
         Assert.Equal("/account", done.Headers.Location!.ToString());
         Assert.True(browser.HasCookie(IdentityCookie.CookieName));
+        await browser.GetAsync("/test/amr", Ct);
+        Assert.Equal("pwd otp mfa", browser.Html);
+
+        // A recovery code is a second factor, not a code generated for this login: the session says so.
+        string recovery;
+        using (var scope = app.Services.CreateScope())
+            recovery = (await scope.ServiceProvider.GetRequiredService<RecoveryCodeService>().GenerateAsync(id, Ct))[0];
+        var again = new Browser(app);
+        await again.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+        await again.PostFormAsync("/login/mfa", new Dictionary<string, string> { ["Code"] = recovery }, Ct);
+        await again.GetAsync("/test/amr", Ct);
+        Assert.Equal("pwd mfa", again.Html);
 
         await using var strict = await PagesTestHost.StartAsync(Ct, identity: o => o.Mfa.RequireForAllUsers = true);
         await strict.CreateAccountAsync(Email, Password, Ct);

@@ -34,13 +34,14 @@ public sealed class CookieTests
             return Results.NoContent();
         });
         app.MapPost("/login/{id:guid}", async (Guid id, CookieSignIn signIn, HttpContext http, CancellationToken ct) =>
-            (await signIn.SignInAsync(http, id, cancellationToken: ct)).ToHttpResult());
+            (await signIn.SignInAsync(http, id, AuthenticationMethods.PasswordAndCode, cancellationToken: ct)).ToHttpResult());
         app.MapPost("/logout", async (CookieSignIn signIn, HttpContext http) =>
         {
             await signIn.SignOutAsync(http);
             return Results.NoContent();
         });
         app.MapGet("/me", (HttpContext http) => Results.Text(http.User.FindFirst("sub")!.Value)).RequireAuthorization();
+        app.MapGet("/amr", (HttpContext http) => Results.Text(string.Join(' ', http.User.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value)))).RequireAuthorization();
         await app.StartAsync(Ct);
         return app;
     }
@@ -70,6 +71,11 @@ public sealed class CookieTests
         Assert.Equal(HttpStatusCode.OK, answered.StatusCode);
         Assert.Equal(id.ToString("N"), await answered.Content.ReadAsStringAsync(Ct));
 
+        // The cookie carries how the person proved who they are: a password alone here.
+        using var amr = new HttpRequestMessage(HttpMethod.Get, "/amr");
+        amr.Headers.Add("Cookie", cookie.Split(';')[0]);
+        Assert.Equal("pwd", await (await client.SendAsync(amr, Ct)).Content.ReadAsStringAsync(Ct));
+
         using var logout = new HttpRequestMessage(HttpMethod.Post, "/logout");
         logout.Headers.Add("Cookie", cookie.Split(';')[0]);
         var loggedOut = await client.SendAsync(logout, Ct);
@@ -92,6 +98,11 @@ public sealed class CookieTests
 
         var byId = await client.PostAsync($"/login/{id:N}", null, Ct);
         Assert.Equal(HttpStatusCode.NoContent, byId.StatusCode);
+        using (var amr = new HttpRequestMessage(HttpMethod.Get, "/amr"))
+        {
+            amr.Headers.Add("Cookie", byId.Headers.GetValues("Set-Cookie").Single().Split(';')[0]);
+            Assert.Equal("pwd otp mfa", await (await client.SendAsync(amr, Ct)).Content.ReadAsStringAsync(Ct));
+        }
 
         var administration = app.Administration(out var scope);
         using (scope)

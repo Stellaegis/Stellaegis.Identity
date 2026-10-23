@@ -18,6 +18,7 @@ public sealed class LoginTests
         Assert.True(result.Succeeded);
         Assert.Equal(id.ToString("N"), result.Principal!.FindFirst("sub")!.Value);
         Assert.Equal("jane@acme.test", result.Principal.FindFirst("email")!.Value);
+        Assert.Equal([AuthenticationMethods.Password], result.Principal.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value));
         Assert.Equal(LoginService.DefaultAuthenticationType, result.Principal.Identity!.AuthenticationType);
         var user = await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id);
         Assert.Equal(host.Clock.Now, user!.LastLogin);
@@ -88,8 +89,10 @@ public sealed class LoginTests
         Assert.Equal("jane@acme.test", result.Email);
         Assert.True(await mfa.ValidateCodeAsync(id, code));
         Assert.False(await mfa.ValidateCodeAsync(id, "000000"));
-        var principal = await host.Get<LoginService>().CreatePrincipalAsync(id);
+        var principal = await host.Get<LoginService>().CreatePrincipalAsync(id, AuthenticationMethods.PasswordAndCode);
         Assert.Equal(id.ToString("N"), principal!.FindFirst("sub")!.Value);
+        Assert.Equal(["pwd", "otp", "mfa"], principal.FindAll("amr").Select(c => c.Value));
+        await Assert.ThrowsAsync<ArgumentException>(() => host.Get<LoginService>().CreatePrincipalAsync(id, []));
 
         using var required = new TestHost(o => o.Mfa.RequireForAllUsers = true);
         var other = await required.CreateUserAsync();
@@ -105,7 +108,7 @@ public sealed class LoginTests
         var id = await host.CreateUserAsync();
         await host.Get<AccountAdministrationService>().BlockAsync(id, Actor.Parse("admin"));
 
-        Assert.Null(await host.Get<LoginService>().CreatePrincipalAsync(id));
+        Assert.Null(await host.Get<LoginService>().CreatePrincipalAsync(id, AuthenticationMethods.PasswordAndCode));
     }
 
     [Fact]
