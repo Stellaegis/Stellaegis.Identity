@@ -21,25 +21,22 @@ public sealed class PostgreSqlCollection : ICollectionFixture<PostgreSqlFixture>
 /// at every run by the installation of the module, under that connection; the tests then connect under an
 /// ordinary role, <c>stellaegis_identity_app</c>, created once, as an application does.
 /// </summary>
-public sealed class PostgreSqlFixture : IAsyncLifetime
+public sealed class PostgreSqlFixture : IIdentityDatabaseFixture
 {
     private const string Variable = "STELLAEGIS_TEST_POSTGRESQL";
     private const string Database = "stellaegis_identity_tests";
     private const string AppRole = "stellaegis_identity_app";
 
-    /// <summary>The frame the database is installed for: the one of an enterprise host.</summary>
-    public static readonly ApplicationFrame Frame = ApplicationFrame.SingleCompartment("acme");
-
     /// <summary>The connection string of the installer, which owns the schema; empty without the variable.</summary>
     public string AdminConnectionString { get; private set; } = string.Empty;
 
-    /// <summary>The connection string the tests use, under the application's role.</summary>
+    /// <inheritdoc/>
     public string AppConnectionString { get; private set; } = string.Empty;
 
-    /// <summary>Why the database cannot be used, or <see langword="null"/> when it can.</summary>
+    /// <inheritdoc/>
     public string? Unavailable { get; private set; }
 
-    /// <summary>Skips the calling test when the database cannot be used.</summary>
+    /// <inheritdoc/>
     public void SkipWhenUnavailable() => Assert.SkipWhen(Unavailable is not null, Unavailable ?? string.Empty);
 
     /// <inheritdoc/>
@@ -86,7 +83,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
                 await reset.ExecuteNonQueryAsync();
             }
 
-            await DatabaseLifecycle.InstallAsync([IdentityDatabase.Value], Frame, (_, ct) => OpenAsync(asApplication: false, ct), AppRole, Actor.Job("tests"));
+            await DatabaseLifecycle.InstallAsync([IdentityDatabase.Value], IdentityStoreTests.Frame, (_, ct) => OpenAsync(asApplication: false, ct), AppRole, Actor.Job("tests"));
         }
         catch (NpgsqlException e)
         {
@@ -97,7 +94,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     /// <inheritdoc/>
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    /// <summary>Opens a connection to the test database, under the application's role or the installer's.</summary>
+    /// <inheritdoc/>
     public async Task<DbConnection> OpenAsync(bool asApplication, CancellationToken cancellationToken)
     {
         var connection = new NpgsqlConnection(asApplication ? AppConnectionString : AdminConnectionString);

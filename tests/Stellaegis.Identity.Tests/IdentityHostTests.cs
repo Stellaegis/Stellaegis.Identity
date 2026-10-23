@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Stellaegis.Identity.PostgreSQL;
 using Stellaegis.Primitives;
 using Stellaegis.Primitives.Data;
 using Stellaegis.Primitives.Hosting;
@@ -10,13 +9,32 @@ using Stellaegis.Primitives.Hosting;
 namespace Stellaegis.Identity.Tests;
 
 /// <summary>
-/// A host assembled on the PostgreSQL stores, as an enterprise host is: the database installed by the fixture,
+/// A host assembled on the stores of an engine, as an enterprise host is: the database installed by the fixture,
 /// verified at startup under the application's role, and the services of the module running on it.
 /// </summary>
-[Collection(PostgreSqlCollection.Name)]
-public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
+public abstract class IdentityHostTests(IIdentityDatabaseFixture database)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    /// <summary>The declaration of the database of the engine.</summary>
+    protected abstract ModuleDatabase Declaration { get; }
+
+    /// <summary>The configuration key of the connection string of the adapter.</summary>
+    protected abstract string ConnectionStringKey { get; }
+
+    /// <summary>Registers the module on the adapter, its options bound from <paramref name="configuration"/>.</summary>
+    protected abstract void AddIdentity(IServiceCollection services, IConfiguration configuration);
+
+    /// <summary>Registers the module on the adapter, its options configured in code.</summary>
+    protected abstract void AddIdentity(IServiceCollection services, string connectionString, Action<IdentityOptions> configure);
+
+    /// <summary>Makes the stores, and the verification, connect under the application's role, when the connection string does not.</summary>
+    protected virtual void UnderApplicationRole(IServiceCollection services)
+    {
+    }
+
+    /// <summary>The statement that renames the record of the installation away, or back.</summary>
+    protected abstract string RenameRecordSql(bool back);
 
     private IHost BuildHost()
     {
@@ -24,18 +42,19 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
         builder.Logging.ClearProviders();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Stellaegis:Identity:PostgreSQL:ConnectionString"] = database.AppConnectionString,
+            [ConnectionStringKey] = database.AppConnectionString,
             ["Stellaegis:Identity:PasswordHasher:Pepper"] = "test-pepper",
             ["Stellaegis:Identity:Mfa:SecretKeys:Keys:1"] = "test-totp-key",
             ["Stellaegis:Identity:PasswordHasher:Iterations"] = "1000",
             ["Stellaegis:Identity:LoginPolicy:MinResponseTime"] = "00:00:00",
         });
         builder.Services
-            .AddStellaegisFrame(PostgreSqlFixture.Frame)
+            .AddStellaegisFrame(IdentityStoreTests.Frame)
             .AddStellaegisValidation()
-            .AddStellaegisDatabaseVerification()
-            .AddStellaegisIdentityPostgreSQL(builder.Configuration)
-            .AddStellaegisLocalBlockedUsersSource();
+            .AddStellaegisDatabaseVerification();
+        AddIdentity(builder.Services, builder.Configuration);
+        builder.Services.AddStellaegisLocalBlockedUsersSource();
+        UnderApplicationRole(builder.Services);
         return builder.Build();
     }
 
@@ -48,7 +67,7 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
         await host.StartAsync(Ct);
         await host.StopAsync(Ct);
 
-        Assert.Equal([IdentityDatabase.Value], host.Services.GetStellaegisModuleDatabases());
+        Assert.Equal([Declaration], host.Services.GetStellaegisModuleDatabases());
         Assert.Contains(host.Services.GetStellaegisModules(), module => module.Module == typeof(IdentityModule));
     }
 
@@ -59,21 +78,20 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
         builder.Services
-            .AddStellaegisFrame(PostgreSqlFixture.Frame)
-            .AddStellaegisDatabaseVerification()
-            .AddStellaegisIdentityPostgreSQL(
-                options => options.ConnectionString = database.AppConnectionString,
-                options =>
-                {
-                    options.PasswordHasher.Pepper = "test-pepper";
-                    options.Mfa.SecretKeys = new KeySlots { Keys = { [1] = "test-totp-key" } };
-                });
+            .AddStellaegisFrame(IdentityStoreTests.Frame)
+            .AddStellaegisDatabaseVerification();
+        AddIdentity(builder.Services, database.AppConnectionString, options =>
+        {
+            options.PasswordHasher.Pepper = "test-pepper";
+            options.Mfa.SecretKeys = new KeySlots { Keys = { [1] = "test-totp-key" } };
+        });
+        UnderApplicationRole(builder.Services);
         using var host = builder.Build();
         await using (var connection = await database.OpenAsync(asApplication: false, Ct))
         await using (var command = connection.CreateCommand())
         {
             // The record of the installation is what the verification reads first: without it, nothing was installed.
-            command.CommandText = $"alter table {IdentityDatabase.Value.MigrationsTable} rename to _schema_migrations_gone";
+            command.CommandText = RenameRecordSql(back: false);
             await command.ExecuteNonQueryAsync(Ct);
         }
 
@@ -86,7 +104,7 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
         {
             await using var connection = await database.OpenAsync(asApplication: false, Ct);
             await using var command = connection.CreateCommand();
-            command.CommandText = "alter table ident._schema_migrations_gone rename to _schema_migrations";
+            command.CommandText = RenameRecordSql(back: true);
             await command.ExecuteNonQueryAsync(Ct);
         }
     }

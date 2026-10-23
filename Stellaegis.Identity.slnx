@@ -4,6 +4,7 @@
     <Project Path="src/Stellaegis.Identity.Client/Stellaegis.Identity.Client.csproj" />
     <Project Path="src/Stellaegis.Identity.PostgreSQL/Stellaegis.Identity.PostgreSQL.csproj" />
     <Project Path="src/Stellaegis.Identity.Server/Stellaegis.Identity.Server.csproj" />
+    <Project Path="src/Stellaegis.Identity.SqlServer/Stellaegis.Identity.SqlServer.csproj" />
     <Project Path="src/Stellaegis.Identity/Stellaegis.Identity.csproj" />
   </Folder>
   <Folder Name="/samples/">

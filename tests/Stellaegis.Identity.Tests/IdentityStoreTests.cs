@@ -1,34 +1,77 @@
-using Microsoft.Extensions.Options;
-using Npgsql;
-using Stellaegis.Identity.PostgreSQL;
+using System.Data.Common;
 using Stellaegis.Primitives;
+using Stellaegis.Primitives.Data;
 
 namespace Stellaegis.Identity.Tests;
 
-/// <summary>
-/// The six stores against a real PostgreSQL, under the application's role: what the schema and the queries
-/// guarantee, each port covered.
-/// </summary>
-[Collection(PostgreSqlCollection.Name)]
-public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposable
+/// <summary>A database of an engine for the store tests, installed by the installation of its module.</summary>
+public interface IIdentityDatabaseFixture : IAsyncLifetime
 {
+    /// <summary>The connection string a host is configured with.</summary>
+    string AppConnectionString { get; }
+
+    /// <summary>Why the database cannot be used, or <see langword="null"/> when it can.</summary>
+    string? Unavailable { get; }
+
+    /// <summary>Skips the calling test when the database cannot be used.</summary>
+    void SkipWhenUnavailable();
+
+    /// <summary>Opens a connection to the test database, under the application's role or the installer's.</summary>
+    Task<DbConnection> OpenAsync(bool asApplication, CancellationToken cancellationToken);
+}
+
+/// <summary>What the schema refuses, whatever the engine says it with.</summary>
+public enum Refusal
+{
+    /// <summary>A key or a unique value already taken.</summary>
+    Duplicate,
+
+    /// <summary>A row naming an account that does not exist.</summary>
+    MissingAccount,
+
+    /// <summary>A value its check refuses.</summary>
+    Check,
+
+    /// <summary>A right the role does not hold.</summary>
+    PermissionDenied,
+}
+
+/// <summary>
+/// The six stores against a real engine, under the application's role: what the schema and the queries
+/// guarantee, each port covered. Every engine runs the same scenarios; a derived class says only how its store is
+/// built and how its engine refuses.
+/// </summary>
+public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : IDisposable
+{
+    /// <summary>The frame the database is installed for: the one of an enterprise host.</summary>
+    public static readonly ApplicationFrame Frame = ApplicationFrame.SingleCompartment("acme");
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private readonly TestClock _clock = new();
-    private PostgreSqlIdentityStore? _store;
+    private object? _store;
 
-    private PostgreSqlIdentityStore Store()
+    /// <summary>The store of the engine on <paramref name="clock"/>, connected under the application's role.</summary>
+    protected abstract object CreateStore(TimeProvider clock);
+
+    /// <summary>Asserts that <paramref name="write"/> fails as the engine says <paramref name="refusal"/>.</summary>
+    protected abstract Task AssertRefusedAsync(Func<Task> write, Refusal refusal);
+
+    private object Store()
     {
         database.SkipWhenUnavailable();
-        return _store ??= new PostgreSqlIdentityStore(Options.Create(new IdentityDatabaseOptions { ConnectionString = database.AppConnectionString }), _clock);
+        return _store ??= CreateStore(_clock);
     }
 
-    private IAuthUserStore Users => Store();
-    private ILoginEventStore Logins => Store();
-    private IAccountTokenStore Tokens => Store();
-    private IEmailVerificationStore Verifications => Store();
-    private IMfaStore Mfa => Store();
-    private IRecoveryCodeStore RecoveryCodes => Store();
+    private IAuthUserStore Users => (IAuthUserStore)Store();
+    private ILoginEventStore Logins => (ILoginEventStore)Store();
+    private IAccountTokenStore Tokens => (IAccountTokenStore)Store();
+    private IEmailVerificationStore Verifications => (IEmailVerificationStore)Store();
+    private IMfaStore Mfa => (IMfaStore)Store();
+    private IRecoveryCodeStore RecoveryCodes => (IRecoveryCodeStore)Store();
+
+    /// <summary>The declaration of the database of the engine.</summary>
+    protected abstract ModuleDatabase Declaration { get; }
 
     /// <summary>An account nobody else wrote: the tests share one table.</summary>
     private AuthUser NewUser(string? email = null, bool enabled = true) => new()
@@ -44,7 +87,12 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         ModifiedBy = Actor.Parse("admin"),
     };
 
-    public void Dispose() => _store?.Dispose();
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        (_store as IDisposable)?.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
     [Fact]
     public async Task An_account_is_created_read_back_by_id_and_by_email_updated_and_counted()
@@ -88,8 +136,7 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         var user = NewUser();
         await Users.CreateAsync(user, Ct);
 
-        var exception = await Assert.ThrowsAsync<PostgresException>(() => Users.CreateAsync(NewUser(user.Email), Ct));
-        Assert.Equal("23505", exception.SqlState);
+        await AssertRefusedAsync(() => Users.CreateAsync(NewUser(user.Email), Ct), Refusal.Duplicate);
     }
 
     [Fact]
@@ -118,8 +165,7 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         // The id of a deleted account is taken for good.
         var sameId = NewUser();
         sameId.UserUniqueId = deleted.UserUniqueId;
-        var exception = await Assert.ThrowsAsync<PostgresException>(() => Users.CreateAsync(sameId, Ct));
-        Assert.Equal("23505", exception.SqlState);
+        await AssertRefusedAsync(() => Users.CreateAsync(sameId, Ct), Refusal.Duplicate);
 
         var blocked = (await Users.ListBlockedAsync(Ct)).Select(u => u.UserUniqueId).ToList();
         Assert.Contains(deleted.UserUniqueId, blocked);
@@ -188,10 +234,9 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         Assert.True((await Tokens.GetAsync(activation.TokenHash, Ct))!.IsValidAt(_clock.Now));
 
         // A token of an account that does not exist, or a hash that is not one, is refused by the schema.
-        var orphan = await Assert.ThrowsAsync<PostgresException>(() => Tokens.CreateAsync(Issued(AccountTokens.New().Hash, owner: Guid.NewGuid()), Ct));
-        Assert.Equal("23503", orphan.SqlState);
-        var notAHash = await Assert.ThrowsAsync<PostgresException>(() => Tokens.CreateAsync(Issued(new string('Z', 64)), Ct));
-        Assert.Equal("23514", notAHash.SqlState);
+        await AssertRefusedAsync(() => Tokens.CreateAsync(Issued(AccountTokens.New().Hash, owner: Guid.NewGuid()), Ct), Refusal.MissingAccount);
+        await AssertRefusedAsync(() => Tokens.CreateAsync(Issued(new string('Z', 64)), Ct), Refusal.Check);
+        await AssertRefusedAsync(() => Tokens.CreateAsync(Issued(AccountTokens.New().Hash.ToUpperInvariant()), Ct), Refusal.Check);
     }
 
     [Fact]
@@ -245,8 +290,23 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         Assert.Null(await Verifications.GetByEmailAsync(email, Ct));
 
         // A code that is not 4 to 10 digits is refused by the schema.
-        var bad = await Assert.ThrowsAsync<PostgresException>(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "12a", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct));
-        Assert.Equal("23514", bad.SqlState);
+        await AssertRefusedAsync(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "12a", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct), Refusal.Check);
+        await AssertRefusedAsync(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "123", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct), Refusal.Check);
+    }
+
+    [Fact]
+    public async Task Upserts_racing_on_the_same_key_leave_one_row()
+    {
+        var email = $"{Guid.NewGuid():N}@acme.test";
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(i => Verifications.UpsertAsync(
+            new EmailVerification { Email = email, Code = $"{1000 + i}", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct)));
+        await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Mfa.SetPendingSecretAsync(user.UserUniqueId, "JBSWY3DPEHPK3PXP", Ct)));
+
+        Assert.NotNull(await Verifications.GetByEmailAsync(email, Ct));
+        Assert.Equal("JBSWY3DPEHPK3PXP", (await Mfa.GetAsync(user.UserUniqueId, Ct))!.PendingSecret);
     }
 
     [Fact]
@@ -327,10 +387,8 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         database.SkipWhenUnavailable();
         await using var connection = await database.OpenAsync(asApplication: true, Ct);
         await using var command = connection.CreateCommand();
-        command.CommandText = $"insert into {IdentityDatabase.Value.MigrationsTable} (version, script_name, checksum, applied_by) values (9, 'x', 'x', 'x')";
+        command.CommandText = $"insert into {Declaration.MigrationsTable} (version, script_name, checksum, applied_by) values (9, 'x', 'x', 'x')";
 
-        var exception = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync(Ct));
-
-        Assert.Equal("42501", exception.SqlState);
+        await AssertRefusedAsync(() => command.ExecuteNonQueryAsync(Ct), Refusal.PermissionDenied);
     }
 }

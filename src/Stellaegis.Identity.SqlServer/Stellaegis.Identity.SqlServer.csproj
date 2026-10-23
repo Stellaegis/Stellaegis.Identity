@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Stellaegis.Identity.SqlServer</RootNamespace>
+    <PackageId>Stellaegis.Identity.SqlServer</PackageId>
+    <Description>The SQL Server stores of Stellaegis.Identity: the accounts, their second factors, recovery codes, e-mail verifications, password reset tokens and login events in the schema ident, with the declaration of the database for its installation and its verification at startup.</Description>
+    <PackageTags>stellaegis;identity;accounts;sqlserver;dapper</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- Pinned above the vulnerable version Microsoft.Data.SqlClient pulls in; see Directory.Packages.props -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <PackageReference Include="Stellaegis.Primitives.Data" />
+    <ProjectReference Include="..\Stellaegis.Identity\Stellaegis.Identity.csproj" />
+    <InternalsVisibleTo Include="Stellaegis.Identity.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Sql\**\*.sql" />
+  </ItemGroup>
+
+</Project>

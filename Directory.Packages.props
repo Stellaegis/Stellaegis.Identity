@@ -4,16 +4,20 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Stellaegis: the Microsoft.Extensions abstractions come with Stellaegis.Primitives.Hosting -->
-    <PackageVersion Include="Stellaegis.Primitives" Version="5.1.0" />
-    <PackageVersion Include="Stellaegis.Primitives.Hosting" Version="5.1.0" />
-    <PackageVersion Include="Stellaegis.Primitives.Data" Version="5.1.0" />
-    <PackageVersion Include="Stellaegis.Primitives.AspNetCore" Version="5.1.0" />
+    <PackageVersion Include="Stellaegis.Primitives" Version="5.2.0" />
+    <PackageVersion Include="Stellaegis.Primitives.Hosting" Version="5.2.0" />
+    <PackageVersion Include="Stellaegis.Primitives.Data" Version="5.2.0" />
+    <PackageVersion Include="Stellaegis.Primitives.AspNetCore" Version="5.2.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
     <!-- Passwords and one-time codes -->
     <PackageVersion Include="Otp.NET" Version="1.4.1" />
-    <!-- PostgreSQL -->
+    <!-- PostgreSQL, and Dapper for both engines -->
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <!-- SQL Server -->
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <!-- Pinned above what Microsoft.Data.SqlClient brings, 9.0.x: CVE-2026-84008, fixed in 10.0.13 -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <!-- Testing -->
     <PackageVersion Include="xunit.v3" Version="4.0.2" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
