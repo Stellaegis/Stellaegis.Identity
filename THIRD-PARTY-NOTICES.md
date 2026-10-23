@@ -7,11 +7,13 @@ Its packages reference the packages below, which NuGet installs alongside them, 
 | Component | Used by | License (SPDX) | Project |
 | --- | --- | --- | --- |
 | Stellaegis.Primitives, and Stellaegis.Primitives.Hosting | all packages | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
-| Stellaegis.Primitives.Data | `Stellaegis.Identity.PostgreSQL` | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
+| Stellaegis.Primitives.Data | `Stellaegis.Identity.PostgreSQL`, `Stellaegis.Identity.SqlServer` | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
 | Stellaegis.Primitives.AspNetCore | `Stellaegis.Identity.AspNetCore`, `Stellaegis.Identity.Server` | MIT | <https://github.com/Stellaegis/Stellaegis.Primitives> |
 | Otp.NET | `Stellaegis.Identity` | MIT | <https://github.com/kspearrin/Otp.NET> |
 | Npgsql | `Stellaegis.Identity.PostgreSQL` | PostgreSQL | <https://github.com/npgsql/npgsql> |
-| Dapper | `Stellaegis.Identity.PostgreSQL` | Apache-2.0 | <https://github.com/DapperLib/Dapper> |
+| Microsoft.Data.SqlClient | `Stellaegis.Identity.SqlServer` | MIT | <https://github.com/dotnet/SqlClient> |
+| System.Security.Cryptography.Pkcs | `Stellaegis.Identity.SqlServer` (pinned above the version Microsoft.Data.SqlClient pulls in) | MIT | <https://github.com/dotnet/runtime> |
+| Dapper | `Stellaegis.Identity.PostgreSQL`, `Stellaegis.Identity.SqlServer` | Apache-2.0 | <https://github.com/DapperLib/Dapper> |
 | Microsoft.Extensions.\* | all packages | MIT | <https://github.com/dotnet> |
 
 `Stellaegis.Identity.AspNetCore` and `Stellaegis.Identity.Server` use the ASP.NET Core shared framework, which the

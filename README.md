@@ -2,8 +2,9 @@
 
 Stellaegis.Identity holds the accounts of a .NET application assembled on
 [Stellaegis.Primitives](https://github.com/Stellaegis/Stellaegis.Primitives): who a person is, and that they are
-who they say. Registration, login with a lockout, a second factor by authenticator app or by e-mail, recovery
-codes, e-mail verification, password reset, the trace of logins, the administration of accounts — and, for any
+who they say. Accounts created by an administrator and activated by their person, or registered by the person
+alone; login with a lockout, a second factor by authenticator app or by e-mail, recovery codes, e-mail
+verification, password reset, the trace of logins and its purge, the administration of accounts — and, for any
 resource server, the one question it asks of the accounts: is this one blocked?
 
 It issues no token. Turning a signed-in person into tokens is the work of `Stellaegis.Issuer`, which takes the
@@ -18,17 +19,19 @@ The library targets .NET 10 and is released under the MIT license.
 | --- | --- | --- |
 | `Stellaegis.Identity` | The services — login, registration, account, password reset, e-mail verification, second factor, recovery codes, administration —, the ports of the stores, the in-memory stores, the module and its operations, the events, the passwords, the mailer port | `Stellaegis.Primitives`, `Stellaegis.Primitives.Hosting`, Otp.NET |
 | `Stellaegis.Identity.PostgreSQL` | The stores on PostgreSQL, and the `ident` schema declared as a module database for the installation and the verification | `Stellaegis.Primitives.Data`, Npgsql, Dapper |
+| `Stellaegis.Identity.SqlServer` | The same stores and the same schema on SQL Server | `Stellaegis.Primitives.Data`, Microsoft.Data.SqlClient, Dapper |
 | `Stellaegis.Identity.AspNetCore` | The cookie a person signs in with, the administration routes of the accounts under their operations, and the admission of actors on a resource server | `Stellaegis.Primitives.AspNetCore`, ASP.NET Core |
 | `Stellaegis.Identity.Client` | The HTTP source of the blocked accounts, for a resource server apart from the host that holds the accounts | `Stellaegis.Primitives.Hosting` |
 | `Stellaegis.Identity.Server` | The pages a person signs in and manages their account with, as a Razor class library the host mounts | `Stellaegis.Identity.AspNetCore`, ASP.NET Core |
 
-The five packages share one version, and follow the major version of Stellaegis.Primitives: 5.0.0 runs on
-Primitives 5.0.1.
+The six packages share one version. They started at the major version of Stellaegis.Primitives, 5; 6.0.0 runs
+on Primitives 5.2.0.
 
 ## A host, in full
 
 An enterprise application — one compartment, the company itself — holding the accounts of its own people. This
-is `samples/Stellaegis.Identity.Sample`, which runs as is on a PostgreSQL server.
+is `samples/Stellaegis.Identity.Sample`, which runs as is on a PostgreSQL server; on SQL Server, the host calls
+`AddStellaegisIdentitySqlServer` instead, from `Stellaegis:Identity:SqlServer`.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -66,9 +69,10 @@ the operations, its messaging behind `IIdentityMailer`, its bus behind `IEventPu
 
 ## Installing, then verifying
 
-The accounts live in the schema `ident` of a PostgreSQL database. Two executants, two roles, as everywhere in the
-family: an installer installs, under a role that owns the schema; the application verifies at every startup,
-under its own role, which was granted its data rights and never a DDL right.
+The accounts live in the schema `ident` of a PostgreSQL or SQL Server database — the same tables, the same rules.
+Two executants, two roles, as everywhere in the family: an installer installs, under a role that owns the schema;
+the application verifies at every startup, under its own role, which was granted its data rights and never a DDL
+right. On SQL Server, the application's role is a database role, which the login of the application joins.
 
 ```csharp
 await DatabaseLifecycle.InstallAsync([IdentityDatabase.Value], frame, openAsAdministrator, applicationRole: "myapp_app");
@@ -83,38 +87,73 @@ No account is seeded. The first administrator is a gesture of the installation, 
 module, as the example does:
 
 ```sh
-dotnet run -- install --admin-email admin@acme.test --admin-password 'Correct-Horse-9'
+dotnet run -- install --admin-email admin@acme.test
 ```
 
 The example's `install` verb creates the database and the application's role if missing, installs the schema
 under the administration connection, then calls `AccountAdministrationService.CreateAsync` as the actor
-`job:install`. Run again, it changes nothing.
+`job:install`. The account has no password: the installation prints its activation link, which the installer
+opens once the application runs, and chooses the password there — no password goes through the command line, its
+history or the list of processes. Run again, it changes nothing but a new link for an administrator still waiting.
 
 ## The accounts
 
 An account is an `AuthUser`: its identity `UserUniqueId`, a random GUID that its `sub` claim carries and that is
-never reused; its e-mail, normalized and unique among the enabled accounts; its display name; the hash of its
-password; whether it is enabled; its failed logins and its lockout; who created, modified and deleted it, as
-`Actor`s, never a default. A deleted account stays, marked, so that its identity is never given to someone else.
+never reused; its e-mail, normalized and unique among the accounts, and whether that address was proven; its
+display name; the hash of its password, absent while the account waits for its activation; whether it is enabled;
+its failed logins and its lockout; who created, modified and deleted it, as `Actor`s, never a default. A deleted
+account stays, marked, so that its identity is never given to someone else.
 
 The services do what a person or an administrator does to accounts, and answer a `Result` whose `Error` carries
 a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Account.Blocked`, `Email.Taken`,
-`Password.Rejected`, `Registration.Closed`, and so on, in `IdentityErrors`:
+`Password.Rejected`, `Registration.Closed`, `Account.NotActivated`, and so on, in `IdentityErrors`:
 
 | Service | What it does |
 | --- | --- |
 | `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due, and builds the principal — `sub`, `email`, `name` — a host signs in |
-| `RegistrationService` | Creates an account when the registration posture allows it, after the e-mail was proved by a code |
-| `AccountService` | Changes the password, the e-mail, deletes the account, verifies a password |
-| `PasswordResetService` | Issues a reset token sent by e-mail, and consumes it |
+| `RegistrationService` | Creates an account when the self-registration is open, after the e-mail was proved by a code |
+| `ActivationService` | Lets the person of an account an administrator created choose its first password, by the link of its activation |
+| `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, verifies a password |
+| `PasswordResetService` | Issues a reset link sent by e-mail to a proven address, and spends its token once |
 | `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read |
 | `MfaService`, `LoginOtpService` | Enrolls an authenticator app (TOTP) or the e-mail as second factor, checks a code |
 | `RecoveryCodeService` | Issues the recovery codes of a second factor, hashed, and consumes one |
-| `AccountAdministrationService` | What an administrator does: create, block, unblock, delete, reset the failed logins, the second factor or the password; each write names its actor |
+| `AccountAdministrationService` | What an administrator does: create an account without a password and issue its activation link, issue a reset link, block, unblock, delete, reset the failed logins or the second factor; each write names its actor. An administrator never knows a password |
+| `IdentityRetentionService` | Removes what identifies a person once it no longer serves: the trace of the logins, the expired tokens and verifications |
 
-The stores are ports, each atomic: `IAuthUserStore`, `IEmailVerificationStore`, `IPasswordResetStore`,
+The stores are ports, each atomic: `IAuthUserStore`, `IEmailVerificationStore`, `IAccountTokenStore`,
 `ILoginEventStore`, `IMfaStore`, `IRecoveryCodeStore`. `AddStellaegisIdentityInMemory` registers their in-memory
-form, for development and tests; `AddStellaegisIdentityPostgreSQL` the PostgreSQL one.
+form, for development and tests; `AddStellaegisIdentityPostgreSQL` and `AddStellaegisIdentitySqlServer` those of
+the two engines.
+
+### The links an account receives
+
+An activation or a reset is a link carrying a token: 32 random bytes from the system's generator, of which the
+store keeps the SHA-256 alone, so that whoever reads the database holds nothing that works. A token is spent once,
+atomically, before the password changes; a newer one of the same purpose revokes the previous ones; opening the
+link spends nothing, and its page sends no referrer. The links start with `Links:PublicBaseUrl` when set, with
+the address of the request otherwise.
+
+A link reaches its person by e-mail, through `IIdentityMailer`, or by hand — given by the administrator by the
+means of their choice — when the host declares `Links:HandDelivery`. A link mailed by the system proves the
+address; a link handed over proves only that the person received it. While an address is not proven, no reset
+link is mailed there: a mistyped address would hand the account to whoever holds it.
+
+### How the person proved who they are
+
+The principal of a session carries one `amr` claim per method, with the values of RFC 8176: `pwd` after a password
+alone; `pwd`, `otp` and `mfa` after the code of an authenticator or one sent by e-mail; `pwd` and `mfa` after a
+recovery code. `AuthenticationMethods` names them. An issuer carries the claim into its tokens, so that a decision
+asks whether a second factor was used for this session, not whether the account has one.
+
+### What is kept, and for how long
+
+The trace of the logins holds an address and a browser; the tokens and the verifications hold an address.
+`IdentityRetentionService.PurgeAsync` removes the attempts older than `Retention:LoginEvents` and the tokens and
+verifications expired longer than `Retention:Expired`, and says how much it removed. The module schedules nothing:
+the host runs the purge every day by its own scheduler, under `IdentityRetentionService.Job`, `job:identity_purge`.
+The secrets of the second factor are protected at rest by the application — AES-256-GCM under a key of
+`Mfa:SecretKeys`, the account bound to its secret —, the same on every engine, and a code is accepted once.
 
 ### Options
 
@@ -128,14 +167,19 @@ Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a passw
 Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5, then a lockout of LockoutDuration, 15 minutes
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
+Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and Keys:<slot>, secrets of the deployment
 Stellaegis:Identity:EmailVerification:CodeLength   6 digits, for Lifetime, 15 minutes, MaxAttempts 5
 Stellaegis:Identity:PasswordReset:TokenLifetime    1 hour
-Stellaegis:Identity:Registration:Posture           Closed, Open, or ByInvitation
+Stellaegis:Identity:Activation:TokenLifetime       7 days
+Stellaegis:Identity:Links:PublicBaseUrl            the address of the request unless set; needed outside a request
+Stellaegis:Identity:Links:HandDelivery             false; true lets an administrator receive a link to hand over
+Stellaegis:Identity:SelfRegistration               Closed, or Open
+Stellaegis:Identity:Retention:LoginEvents          180 days, and never less
+Stellaegis:Identity:Retention:Expired              30 days past their expiry, and never less
 ```
 
-The posture `Closed` is the default: a host whose people are created by its administration — an enterprise, a
-solution installed for one organization — opens nothing. `Open` lets anyone register. `ByInvitation` refuses
-unless the host says the person was invited, after checking the invitation itself: the accounts know no invitation.
+`SelfRegistration` is `Closed` unless set: a host whose people are created by its administration — an
+enterprise, a solution installed for one organization — opens nothing. `Open` lets anyone register alone.
 
 ### Events
 
@@ -163,9 +207,15 @@ load none: the operation each is labelled with is the whole decision, and the ho
 | Route | Operation |
 | --- | --- |
 | `GET identity/users?skip=&take=`, `POST identity/users/lookup`, `GET identity/users/{id}` | `users.read` |
-| `POST identity/users`, `POST identity/users/{id}/block`, `/unblock`, `/reset-failed-logins`, `/reset-mfa`, `/change-password` | `users.write` |
+| `POST identity/users`, `POST identity/users/{id}/activation`, `/password-reset`, `/block`, `/unblock`, `/reset-failed-logins`, `/reset-mfa` | `users.write` |
 | `DELETE identity/users/{id}` | `users.delete` |
 | `GET identity/security/blocked-users` | `security.read` |
+
+`POST identity/users` takes `{ "email", "displayName", "delivery" }` and creates the account without a password;
+`/activation` issues a new activation link to an account still waiting, `/password-reset` a reset link to an
+active one. `delivery` is `email`, the default, or `hand` when the host declares `Links:HandDelivery`: the link is
+then in the answer, shown this once. A host with neither a mailer nor the hand delivery could activate nobody, and
+`MapIdentityAdminEndpoints()` refuses it.
 
 The module declares these four operations, `IdentityOperations.All`, so that the startup check of Primitives
 refuses a route labelled with one the module does not declare, and so that a host harvests its catalogue from the
@@ -198,7 +248,7 @@ from its own `IEventPublisher`; with several, from a subscription to `Stellaegis
 ## The pages
 
 `Stellaegis.Identity.Server` is a Razor class library: `/login`, `/login/mfa`, `/login/mfa-setup`, `/register`,
-`/verify-email`, `/forgot-password`, `/reset-password`, and under `/account` the overview, the password, the
+`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, and under `/account` the overview, the password, the
 e-mail, the second factor and its recovery codes, the sign-in history, the deletion. The host mounts them beside
 what it serves:
 
@@ -218,9 +268,10 @@ environment. A host on `UseStaticFiles()` serves them too, but only in `Developm
 
 ### What the pages send
 
-Four messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
-verification code, a login code, a password reset link, and the notice that an e-mail has an account already.
-Without an implementation, a host whose registration is open or whose password reset is enabled refuses to start.
+Five messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
+verification code, a login code, a password reset link, an activation link, and the notice that an e-mail has an
+account already. Without an implementation, a host whose self-registration is open or whose password reset is
+enabled refuses to start.
 `AddStellaegisInMemoryIdentityMailer()` keeps the messages in memory, for development and tests.
 
 ### Making the pages the host's own
@@ -234,7 +285,9 @@ From the lightest gesture to the heaviest, each one leaving the others untouched
 | The colors, the typography, the spacing | a stylesheet of the host that redefines the CSS variables of `identity.css`, named in `StylesheetPath` — or served at the same path, which wins over the package's |
 | A layout, a page | a file of the host at the same path — `Pages/Shared/_Layout.cshtml`, `_AuthLayout.cshtml`, `_AccountLayout.cshtml`, `Pages/Login.cshtml` — replaces the package's: ASP.NET Core resolves a page in the host first, then in the libraries |
 
-The texts come in English and in French, and the pages follow the light or dark scheme of the device. `Culture`
+The texts come in English and in French, and the pages follow the light or dark scheme of the device. The French
+texts address nobody — the infinitive or an impersonal turn, never « vous » nor « tu » —: the address of a person
+is the host's to choose, and a text of the package never contradicts it. `Culture`
 fixes one; otherwise the pages follow the culture of the request, which the host's request localization decides.
 
 ### What waits between two pages
@@ -247,13 +300,16 @@ of scripts, for ten to fifteen minutes. The registration keeps the password ther
 
 ```powershell
 $env:STELLAEGIS_TEST_POSTGRESQL = "Host=127.0.0.1;Username=postgres;Database=postgres"
+$env:STELLAEGIS_TEST_SQLSERVER = "Server=.\DEV;Integrated Security=true;TrustServerCertificate=true"
 dotnet test --solution Stellaegis.Identity.slnx
 ```
 
-The PostgreSQL tests create the database `stellaegis_identity_tests` on that server if it does not exist,
-install the schema as an installer does, under that connection, and run under an ordinary role they create,
-`stellaegis_identity_app`. Without the variable they are skipped. The publishing workflow runs them against a
-PostgreSQL service and fails on a skipped test.
+The store and host tests run the same scenarios on both engines. On PostgreSQL, they create the database
+`stellaegis_identity_tests` if it does not exist, install the schema as an installer does, under that connection,
+and run under an ordinary role they create, `stellaegis_identity_app`. On SQL Server, they create that database at
+every run and drop it after, and run as a user without login, member of the application's role, by
+`EXECUTE AS USER`: an instance with integrated security only runs them. Without a variable, its tests are skipped.
+The publishing workflow runs them against a PostgreSQL and a SQL Server service, and fails on a skipped test.
 
 ## License
 

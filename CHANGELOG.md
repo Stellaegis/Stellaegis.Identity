@@ -7,6 +7,72 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [6.0.0] — 2026-10-23
+
+The creation of the accounts reviewed for its security, and the stores on SQL Server. An administrator no
+longer chooses the password of anyone: the account is created without one, and its person chooses it by a link.
+The links carry tokens of which only the hash is kept, the address of an account is proven before a reset link
+goes there, the secrets of the second factor are protected at rest, the session says how the person proved who
+they are, and what identifies a person is removed once it no longer serves.
+
+### Migrating from 5.x
+
+1. **Reinstall the schema.** `0001_ident.sql` is corrected in place — no database held real data yet: drop the
+   schema `ident` (`drop schema ident cascade`) and run the installation again. The verification at startup
+   refuses a schema installed from the 5.x script, and says so.
+2. **Configure `Stellaegis:Identity:Mfa:SecretKeys`**, required like the pepper: `ActiveKeySlot` and
+   `Keys:<slot>`, secrets of the deployment. The startup refuses a host without it.
+3. **`Registration:Posture` becomes `SelfRegistration`**, `Closed` or `Open`, `Closed` unless set.
+   `RegistrationPosture`, `ByInvitation` and the `invited` flag of the registration are gone: an invitation will be
+   a port of its own (6.1.0).
+4. **`AccountAdministrationService.CreateAsync(email, displayName, delivery, actor)`** creates the account without
+   a password and answers a `PendingAccount` carrying its activation token. `ChangePasswordAsync` and the route
+   `POST identity/users/{id}/change-password` are gone: `IssuePasswordResetAsync` and
+   `POST identity/users/{id}/password-reset` issue a reset link instead. `POST identity/users` takes
+   `{ "email", "displayName", "delivery" }`.
+5. **Implement `IIdentityMailer.SendActivationLinkAsync`**, or declare `Links:HandDelivery`:
+   `MapIdentityAdminEndpoints()` refuses a host that can do neither. Set `Links:PublicBaseUrl` when the pages are
+   served behind a proxy or by another host, and wherever a link is issued outside a request.
+6. **`IAccountTokenStore` replaces `IPasswordResetStore`**; `PasswordResetService` takes and returns the token as
+   a string.
+7. **`LoginService.CreatePrincipalAsync` and `CookieSignIn.SignInAsync` by id take the authentication methods**,
+   `AuthenticationMethods.PasswordOnly` and its siblings: a principal says how its person proved who they are.
+8. **Schedule the purge**: call `IdentityRetentionService.PurgeAsync(IdentityRetentionService.Job)` every day from
+   the host's scheduler.
+
+### Added
+
+- `Stellaegis.Identity.SqlServer`: the six stores and the schema `ident` on SQL Server, the same tables and rules
+  as on PostgreSQL, registered by `AddStellaegisIdentitySqlServer` from `Stellaegis:Identity:SqlServer`.
+- The activation: `ActivationService`, the page `/activate`, `Activation:TokenLifetime` (7 days),
+  `AccountAdministrationService.IssueActivationAsync` and the route `POST identity/users/{id}/activation`. An
+  account waiting for its activation is refused at login, recorded as `NOT_ACTIVATED`, and its person is answered
+  what anyone is.
+- `Links:PublicBaseUrl` and `Links:HandDelivery`: how the links are written, and whether an administrator may
+  receive one to hand over.
+- `AuthUser.EmailVerified`: the address proven by a code, or by a link the system mailed — never by a link handed
+  over. While it is not, no reset link is mailed there, and an administrator asking for one is refused with
+  `Email.NotVerified`. The account page verifies the current address.
+- The `amr` claim in the principal, with the values of RFC 8176: `pwd`; `pwd`, `otp`, `mfa`; `pwd`, `mfa` after a
+  recovery code. `AuthenticationMethods` names them.
+- `IdentityRetentionService` and `Retention:LoginEvents` (180 days) and `Retention:Expired` (30 days), each may be
+  raised and never lowered under its default.
+
+### Changed
+
+- The tokens of the links are 32 random bytes, of which only the SHA-256 is kept, in `ident.account_tokens`; a
+  token is spent once, atomically, and a newer one of the same purpose revokes the previous ones.
+- The TOTP secrets are protected at rest — AES-256-GCM under a key of `Mfa:SecretKeys` derived by HKDF, the account
+  bound as associated data —, protected again under the active key at their use; a code is accepted once, and a
+  code of an earlier step is refused.
+- The French texts of the pages address nobody: the infinitive or an impersonal turn, never « vous ».
+- The packages take `Stellaegis.Primitives` 5.2.0.
+
+### Removed
+
+- `AccountAdministrationService.ChangePasswordAsync`, the route `change-password`, `IPasswordResetStore`,
+  `RegistrationPosture`, `Registration:Posture`, the error `Registration.ByInvitation`.
+
 ## [5.1.0] — 2026-10-21
 
 ### Added
