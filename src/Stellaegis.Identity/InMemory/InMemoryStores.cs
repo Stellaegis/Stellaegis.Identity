@@ -8,7 +8,7 @@ public sealed class InMemoryIdentityData
 {
     internal ConcurrentDictionary<Guid, AuthUser> Users { get; } = new();
     internal ConcurrentDictionary<string, EmailVerification> EmailVerifications { get; } = new(StringComparer.Ordinal);
-    internal ConcurrentDictionary<Guid, PasswordResetToken> ResetTokens { get; } = new();
+    internal ConcurrentDictionary<string, AccountToken> AccountTokens { get; } = new(StringComparer.Ordinal);
     internal ConcurrentDictionary<Guid, ConcurrentQueue<LoginEvent>> LoginEvents { get; } = new();
     internal ConcurrentDictionary<Guid, MfaRecord> Mfa { get; } = new();
     internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, bool>> RecoveryCodes { get; } = new();
@@ -87,21 +87,37 @@ internal sealed class InMemoryLoginEventStore(InMemoryIdentityData data) : ILogi
             : []);
 }
 
-internal sealed class InMemoryPasswordResetStore(InMemoryIdentityData data) : IPasswordResetStore
+internal sealed class InMemoryAccountTokenStore(InMemoryIdentityData data) : IAccountTokenStore
 {
-    public Task CreateAsync(PasswordResetToken token, CancellationToken cancellationToken = default)
+    private readonly Lock _gate = new();
+
+    public Task CreateAsync(AccountToken token, CancellationToken cancellationToken = default)
     {
-        data.ResetTokens[token.Token] = token;
+        data.AccountTokens[token.TokenHash] = token;
         return Task.CompletedTask;
     }
 
-    public Task<PasswordResetToken?> GetByTokenAsync(Guid token, CancellationToken cancellationToken = default)
-        => Task.FromResult(data.ResetTokens.TryGetValue(token, out var found) ? found : null);
+    public Task<AccountToken?> GetAsync(string tokenHash, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.AccountTokens.TryGetValue(tokenHash, out var found) ? found : null);
 
-    public Task ConsumeAsync(Guid token, DateTimeOffset consumedAt, CancellationToken cancellationToken = default)
+    public Task<bool> TryConsumeAsync(string tokenHash, DateTimeOffset consumedAt, CancellationToken cancellationToken = default)
     {
-        if (data.ResetTokens.TryGetValue(token, out var existing))
-            existing.ConsumedAt = consumedAt;
+        lock (_gate)
+        {
+            if (!data.AccountTokens.TryGetValue(tokenHash, out var token) || token.ConsumedAt is not null || token.RevokedAt is not null)
+                return Task.FromResult(false);
+            token.ConsumedAt = consumedAt;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            foreach (var token in data.AccountTokens.Values.Where(t => t.UserUniqueId == userUniqueId && t.Purpose == purpose && t.ConsumedAt is null && t.RevokedAt is null))
+                token.RevokedAt = revokedAt;
+        }
         return Task.CompletedTask;
     }
 }

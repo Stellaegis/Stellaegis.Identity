@@ -200,6 +200,10 @@ public sealed class PagesTests
         Assert.NotNull(mail?.Link);
         Assert.StartsWith("http://localhost/reset-password?token=", mail.Link.ToString());
 
+        // A scanner or a preview opens the link ahead: opening it spends nothing, and the page sends no referrer.
+        var preview = await browser.GetAsync(mail.Link.PathAndQuery, Ct);
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        Assert.Equal("no-referrer", preview.Headers.GetValues("Referrer-Policy").Single());
         var form = await browser.GetAsync(mail.Link.PathAndQuery, Ct);
         Assert.Equal(HttpStatusCode.OK, form.StatusCode);
         Assert.Contains("Input_NewPassword", browser.Html);

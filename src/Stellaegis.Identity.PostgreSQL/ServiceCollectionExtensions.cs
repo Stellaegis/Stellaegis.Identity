@@ -55,7 +55,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<PostgreSqlIdentityStore>();
         services.TryAddSingleton<IAuthUserStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.TryAddSingleton<ILoginEventStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
-        services.TryAddSingleton<IPasswordResetStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
+        services.TryAddSingleton<IAccountTokenStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.TryAddSingleton<IEmailVerificationStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.TryAddSingleton<IMfaStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.TryAddSingleton<IRecoveryCodeStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());

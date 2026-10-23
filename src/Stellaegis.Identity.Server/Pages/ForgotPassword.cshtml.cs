@@ -48,7 +48,7 @@ internal sealed class ForgotPasswordModel(
         var email = Emails.Normalize(Email!);
         if (await reset.RequestResetAsync(email, this.ClientAddress(), cancellationToken) is { } token)
         {
-            var link = new Uri($"{Request.Scheme}://{Request.Host}{Request.PathBase}/reset-password?token={token:N}");
+            var link = new Uri($"{Request.Scheme}://{Request.Host}{Request.PathBase}/reset-password?token={Uri.EscapeDataString(token)}");
             try
             {
                 await mailer.SendPasswordResetLinkAsync(email, link, identity.Value.PasswordReset.TokenLifetime, cancellationToken);

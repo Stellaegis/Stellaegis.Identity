@@ -1,3 +1,5 @@
+using Stellaegis.Primitives;
+
 namespace Stellaegis.Identity;
 
 /// <summary>One login attempt, succeeded or failed, written by <see cref="LoginService"/> and shown to the person on their security page.</summary>
@@ -35,14 +37,43 @@ public static class LoginFailureReasons
     public const string LockedOut = "LOCKED_OUT";
 }
 
-/// <summary>A short-lived token that authorizes one password reset.</summary>
-public sealed class PasswordResetToken
+/// <summary>What an account token authorizes, once.</summary>
+public enum AccountTokenPurpose
 {
-    /// <summary>The token itself, which the reset link carries.</summary>
-    public Guid Token { get; set; }
+    /// <summary>Choosing a new password, for a person who forgot theirs.</summary>
+    PasswordReset,
+
+    /// <summary>Choosing the first password of an account an administrator created.</summary>
+    Activation,
+}
+
+/// <summary>How the link of an account token reached its holder: what its use proves about the address.</summary>
+public enum TokenDelivery
+{
+    /// <summary>Sent by e-mail by the system to the address of the account: using it proves the address.</summary>
+    Email,
+
+    /// <summary>Handed by an administrator, by any means: using it proves nothing about the address.</summary>
+    Hand,
+}
+
+/// <summary>
+/// A short-lived token that authorizes one act on an account — a password reset, an activation. Only the hash of the
+/// token is kept: the token itself is in the link, and whoever reads the table holds nothing that works.
+/// </summary>
+public sealed class AccountToken
+{
+    /// <summary>The SHA-256 of the token, in lowercase hexadecimal (<see cref="AccountTokens.Hash"/>).</summary>
+    public string TokenHash { get; set; } = "";
 
     /// <summary>The account the token was issued for.</summary>
     public Guid UserUniqueId { get; set; }
+
+    /// <summary>What the token authorizes.</summary>
+    public AccountTokenPurpose Purpose { get; set; }
+
+    /// <summary>How its link reached its holder.</summary>
+    public TokenDelivery Delivery { get; set; }
 
     /// <summary>The e-mail of the account when the token was issued.</summary>
     public string Email { get; set; } = "";
@@ -50,17 +81,23 @@ public sealed class PasswordResetToken
     /// <summary>When the token was issued.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Who asked for it: the person, for a reset; the administrator, for an activation.</summary>
+    public required Actor CreatedBy { get; set; }
+
     /// <summary>After when the token no longer works.</summary>
     public DateTimeOffset ExpiresAt { get; set; }
 
     /// <summary>When the token was used, or <see langword="null"/>.</summary>
     public DateTimeOffset? ConsumedAt { get; set; }
 
+    /// <summary>When the token was revoked — a newer one issued for the same purpose, an administrator —, or <see langword="null"/>.</summary>
+    public DateTimeOffset? RevokedAt { get; set; }
+
     /// <summary>The address the request came from, when the host records it.</summary>
     public string? IpAddress { get; set; }
 
-    /// <summary>Whether the token can still be used: not consumed, not expired at <paramref name="now"/>.</summary>
-    public bool IsValidAt(DateTimeOffset now) => ConsumedAt is null && ExpiresAt > now;
+    /// <summary>Whether the token can still be used: neither consumed nor revoked, not expired at <paramref name="now"/>.</summary>
+    public bool IsValidAt(DateTimeOffset now) => ConsumedAt is null && RevokedAt is null && ExpiresAt > now;
 }
 
 /// <summary>A pending or completed verification of an e-mail: one per e-mail, keyed by it.</summary>

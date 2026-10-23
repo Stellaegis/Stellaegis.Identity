@@ -25,7 +25,7 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
 
     private IAuthUserStore Users => Store();
     private ILoginEventStore Logins => Store();
-    private IPasswordResetStore Resets => Store();
+    private IAccountTokenStore Tokens => Store();
     private IEmailVerificationStore Verifications => Store();
     private IMfaStore Mfa => Store();
     private IRecoveryCodeStore RecoveryCodes => Store();
@@ -145,30 +145,50 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
     }
 
     [Fact]
-    public async Task A_reset_token_is_read_back_and_consumed_once()
+    public async Task An_account_token_is_read_back_by_its_hash_consumed_once_and_revoked()
     {
         var user = NewUser();
         await Users.CreateAsync(user, Ct);
-        var token = new PasswordResetToken { Token = Guid.NewGuid(), UserUniqueId = user.UserUniqueId, Email = user.Email, CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddHours(1), IpAddress = "10.0.0.2" };
-        await Resets.CreateAsync(token, Ct);
+        AccountToken Issued(string hash, AccountTokenPurpose purpose = AccountTokenPurpose.PasswordReset, Guid? owner = null) => new()
+        {
+            TokenHash = hash, UserUniqueId = owner ?? user.UserUniqueId, Purpose = purpose, Delivery = TokenDelivery.Hand, Email = user.Email,
+            CreatedAt = _clock.Now, CreatedBy = Actor.Parse("admin"), ExpiresAt = _clock.Now.AddHours(1), IpAddress = "10.0.0.2",
+        };
+        var token = Issued(AccountTokens.New().Hash);
+        await Tokens.CreateAsync(token, Ct);
 
-        var found = await Resets.GetByTokenAsync(token.Token, Ct);
+        var found = await Tokens.GetAsync(token.TokenHash, Ct);
         Assert.NotNull(found);
         Assert.True(found.IsValidAt(_clock.Now));
         Assert.Equal(user.UserUniqueId, found.UserUniqueId);
+        Assert.Equal(TokenDelivery.Hand, found.Delivery);
+        Assert.Equal(AccountTokenPurpose.PasswordReset, found.Purpose);
+        Assert.Equal("admin", found.CreatedBy.Value);
         Assert.Equal("10.0.0.2", found.IpAddress);
-        Assert.Null(await Resets.GetByTokenAsync(Guid.NewGuid(), Ct));
+        Assert.Null(await Tokens.GetAsync(AccountTokens.New().Hash, Ct));
 
         var consumedAt = _clock.Now.AddMinutes(5);
-        await Resets.ConsumeAsync(token.Token, consumedAt, Ct);
-        await Resets.ConsumeAsync(token.Token, consumedAt.AddHours(1), Ct);   // the first use holds
-        var consumed = await Resets.GetByTokenAsync(token.Token, Ct);
+        Assert.True(await Tokens.TryConsumeAsync(token.TokenHash, consumedAt, Ct));
+        Assert.False(await Tokens.TryConsumeAsync(token.TokenHash, consumedAt.AddHours(1), Ct));   // the first use holds
+        var consumed = await Tokens.GetAsync(token.TokenHash, Ct);
         Assert.Equal(consumedAt, consumed!.ConsumedAt);
         Assert.False(consumed.IsValidAt(_clock.Now));
 
-        // A token of an account that does not exist is refused by the schema.
-        var orphan = await Assert.ThrowsAsync<PostgresException>(() => Resets.CreateAsync(new PasswordResetToken { Token = Guid.NewGuid(), UserUniqueId = Guid.NewGuid(), Email = "x@acme.test", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddHours(1) }, Ct));
+        // Revoking reaches the usable tokens of the purpose, and a revoked token is not consumed.
+        var reset = Issued(AccountTokens.New().Hash);
+        var activation = Issued(AccountTokens.New().Hash, AccountTokenPurpose.Activation);
+        await Tokens.CreateAsync(reset, Ct);
+        await Tokens.CreateAsync(activation, Ct);
+        await Tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, _clock.Now, Ct);
+        Assert.NotNull((await Tokens.GetAsync(reset.TokenHash, Ct))!.RevokedAt);
+        Assert.False(await Tokens.TryConsumeAsync(reset.TokenHash, _clock.Now, Ct));
+        Assert.True((await Tokens.GetAsync(activation.TokenHash, Ct))!.IsValidAt(_clock.Now));
+
+        // A token of an account that does not exist, or a hash that is not one, is refused by the schema.
+        var orphan = await Assert.ThrowsAsync<PostgresException>(() => Tokens.CreateAsync(Issued(AccountTokens.New().Hash, owner: Guid.NewGuid()), Ct));
         Assert.Equal("23503", orphan.SqlState);
+        var notAHash = await Assert.ThrowsAsync<PostgresException>(() => Tokens.CreateAsync(Issued(new string('Z', 64)), Ct));
+        Assert.Equal("23514", notAHash.SqlState);
     }
 
     [Fact]

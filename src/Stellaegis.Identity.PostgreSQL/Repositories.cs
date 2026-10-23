@@ -230,51 +230,91 @@ internal sealed class LoginEventRepository(DbConnection connection, Func<DbTrans
     }
 }
 
-/// <summary>The rows of <c>ident.password_reset_tokens</c>.</summary>
-internal sealed class PasswordResetRepository(DbConnection connection, Func<DbTransaction?> transaction)
+/// <summary>The rows of <c>ident.account_tokens</c>, keyed by the hash of the token.</summary>
+internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTransaction?> transaction)
 {
-    static PasswordResetRepository() => SnakeCaseTypeMap<ResetTokenRow>.Register();
+    static AccountTokenRepository() => SnakeCaseTypeMap<AccountTokenRow>.Register();
 
-    public Task InsertAsync(PasswordResetToken token, CancellationToken cancellationToken)
+    private const string Columns =
+        "token_hash, user_unique_id, purpose, delivery, email, created_at, created_by, expires_at, consumed_at, revoked_at, ip_address";
+
+    public Task InsertAsync(AccountToken token, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
-            """
-            insert into ident.password_reset_tokens (token, user_unique_id, email, created_at, expires_at, consumed_at, ip_address)
-            values (@Token, @UserUniqueId, @Email, @CreatedAt, @ExpiresAt, @ConsumedAt, @IpAddress)
+            $"""
+            insert into ident.account_tokens ({Columns})
+            values (@TokenHash, @UserUniqueId, @Purpose, @Delivery, @Email, @CreatedAt, @CreatedBy, @ExpiresAt, @ConsumedAt, @RevokedAt, @IpAddress)
             """,
-            new { token.Token, token.UserUniqueId, token.Email, token.CreatedAt, token.ExpiresAt, token.ConsumedAt, token.IpAddress },
-            transaction(), cancellationToken: cancellationToken));
+            AccountTokenRow.From(token), transaction(), cancellationToken: cancellationToken));
 
-    public async Task<PasswordResetToken?> FindAsync(Guid token, CancellationToken cancellationToken)
+    public async Task<AccountToken?> FindAsync(string tokenHash, CancellationToken cancellationToken)
     {
-        var row = await connection.QuerySingleOrDefaultAsync<ResetTokenRow>(new CommandDefinition(
-            "select token, user_unique_id, email, created_at, expires_at, consumed_at, ip_address from ident.password_reset_tokens where token = @token",
-            new { token }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var row = await connection.QuerySingleOrDefaultAsync<AccountTokenRow>(new CommandDefinition(
+            $"select {Columns} from ident.account_tokens where token_hash = @tokenHash",
+            new { tokenHash }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return row?.ToToken();
     }
 
-    public Task ConsumeAsync(Guid token, DateTimeOffset consumedAt, CancellationToken cancellationToken)
-        => connection.ExecuteAsync(new CommandDefinition(
-            "update ident.password_reset_tokens set consumed_at = @consumedAt where token = @token and consumed_at is null",
-            new { token, consumedAt }, transaction(), cancellationToken: cancellationToken));
+    public async Task<bool> TryConsumeAsync(string tokenHash, DateTimeOffset consumedAt, CancellationToken cancellationToken)
+        => await connection.ExecuteAsync(new CommandDefinition(
+            "update ident.account_tokens set consumed_at = @consumedAt where token_hash = @tokenHash and consumed_at is null and revoked_at is null",
+            new { tokenHash, consumedAt }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false) == 1;
 
-    private sealed class ResetTokenRow
+    public Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            """
+            update ident.account_tokens set revoked_at = @revokedAt
+            where user_unique_id = @userUniqueId and purpose = @purpose and consumed_at is null and revoked_at is null
+            """,
+            new { userUniqueId, purpose = AccountTokenRow.PurposeOf(purpose), revokedAt }, transaction(), cancellationToken: cancellationToken));
+
+    private sealed class AccountTokenRow
     {
-        public Guid Token { get; set; }
+        public string TokenHash { get; set; } = "";
         public Guid UserUniqueId { get; set; }
+        public string Purpose { get; set; } = "";
+        public string Delivery { get; set; } = "";
         public string Email { get; set; } = "";
         public DateTimeOffset CreatedAt { get; set; }
+        public Actor CreatedBy { get; set; } = null!;
         public DateTimeOffset ExpiresAt { get; set; }
         public DateTimeOffset? ConsumedAt { get; set; }
+        public DateTimeOffset? RevokedAt { get; set; }
         public string? IpAddress { get; set; }
 
-        public PasswordResetToken ToToken() => new()
+        public static string PurposeOf(AccountTokenPurpose purpose) => purpose switch
         {
-            Token = Token,
+            AccountTokenPurpose.PasswordReset => "password_reset",
+            AccountTokenPurpose.Activation => "activation",
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null),
+        };
+
+        public static AccountTokenRow From(AccountToken token) => new()
+        {
+            TokenHash = token.TokenHash,
+            UserUniqueId = token.UserUniqueId,
+            Purpose = PurposeOf(token.Purpose),
+            Delivery = token.Delivery == TokenDelivery.Email ? "email" : "hand",
+            Email = token.Email,
+            CreatedAt = token.CreatedAt,
+            CreatedBy = token.CreatedBy,
+            ExpiresAt = token.ExpiresAt,
+            ConsumedAt = token.ConsumedAt,
+            RevokedAt = token.RevokedAt,
+            IpAddress = token.IpAddress,
+        };
+
+        public AccountToken ToToken() => new()
+        {
+            TokenHash = TokenHash,
             UserUniqueId = UserUniqueId,
+            Purpose = Purpose == "activation" ? AccountTokenPurpose.Activation : AccountTokenPurpose.PasswordReset,
+            Delivery = Delivery == "hand" ? TokenDelivery.Hand : TokenDelivery.Email,
             Email = Email,
             CreatedAt = CreatedAt,
+            CreatedBy = CreatedBy,
             ExpiresAt = ExpiresAt,
             ConsumedAt = ConsumedAt,
+            RevokedAt = RevokedAt,
             IpAddress = IpAddress,
         };
     }

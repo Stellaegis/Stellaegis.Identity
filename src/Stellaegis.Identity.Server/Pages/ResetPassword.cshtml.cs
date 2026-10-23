@@ -30,12 +30,13 @@ internal sealed class ResetPasswordModel(PasswordResetService reset, PasswordRul
     {
         if (!pages.Value.PasswordResetEnabled)
             return NotFound();
+        this.KeepTokenFromReferrers();
         if (done)
         {
             Done = true;
             return Page();
         }
-        TokenInvalid = !Guid.TryParse(Token, out var token) || !await reset.ValidateTokenAsync(token, cancellationToken);
+        TokenInvalid = string.IsNullOrWhiteSpace(Token) || !await reset.ValidateTokenAsync(Token, cancellationToken);
         return Page();
     }
 
@@ -43,7 +44,8 @@ internal sealed class ResetPasswordModel(PasswordResetService reset, PasswordRul
     {
         if (!pages.Value.PasswordResetEnabled)
             return NotFound();
-        if (!Guid.TryParse(Token, out var token))
+        this.KeepTokenFromReferrers();
+        if (string.IsNullOrWhiteSpace(Token))
         {
             TokenInvalid = true;
             return Page();
@@ -55,7 +57,7 @@ internal sealed class ResetPasswordModel(PasswordResetService reset, PasswordRul
         if (!ModelState.IsValid)
             return Page();
 
-        var result = await reset.ResetPasswordAsync(token, Input.NewPassword ?? "", cancellationToken);
+        var result = await reset.ResetPasswordAsync(Token, Input.NewPassword ?? "", cancellationToken);
         if (result.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));

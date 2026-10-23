@@ -64,25 +64,35 @@ create index ix_users_email_active on ident.users (email)
 create index ix_users_blocked on ident.users (user_unique_id)
   where is_enabled = false or is_deleted = true;
 
--- ── Password reset tokens ────────────────────────────────────────────────────
--- Short-lived tokens that authorize a single password reset. One use per token: consumed_at is
--- set on use and prevents replay.
+-- ── Account tokens ───────────────────────────────────────────────────────────
+-- The tokens of the links an account receives — a password reset, an activation —, each good once,
+-- for a while. Only the SHA-256 of a token is kept, in hexadecimal: the token is in the link, and
+-- whoever reads this table holds nothing that works. consumed_at is set on use, atomically, and
+-- prevents a replay; revoked_at, when a newer token of the same purpose replaces it. delivery says
+-- how the link reached its holder: by e-mail from the system, which proves the address, or by hand.
 
-create table ident.password_reset_tokens (
-  token          uuid         not null,
+create table ident.account_tokens (
+  token_hash     char(64)     not null,
   user_unique_id uuid         not null,
+  purpose        varchar(20)  not null,
+  delivery       varchar(10)  not null,
   email          varchar(320) not null,
   created_at     timestamptz  not null,
+  created_by     varchar(128) not null,
   expires_at     timestamptz  not null,
   consumed_at    timestamptz,
+  revoked_at     timestamptz,
   ip_address     varchar(45),
 
-  constraint pk_password_reset_tokens primary key (token),
-  constraint fk_password_reset_tokens_user
-    foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade
+  constraint pk_account_tokens primary key (token_hash),
+  constraint fk_account_tokens_user
+    foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade,
+  constraint ck_account_tokens_token_hash check (token_hash ~ '^[0-9a-f]{64}$'),
+  constraint ck_account_tokens_purpose check (purpose in ('password_reset', 'activation')),
+  constraint ck_account_tokens_delivery check (delivery in ('email', 'hand'))
 );
 
-create index ix_password_reset_tokens_user on ident.password_reset_tokens (user_unique_id);
+create index ix_account_tokens_user_purpose on ident.account_tokens (user_unique_id, purpose);
 
 -- ── E-mail verifications ─────────────────────────────────────────────────────
 -- The code sent to an e-mail before an account is created with it, or before an account takes

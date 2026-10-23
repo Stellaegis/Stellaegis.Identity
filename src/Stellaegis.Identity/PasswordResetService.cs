@@ -7,7 +7,7 @@ namespace Stellaegis.Identity;
 /// <summary>A person who forgot their password: a link sent to their e-mail, good once, for a while.</summary>
 public sealed class PasswordResetService(
     IAuthUserStore users,
-    IPasswordResetStore tokens,
+    IAccountTokenStore tokens,
     PasswordHasher hasher,
     PasswordStrengthEvaluator passwords,
     IOptions<IdentityOptions> options,
@@ -17,38 +17,49 @@ public sealed class PasswordResetService(
     /// <summary>
     /// Issues a reset token for the account of <paramref name="email"/>, which the host puts in a link and sends
     /// there; <see langword="null"/> when no enabled account has that e-mail. The caller shows the same message
-    /// either way, so that the answer does not say which e-mails have an account.
+    /// either way, so that the answer does not say which e-mails have an account. A newer token revokes the
+    /// previous ones; only its hash is kept.
     /// </summary>
-    public async Task<Guid?> RequestResetAsync(string email, string? ipAddress = null, CancellationToken cancellationToken = default)
+    public async Task<string?> RequestResetAsync(string email, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
         var normalized = Emails.Normalize(email);
         var user = await users.GetByEmailAsync(normalized, cancellationToken);
         if (user is null || !user.IsEnabled)
             return null;
         var now = clock.GetUtcNow();
-        var token = new PasswordResetToken
+        var (token, hash) = AccountTokens.New();
+        await tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, now, cancellationToken);
+        await tokens.CreateAsync(new AccountToken
         {
-            Token = Guid.NewGuid(),
+            TokenHash = hash,
             UserUniqueId = user.UserUniqueId,
+            Purpose = AccountTokenPurpose.PasswordReset,
+            Delivery = TokenDelivery.Email,
             Email = normalized,
             CreatedAt = now,
+            CreatedBy = user.AsActor(),
             ExpiresAt = now.Add(options.Value.PasswordReset.TokenLifetime),
             IpAddress = ipAddress,
-        };
-        await tokens.CreateAsync(token, cancellationToken);
+        }, cancellationToken);
         logger.LogInformation("Password reset requested for {UserUniqueId}", user.UserUniqueId);
-        return token.Token;
+        return token;
     }
 
-    /// <summary>Whether <paramref name="token"/> can still be used: to show the form, or refuse the link.</summary>
-    public async Task<bool> ValidateTokenAsync(Guid token, CancellationToken cancellationToken = default)
-        => (await tokens.GetByTokenAsync(token, cancellationToken))?.IsValidAt(clock.GetUtcNow()) is true;
+    /// <summary>
+    /// Whether <paramref name="token"/> can still be used: to show the form, or refuse the link. Reading it spends
+    /// nothing — the scanners of mail systems and the previews of messaging applications open links ahead.
+    /// </summary>
+    public async Task<bool> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
+        => await FindAsync(token, cancellationToken) is { } stored && stored.IsValidAt(clock.GetUtcNow());
 
-    /// <summary>Sets the new password of the account <paramref name="token"/> was issued for, and spends the token; a lockout in progress ends with it.</summary>
-    public async Task<Result> ResetPasswordAsync(Guid token, string newPassword, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Sets the new password of the account <paramref name="token"/> was issued for; the token is spent first, so
+    /// that two uses at once cannot both succeed. A lockout in progress ends with it.
+    /// </summary>
+    public async Task<Result> ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
     {
-        var stored = await tokens.GetByTokenAsync(token, cancellationToken);
-        if (stored is null || stored.ConsumedAt is not null)
+        var stored = await FindAsync(token, cancellationToken);
+        if (stored is null || stored.ConsumedAt is not null || stored.RevokedAt is not null)
             return Result.Failure(IdentityErrors.InvalidResetToken);
         var now = clock.GetUtcNow();
         if (stored.ExpiresAt < now)
@@ -59,6 +70,8 @@ public sealed class PasswordResetService(
         var violations = passwords.Violations(newPassword);
         if (violations.Count > 0)
             return Result.Failure(IdentityErrors.PasswordRejected(violations));
+        if (!await tokens.TryConsumeAsync(stored.TokenHash, now, cancellationToken))
+            return Result.Failure(IdentityErrors.InvalidResetToken);
 
         user.PasswordHash = hasher.Hash(newPassword);
         user.FailedLoginCount = 0;
@@ -66,8 +79,15 @@ public sealed class PasswordResetService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
-        await tokens.ConsumeAsync(token, now, cancellationToken);
         logger.LogInformation("Password of {UserUniqueId} reset", user.UserUniqueId);
         return Result.Success();
+    }
+
+    private async Task<AccountToken?> FindAsync(string token, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
+        var stored = await tokens.GetAsync(AccountTokens.Hash(token), cancellationToken);
+        return stored?.Purpose == AccountTokenPurpose.PasswordReset ? stored : null;
     }
 }

@@ -14,7 +14,7 @@ namespace Stellaegis.Identity.PostgreSQL;
 /// runs in a transaction.
 /// </summary>
 internal sealed class PostgreSqlIdentityStore
-    : IAuthUserStore, ILoginEventStore, IPasswordResetStore, IEmailVerificationStore, IMfaStore, IRecoveryCodeStore, IAsyncDisposable, IDisposable
+    : IAuthUserStore, ILoginEventStore, IAccountTokenStore, IEmailVerificationStore, IMfaStore, IRecoveryCodeStore, IAsyncDisposable, IDisposable
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly AdoUnitOfWorkFactory<IdentityDatabase> _units;
@@ -32,7 +32,7 @@ internal sealed class PostgreSqlIdentityStore
         var registry = new RepositoryRegistry<IdentityDatabase>()
             .Add<UserRepository>((connection, transaction) => new UserRepository(connection, transaction))
             .Add<LoginEventRepository>((connection, transaction) => new LoginEventRepository(connection, transaction))
-            .Add<PasswordResetRepository>((connection, transaction) => new PasswordResetRepository(connection, transaction))
+            .Add<AccountTokenRepository>((connection, transaction) => new AccountTokenRepository(connection, transaction))
             .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository(connection, transaction))
             .Add<MfaRepository>((connection, transaction) => new MfaRepository(connection, transaction))
             .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository(connection, transaction));
@@ -124,25 +124,31 @@ internal sealed class PostgreSqlIdentityStore
         return await uow.Repo<LoginEventRepository>().ListRecentAsync(userUniqueId, take, cancellationToken).ConfigureAwait(false);
     }
 
-    // ── Password reset tokens ────────────────────────────────────────────────
+    // ── Account tokens ───────────────────────────────────────────────────────
 
-    async Task IPasswordResetStore.CreateAsync(PasswordResetToken token, CancellationToken cancellationToken)
+    async Task IAccountTokenStore.CreateAsync(AccountToken token, CancellationToken cancellationToken)
     {
         Guard.NotNull(token);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await uow.Repo<PasswordResetRepository>().InsertAsync(token, cancellationToken).ConfigureAwait(false);
+        await uow.Repo<AccountTokenRepository>().InsertAsync(token, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task<PasswordResetToken?> IPasswordResetStore.GetByTokenAsync(Guid token, CancellationToken cancellationToken)
+    async Task<AccountToken?> IAccountTokenStore.GetAsync(string tokenHash, CancellationToken cancellationToken)
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await uow.Repo<PasswordResetRepository>().FindAsync(token, cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AccountTokenRepository>().FindAsync(tokenHash, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task IPasswordResetStore.ConsumeAsync(Guid token, DateTimeOffset consumedAt, CancellationToken cancellationToken)
+    async Task<bool> IAccountTokenStore.TryConsumeAsync(string tokenHash, DateTimeOffset consumedAt, CancellationToken cancellationToken)
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await uow.Repo<PasswordResetRepository>().ConsumeAsync(token, consumedAt, cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AccountTokenRepository>().TryConsumeAsync(tokenHash, consumedAt, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task IAccountTokenStore.RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await uow.Repo<AccountTokenRepository>().RevokeOutstandingAsync(userUniqueId, purpose, revokedAt, cancellationToken).ConfigureAwait(false);
     }
 
     // ── E-mail verifications ─────────────────────────────────────────────────

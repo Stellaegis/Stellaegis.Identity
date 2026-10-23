@@ -77,14 +77,61 @@ public sealed class PasswordResetTests
         Assert.Null(await reset.RequestResetAsync("nobody@acme.test"));
         var token = await reset.RequestResetAsync("JANE@acme.test");
         Assert.NotNull(token);
-        Assert.True(await reset.ValidateTokenAsync(token.Value));
-        Assert.False(await reset.ValidateTokenAsync(Guid.NewGuid()));
+        Assert.True(await reset.ValidateTokenAsync(token));
+        Assert.False(await reset.ValidateTokenAsync(AccountTokens.New().Token));
+        Assert.False(await reset.ValidateTokenAsync(""));
 
-        Assert.Equal(IdentityErrors.PasswordRejectedCode, (await reset.ResetPasswordAsync(token.Value, "weak")).Error!.Code);
-        Assert.True((await reset.ResetPasswordAsync(token.Value, "New-Horse-10")).IsSuccess);
+        Assert.Equal(IdentityErrors.PasswordRejectedCode, (await reset.ResetPasswordAsync(token, "weak")).Error!.Code);
+        Assert.True(await reset.ValidateTokenAsync(token));   // a rejected password spends nothing
+        Assert.True((await reset.ResetPasswordAsync(token, "New-Horse-10")).IsSuccess);
         Assert.True(await host.Get<AccountService>().VerifyCurrentPasswordAsync(id, "New-Horse-10"));
-        Assert.False(await reset.ValidateTokenAsync(token.Value));
-        Assert.Equal(IdentityErrors.InvalidResetToken, (await reset.ResetPasswordAsync(token.Value, "New-Horse-11")).Error);
+        Assert.False(await reset.ValidateTokenAsync(token));
+        Assert.Equal(IdentityErrors.InvalidResetToken, (await reset.ResetPasswordAsync(token, "New-Horse-11")).Error);
+    }
+
+    [Fact]
+    public async Task The_store_keeps_the_hash_of_a_token_never_the_token()
+    {
+        using var host = new TestHost();
+        await host.CreateUserAsync();
+        var reset = host.Get<PasswordResetService>();
+
+        var token = (await reset.RequestResetAsync("jane@acme.test"))!;
+
+        Assert.Equal(43, token.Length);   // 32 bytes, base64url
+        var stored = Assert.Single(host.Get<Stellaegis.Identity.InMemory.InMemoryIdentityData>().AccountTokens.Values);
+        Assert.Equal(AccountTokens.Hash(token), stored.TokenHash);
+        Assert.DoesNotContain(token, stored.TokenHash);
+        Assert.Equal(TokenDelivery.Email, stored.Delivery);
+        Assert.Equal(AccountTokenPurpose.PasswordReset, stored.Purpose);
+    }
+
+    [Fact]
+    public async Task A_newer_token_revokes_the_previous_one()
+    {
+        using var host = new TestHost();
+        await host.CreateUserAsync();
+        var reset = host.Get<PasswordResetService>();
+
+        var first = (await reset.RequestResetAsync("jane@acme.test"))!;
+        var second = (await reset.RequestResetAsync("jane@acme.test"))!;
+
+        Assert.False(await reset.ValidateTokenAsync(first));
+        Assert.Equal(IdentityErrors.InvalidResetToken, (await reset.ResetPasswordAsync(first, "New-Horse-10")).Error);
+        Assert.True((await reset.ResetPasswordAsync(second, "New-Horse-10")).IsSuccess);
+    }
+
+    [Fact]
+    public async Task Two_uses_of_one_token_at_once_succeed_once()
+    {
+        using var host = new TestHost();
+        await host.CreateUserAsync();
+        var reset = host.Get<PasswordResetService>();
+        var token = (await reset.RequestResetAsync("jane@acme.test"))!;
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(i => reset.ResetPasswordAsync(token, $"New-Horse-{10 + i}")));
+
+        Assert.Equal(1, results.Count(result => result.IsSuccess));
     }
 
     [Fact]
@@ -94,12 +141,12 @@ public sealed class PasswordResetTests
         var id = await host.CreateUserAsync();
         var reset = host.Get<PasswordResetService>();
 
-        var expired = (await reset.RequestResetAsync("jane@acme.test"))!.Value;
+        var expired = (await reset.RequestResetAsync("jane@acme.test"))!;
         host.Clock.Advance(TimeSpan.FromMinutes(31));
         Assert.False(await reset.ValidateTokenAsync(expired));
         Assert.Equal(IdentityErrors.ResetTokenExpired, (await reset.ResetPasswordAsync(expired, "New-Horse-10")).Error);
 
-        var fresh = (await reset.RequestResetAsync("jane@acme.test"))!.Value;
+        var fresh = (await reset.RequestResetAsync("jane@acme.test"))!;
         await host.Get<AccountAdministrationService>().BlockAsync(id, Actor.Parse("admin"));
         Assert.Equal(IdentityErrors.InvalidResetToken, (await reset.ResetPasswordAsync(fresh, "New-Horse-10")).Error);
     }

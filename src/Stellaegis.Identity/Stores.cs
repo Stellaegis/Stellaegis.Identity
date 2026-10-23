@@ -41,17 +41,23 @@ public interface ILoginEventStore
     Task<IReadOnlyList<LoginEvent>> GetRecentAsync(Guid userUniqueId, int take = 20, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Where the password reset tokens are kept.</summary>
-public interface IPasswordResetStore
+/// <summary>The account tokens, kept by their hash: issued, found, spent once, revoked.</summary>
+public interface IAccountTokenStore
 {
-    /// <summary>Stores a token just issued.</summary>
-    Task CreateAsync(PasswordResetToken token, CancellationToken cancellationToken = default);
+    /// <summary>Records a token issued.</summary>
+    Task CreateAsync(AccountToken token, CancellationToken cancellationToken = default);
 
-    /// <summary>The token with that value, or <see langword="null"/>.</summary>
-    Task<PasswordResetToken?> GetByTokenAsync(Guid token, CancellationToken cancellationToken = default);
+    /// <summary>The token whose hash is <paramref name="tokenHash"/>, or <see langword="null"/>.</summary>
+    Task<AccountToken?> GetAsync(string tokenHash, CancellationToken cancellationToken = default);
 
-    /// <summary>Marks the token used, at <paramref name="consumedAt"/>.</summary>
-    Task ConsumeAsync(Guid token, DateTimeOffset consumedAt, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Spends the token whose hash is <paramref name="tokenHash"/>, at <paramref name="consumedAt"/>, if neither spent
+    /// nor revoked: <see langword="false"/> when another use came first.
+    /// </summary>
+    Task<bool> TryConsumeAsync(string tokenHash, DateTimeOffset consumedAt, CancellationToken cancellationToken = default);
+
+    /// <summary>Revokes the tokens of the account for <paramref name="purpose"/> still usable: a newer one replaces them.</summary>
+    Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Where the e-mail verifications are kept, one per e-mail.</summary>
