@@ -195,6 +195,35 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
     }
 
     [Fact]
+    public async Task The_purge_deletes_what_came_due_by_its_date_and_says_how_much()
+    {
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+        var old = _clock.Now.AddDays(-400);
+        await Logins.AddAsync(new LoginEvent { UserUniqueId = user.UserUniqueId, Email = user.Email, Success = false, CreatedAt = old }, Ct);
+        await Logins.AddAsync(new LoginEvent { UserUniqueId = user.UserUniqueId, Email = user.Email, Success = true, CreatedAt = _clock.Now }, Ct);
+        AccountToken Token(DateTimeOffset expiresAt) => new()
+        {
+            TokenHash = AccountTokens.New().Hash, UserUniqueId = user.UserUniqueId, Purpose = AccountTokenPurpose.PasswordReset,
+            Delivery = TokenDelivery.Email, Email = user.Email, CreatedAt = expiresAt.AddHours(-1), CreatedBy = user.AsActor(), ExpiresAt = expiresAt,
+        };
+        await Tokens.CreateAsync(Token(old), Ct);
+        var live = Token(_clock.Now.AddHours(1));
+        await Tokens.CreateAsync(live, Ct);
+        var email = $"{Guid.NewGuid():N}@acme.test";
+        await Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "1234", CreatedAt = old, ExpiresAt = old.AddMinutes(15) }, Ct);
+
+        var cutoff = _clock.Now.AddDays(-180);
+        Assert.True(await Logins.DeleteBeforeAsync(cutoff, Ct) >= 1);
+        Assert.True(await Tokens.DeleteExpiredBeforeAsync(cutoff, Ct) >= 1);
+        Assert.True(await Verifications.DeleteExpiredBeforeAsync(cutoff, Ct) >= 1);
+
+        Assert.True(Assert.Single(await Logins.GetRecentAsync(user.UserUniqueId, 10, Ct)).Success);
+        Assert.NotNull(await Tokens.GetAsync(live.TokenHash, Ct));
+        Assert.Null(await Verifications.GetByEmailAsync(email, Ct));
+    }
+
+    [Fact]
     public async Task An_email_verification_is_one_per_email_replaced_by_a_new_request_counted_marked_and_deleted()
     {
         var email = $"{Guid.NewGuid():N}@acme.test";

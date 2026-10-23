@@ -55,6 +55,7 @@ public sealed class ServiceRegistrationTests
     [InlineData("EmailVerification", "CodeLength must be between 4 and 10")]
     [InlineData("PasswordReset", "TokenLifetime must be positive")]
     [InlineData("Mfa", "SecretKeys: No key is configured for the active slot 1: set Keys:1")]
+    [InlineData("Retention", "LoginEvents must be at least 180 days")]
     public void Each_concern_says_what_is_wrong_with_it(string concern, string error)
     {
         var options = Valid();
@@ -66,6 +67,7 @@ public sealed class ServiceRegistrationTests
             case "EmailVerification": options.EmailVerification.CodeLength = 12; break;
             case "PasswordReset": options.PasswordReset.TokenLifetime = TimeSpan.Zero; break;
             case "Mfa": options.Mfa.SecretKeys = new KeySlots(); break;
+            case "Retention": options.Retention.LoginEvents = TimeSpan.FromDays(30); break;
         }
 
         Assert.Equal($"{concern}: {error}.", options.FindError());

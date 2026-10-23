@@ -37,6 +37,9 @@ public interface ILoginEventStore
     /// <summary>Records an attempt.</summary>
     Task AddAsync(LoginEvent loginEvent, CancellationToken cancellationToken = default);
 
+    /// <summary>Deletes the attempts made before <paramref name="before"/>, and returns how many.</summary>
+    Task<int> DeleteBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default);
+
     /// <summary>The most recent attempts of an account, newest first.</summary>
     Task<IReadOnlyList<LoginEvent>> GetRecentAsync(Guid userUniqueId, int take = 20, CancellationToken cancellationToken = default);
 }
@@ -56,6 +59,9 @@ public interface IAccountTokenStore
     /// </summary>
     Task<bool> TryConsumeAsync(string tokenHash, DateTimeOffset consumedAt, CancellationToken cancellationToken = default);
 
+    /// <summary>Deletes the tokens that expired before <paramref name="before"/>, used or not, and returns how many.</summary>
+    Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default);
+
     /// <summary>Revokes the tokens of the account for <paramref name="purpose"/> still usable: a newer one replaces them.</summary>
     Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
 }
@@ -65,6 +71,9 @@ public interface IEmailVerificationStore
 {
     /// <summary>Creates or replaces the verification of its e-mail.</summary>
     Task UpsertAsync(EmailVerification verification, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes the verifications that expired before <paramref name="before"/>, and returns how many.</summary>
+    Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default);
 
     /// <summary>The verification of that e-mail, or <see langword="null"/>.</summary>
     Task<EmailVerification?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);

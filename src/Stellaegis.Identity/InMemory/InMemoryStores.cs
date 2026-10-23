@@ -81,6 +81,18 @@ internal sealed class InMemoryLoginEventStore(InMemoryIdentityData data) : ILogi
         return Task.CompletedTask;
     }
 
+    public Task<int> DeleteBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default)
+    {
+        var removed = 0;
+        foreach (var (id, queue) in data.LoginEvents)
+        {
+            var kept = queue.Where(e => e.CreatedAt >= before).ToList();
+            removed += queue.Count - kept.Count;
+            data.LoginEvents[id] = new ConcurrentQueue<LoginEvent>(kept);
+        }
+        return Task.FromResult(removed);
+    }
+
     public Task<IReadOnlyList<LoginEvent>> GetRecentAsync(Guid userUniqueId, int take = 20, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<LoginEvent>>(data.LoginEvents.TryGetValue(userUniqueId, out var queue)
             ? queue.OrderByDescending(e => e.CreatedAt).Take(take).ToList()
@@ -111,6 +123,17 @@ internal sealed class InMemoryAccountTokenStore(InMemoryIdentityData data) : IAc
         }
     }
 
+    public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default)
+    {
+        var removed = 0;
+        foreach (var (hash, token) in data.AccountTokens)
+        {
+            if (token.ExpiresAt < before && data.AccountTokens.TryRemove(hash, out _))
+                removed++;
+        }
+        return Task.FromResult(removed);
+    }
+
     public Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken = default)
     {
         lock (_gate)
@@ -128,6 +151,17 @@ internal sealed class InMemoryEmailVerificationStore(InMemoryIdentityData data) 
     {
         data.EmailVerifications[verification.Email] = verification;
         return Task.CompletedTask;
+    }
+
+    public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default)
+    {
+        var removed = 0;
+        foreach (var (email, verification) in data.EmailVerifications)
+        {
+            if (verification.ExpiresAt < before && data.EmailVerifications.TryRemove(email, out _))
+                removed++;
+        }
+        return Task.FromResult(removed);
     }
 
     public Task<EmailVerification?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)

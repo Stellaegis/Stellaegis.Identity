@@ -135,6 +135,9 @@ create table ident.login_events (
 -- The recent attempts of an account, newest first.
 create index ix_login_events_user_date on ident.login_events (user_unique_id, created_at desc);
 
+-- The purge of the attempts past their retention, every day.
+create index ix_login_events_date on ident.login_events (created_at);
+
 -- ── Second factor ────────────────────────────────────────────────────────────
 
 create table ident.user_mfa (

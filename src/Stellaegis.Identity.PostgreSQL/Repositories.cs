@@ -188,6 +188,11 @@ internal sealed class LoginEventRepository(DbConnection connection, Func<DbTrans
 {
     static LoginEventRepository() => SnakeCaseTypeMap<LoginEventRow>.Register();
 
+    public Task<int> DeleteBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            "delete from ident.login_events where created_at < @before",
+            new { before }, transaction(), cancellationToken: cancellationToken));
+
     public Task InsertAsync(LoginEvent loginEvent, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
             """
@@ -271,6 +276,11 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
             """,
             new { userUniqueId, purpose = AccountTokenRow.PurposeOf(purpose), revokedAt }, transaction(), cancellationToken: cancellationToken));
 
+    public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            "delete from ident.account_tokens where expires_at < @before",
+            new { before }, transaction(), cancellationToken: cancellationToken));
+
     private sealed class AccountTokenRow
     {
         public string TokenHash { get; set; } = "";
@@ -328,6 +338,11 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
 internal sealed class EmailVerificationRepository(DbConnection connection, Func<DbTransaction?> transaction)
 {
     static EmailVerificationRepository() => SnakeCaseTypeMap<VerificationRow>.Register();
+
+    public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            "delete from ident.email_verifications where expires_at < @before",
+            new { before }, transaction(), cancellationToken: cancellationToken));
 
     public Task UpsertAsync(EmailVerification verification, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(

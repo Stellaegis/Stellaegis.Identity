@@ -406,3 +406,43 @@ public sealed class PasswordTests
         Assert.Equal(host.Options.PasswordPolicy.MaxLength, host.Get<PasswordGenerator>().Generate(1000).Length);
     }
 }
+
+/// <summary>What identifies a person, removed once it no longer serves.</summary>
+public sealed class RetentionTests
+{
+    [Fact]
+    public async Task The_purge_removes_the_trace_and_the_tokens_past_their_retention_and_keeps_the_rest()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();   // its activation token, spent
+        var login = host.Get<LoginService>();
+        await login.AuthenticateAsync("jane@acme.test", "wrong", ipAddress: "10.0.0.1");
+        await host.Get<EmailVerificationService>().RequestVerificationAsync("other@acme.test");
+        var purge = host.Get<IdentityRetentionService>();
+
+        // Nothing is due yet.
+        Assert.Equal(new RetentionReport(0, 0, 0), await purge.PurgeAsync(IdentityRetentionService.Job));
+
+        // Past the retention of the expired, the token and the verification go; the trace stays.
+        host.Clock.Advance(TimeSpan.FromDays(40));
+        var fresh = await host.Get<PasswordResetService>().RequestResetAsync("jane@acme.test");
+        Assert.Equal(new RetentionReport(0, 1, 1), await purge.PurgeAsync(IdentityRetentionService.Job));
+        Assert.True(await host.Get<PasswordResetService>().ValidateTokenAsync(fresh!));   // a token still usable stays
+
+        // Past 180 days, the attempt goes; the recent one stays.
+        host.Clock.Advance(TimeSpan.FromDays(145));
+        await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9");
+        var report = await purge.PurgeAsync(IdentityRetentionService.Job);
+        Assert.Equal(1, report.LoginEvents);
+        var left = Assert.Single(await host.Get<ILoginEventStore>().GetRecentAsync(id));
+        Assert.True(left.Success);
+    }
+
+    [Fact]
+    public void A_retention_may_be_raised_and_never_lowered_under_its_default()
+    {
+        Assert.Null(new RetentionOptions { LoginEvents = TimeSpan.FromDays(365), Expired = TimeSpan.FromDays(90) }.FindError());
+        Assert.Equal("LoginEvents must be at least 180 days.", new RetentionOptions { LoginEvents = TimeSpan.FromDays(179) }.FindError());
+        Assert.Equal("Expired must be at least 30 days.", new RetentionOptions { Expired = TimeSpan.FromDays(7) }.FindError());
+    }
+}

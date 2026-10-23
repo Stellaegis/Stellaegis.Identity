@@ -118,6 +118,12 @@ internal sealed class PostgreSqlIdentityStore
         await uow.Repo<LoginEventRepository>().InsertAsync(loginEvent, cancellationToken).ConfigureAwait(false);
     }
 
+    async Task<int> ILoginEventStore.DeleteBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<LoginEventRepository>().DeleteBeforeAsync(before, cancellationToken).ConfigureAwait(false);
+    }
+
     async Task<IReadOnlyList<LoginEvent>> ILoginEventStore.GetRecentAsync(Guid userUniqueId, int take, CancellationToken cancellationToken)
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -145,6 +151,12 @@ internal sealed class PostgreSqlIdentityStore
         return await uow.Repo<AccountTokenRepository>().TryConsumeAsync(tokenHash, consumedAt, cancellationToken).ConfigureAwait(false);
     }
 
+    async Task<int> IAccountTokenStore.DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AccountTokenRepository>().DeleteExpiredBeforeAsync(before, cancellationToken).ConfigureAwait(false);
+    }
+
     async Task IAccountTokenStore.RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken)
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -158,6 +170,12 @@ internal sealed class PostgreSqlIdentityStore
         Guard.NotNull(verification);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
         await uow.Repo<EmailVerificationRepository>().UpsertAsync(verification, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<int> IEmailVerificationStore.DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<EmailVerificationRepository>().DeleteExpiredBeforeAsync(before, cancellationToken).ConfigureAwait(false);
     }
 
     async Task<EmailVerification?> IEmailVerificationStore.GetByEmailAsync(string email, CancellationToken cancellationToken)

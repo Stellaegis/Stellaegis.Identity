@@ -49,6 +49,9 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>How the links an account receives are written and delivered.</summary>
     public LinkOptions Links { get; set; } = new();
 
+    /// <summary>How long what identifies a person is kept once it no longer serves (<see cref="IdentityRetentionService"/>).</summary>
+    public RetentionOptions Retention { get; set; } = new();
+
     /// <inheritdoc/>
     public string? FindError()
         => Prefix(nameof(PasswordHasher), PasswordHasher.FindError())
@@ -58,7 +61,8 @@ public sealed class IdentityOptions : IValidatableOptions
         ?? Prefix(nameof(EmailVerification), EmailVerification.FindError())
         ?? Prefix(nameof(PasswordReset), PasswordReset.FindError())
         ?? Prefix(nameof(Activation), Activation.FindError())
-        ?? Prefix(nameof(Links), Links.FindError());
+        ?? Prefix(nameof(Links), Links.FindError())
+        ?? Prefix(nameof(Retention), Retention.FindError());
 
     private static string? Prefix(string section, string? error) => error is null ? null : $"{section}: {error}";
 }
@@ -242,6 +246,36 @@ public sealed class LinkOptions : IValidatableOptions
         return Uri.TryCreate(PublicBaseUrl, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
             ? null
             : $"{nameof(PublicBaseUrl)} must be an absolute http or https address.";
+    }
+}
+
+/// <summary>
+/// How long what identifies a person is kept once it no longer serves: the trace of the logins, which holds an
+/// address and a browser, and the tokens and verifications past their expiry. Each duration may be raised, not
+/// lowered under its default: the trace answers who tried what, the tokens a "this link is invalid" told by a person.
+/// </summary>
+public sealed class RetentionOptions : IValidatableOptions
+{
+    /// <summary>The least the trace of the logins is kept: 180 days, the low end of what a security log keeps.</summary>
+    public static readonly TimeSpan MinimumLoginEvents = TimeSpan.FromDays(180);
+
+    /// <summary>The least a token or a verification is kept past its expiry: 30 days.</summary>
+    public static readonly TimeSpan MinimumExpired = TimeSpan.FromDays(30);
+
+    /// <summary>How long the trace of the logins is kept. <see cref="MinimumLoginEvents"/> unless set, and never less.</summary>
+    public TimeSpan LoginEvents { get; set; } = MinimumLoginEvents;
+
+    /// <summary>How long a token or a verification is kept past its expiry. <see cref="MinimumExpired"/> unless set, and never less.</summary>
+    public TimeSpan Expired { get; set; } = MinimumExpired;
+
+    /// <inheritdoc/>
+    public string? FindError()
+    {
+        if (LoginEvents < MinimumLoginEvents)
+            return $"{nameof(LoginEvents)} must be at least {MinimumLoginEvents.TotalDays} days.";
+        if (Expired < MinimumExpired)
+            return $"{nameof(Expired)} must be at least {MinimumExpired.TotalDays} days.";
+        return null;
     }
 }
 
