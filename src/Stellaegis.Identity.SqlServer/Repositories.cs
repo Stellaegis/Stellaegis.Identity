@@ -344,8 +344,8 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
             new { before }, transaction(), cancellationToken: cancellationToken));
 
     // The upserts of SQL Server: an update, an insert when it found no row, and the update again when a request at
-    // the same moment inserted first. No range lock is held, so two requests at once cannot deadlock — a merge
-    // under holdlock does, on a table without a clustered index; the last request written wins, as on PostgreSQL.
+    // the same moment inserted first. It holds no range lock, so two requests at once cannot deadlock on it; a merge
+    // under holdlock did, on a table then without a clustered index. The last request written wins, as on PostgreSQL.
     public Task UpsertAsync(EmailVerification verification, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
             """

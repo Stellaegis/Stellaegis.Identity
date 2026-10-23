@@ -9,8 +9,8 @@
 --
 -- The same tables as the PostgreSQL script of Stellaegis.Identity.PostgreSQL, the same names, the
 -- same rules. What differs, and why:
---   * a key that is a uuid or a hash is nonclustered: a table is stored in the order of its
---     clustered key, and a random one would scatter every insertion;
+--   * every table is stored in the order of its key, clustered, and none is a heap: a key that is a
+--     uuid or a hash scatters the insertions among the pages, a small cost at the size of these tables;
 --   * the hashes compared by the queries — of a token, of a recovery code — and the format checks
 --     carry a binary collation. A database of SQL Server is usually case-insensitive: without it,
 --     two hashes differing only by case would be one, and a check would accept a capital;
@@ -56,7 +56,7 @@ create table ident.users (
   deleted_at           datetimeoffset(3) null,
   deleted_by           nvarchar(128)     null,
 
-  constraint pk_users primary key nonclustered (user_unique_id),
+  constraint pk_users primary key clustered (user_unique_id),
   constraint ux_users_email unique (email),
   constraint ck_users_failed_login_count check (failed_login_count >= 0),
   constraint ck_users_deleted check (
@@ -88,7 +88,7 @@ create table ident.account_tokens (
   revoked_at     datetimeoffset(3) null,
   ip_address     nvarchar(45)      null,
 
-  constraint pk_account_tokens primary key nonclustered (token_hash),
+  constraint pk_account_tokens primary key clustered (token_hash),
   constraint fk_account_tokens_user
     foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade,
   constraint ck_account_tokens_token_hash check (token_hash not like N'%[^0-9a-f]%'),
@@ -152,7 +152,7 @@ create table ident.user_mfa (
   enabled_at      datetimeoffset(3) null,
   method          nvarchar(10)      not null constraint df_user_mfa_method default N'totp',
 
-  constraint pk_user_mfa primary key nonclustered (user_unique_id),
+  constraint pk_user_mfa primary key clustered (user_unique_id),
   constraint ck_user_mfa_method check (method collate Latin1_General_100_BIN2 in (N'totp', N'email'))
 );
 
