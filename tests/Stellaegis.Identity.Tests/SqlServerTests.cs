@@ -31,11 +31,11 @@ public sealed class SqlServerStoreTests(SqlServerFixture database) : IdentitySto
                 break;
             case Refusal.MissingAccount:
                 Assert.Equal(547, exception.Number);
-                Assert.Contains("FOREIGN KEY", exception.Message);
+                Assert.Contains("\"fk_", exception.Message);   // the message speaks the language of the server; the name of the constraint is ours
                 break;
             case Refusal.Check:
                 Assert.Equal(547, exception.Number);
-                Assert.Contains("CHECK", exception.Message);
+                Assert.Contains("\"ck_", exception.Message);
                 break;
             default:
                 Assert.Equal(229, exception.Number);   // the permission was denied
