@@ -7,15 +7,17 @@ namespace Stellaegis.Identity;
 
 /// <summary>
 /// The second factor of an account: setting an authenticator up, checking a code at login, enabling the e-mail
-/// method, disabling. Time-based one-time codes follow RFC 6238, as every authenticator application does.
+/// method, disabling. Time-based one-time codes follow RFC 6238, as every authenticator application does: a code
+/// is accepted once — the one that confirmed the setup included —, never one of an earlier step, and the secret is
+/// kept protected (<see cref="TotpSecretProtector"/>).
 /// </summary>
-public sealed class MfaService(IMfaStore store, TimeProvider clock)
+public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, TimeProvider clock)
 {
-    /// <summary>Generates a 20-byte secret, keeps it pending a first code, and returns it base32 for the enrollment QR code.</summary>
+    /// <summary>Generates a 20-byte secret, keeps it protected pending a first code, and returns it base32 for the enrollment QR code.</summary>
     public async Task<string> BeginSetupAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
     {
         var secret = Base32Encoding.ToString(KeyGeneration.GenerateRandomKey(20));
-        await store.SetPendingSecretAsync(userUniqueId, secret, cancellationToken);
+        await store.SetPendingSecretAsync(userUniqueId, protector.Protect(userUniqueId, secret), cancellationToken);
         return secret;
     }
 
@@ -28,17 +30,29 @@ public sealed class MfaService(IMfaStore store, TimeProvider clock)
         var record = await store.GetAsync(userUniqueId, cancellationToken);
         if (record?.PendingSecret is null)
             return Result.Failure(IdentityErrors.MfaNotPending);
-        if (!Verify(record.PendingSecret, code))
+        var (secret, _) = protector.Unprotect(userUniqueId, record.PendingSecret);
+        if (Verify(secret, code) is not { } step)
             return Result.Failure(IdentityErrors.InvalidMfaCode);
         await store.EnableAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
+        await store.TryUseStepAsync(userUniqueId, step, cancellationToken);   // the code that confirmed is spent too
         return Result.Success();
     }
 
-    /// <summary>Whether <paramref name="code"/> is the current code of the account's authenticator.</summary>
+    /// <summary>
+    /// Whether <paramref name="code"/> is a current code of the account's authenticator, not accepted before: a code
+    /// is good once, and a code of an earlier step than the last one accepted is refused.
+    /// </summary>
     public async Task<bool> ValidateCodeAsync(Guid userUniqueId, string code, CancellationToken cancellationToken = default)
     {
         var record = await store.GetAsync(userUniqueId, cancellationToken);
-        return record is { IsEnabled: true, TotpSecret: { } secret } && Verify(secret, code);
+        if (record is not { IsEnabled: true, TotpSecret: { } stored })
+            return false;
+        var (secret, slot) = protector.Unprotect(userUniqueId, stored);
+        if (Verify(secret, code) is not { } step || !await store.TryUseStepAsync(userUniqueId, step, cancellationToken))
+            return false;
+        if (slot != protector.ActiveSlot)
+            await store.ReplaceTotpSecretAsync(userUniqueId, protector.Protect(userUniqueId, secret), cancellationToken);
+        return true;
     }
 
     /// <summary>The second factor of the account, or <see langword="null"/> when none was ever set up.</summary>
@@ -66,12 +80,13 @@ public sealed class MfaService(IMfaStore store, TimeProvider clock)
         => $"otpauth://totp/{Uri.EscapeDataString(Guard.NotWhiteSpace(issuer))}:{Uri.EscapeDataString(Guard.NotWhiteSpace(email))}"
          + $"?secret={Guard.NotWhiteSpace(secretBase32)}&issuer={Uri.EscapeDataString(issuer)}&algorithm=SHA1&digits=6&period=30";
 
-    private bool Verify(string secretBase32, string code)
+    // The time step the code matches, within one step of network delay either way, or null.
+    private long? Verify(string secretBase32, string code)
     {
         if (string.IsNullOrWhiteSpace(code))
-            return false;
+            return null;
         var totp = new Totp(Base32Encoding.ToBytes(secretBase32));
-        return totp.VerifyTotp(clock.GetUtcNow().UtcDateTime, code.Trim(), out _, VerificationWindow.RfcSpecifiedNetworkDelay);
+        return totp.VerifyTotp(clock.GetUtcNow().UtcDateTime, code.Trim(), out var step, VerificationWindow.RfcSpecifiedNetworkDelay) ? step : null;
     }
 }
 

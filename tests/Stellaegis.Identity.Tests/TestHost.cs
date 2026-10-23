@@ -43,6 +43,7 @@ internal sealed class TestHost : IDisposable
         services.AddStellaegisIdentityInMemory(options =>
         {
             options.PasswordHasher.Pepper = Pepper;
+            options.Mfa.SecretKeys = new Stellaegis.Primitives.KeySlots { Keys = { [1] = "test-totp-key" } };
             options.PasswordHasher.Iterations = 1000;   // fast; the count does not change what is tested
             options.LoginPolicy.MinResponseTime = TimeSpan.Zero;
             options.SelfRegistration = SelfRegistration.Open;

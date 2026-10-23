@@ -18,6 +18,8 @@ public sealed class ServiceRegistrationTests
     {
         var configuration = Configuration(
             ("Stellaegis:Identity:PasswordHasher:Pepper", "p"),
+            ("Stellaegis:Identity:Mfa:SecretKeys:ActiveKeySlot", "2"),
+            ("Stellaegis:Identity:Mfa:SecretKeys:Keys:2", "k2"),
             ("Stellaegis:Identity:PasswordHasher:Iterations", "2000"),
             ("Stellaegis:Identity:LoginPolicy:MaxFailedAttempts", "3"),
             ("Stellaegis:Identity:SelfRegistration", "Open"),
@@ -30,6 +32,7 @@ public sealed class ServiceRegistrationTests
         Assert.Equal(3, options.LoginPolicy.MaxFailedAttempts);
         Assert.Equal(SelfRegistration.Open, options.SelfRegistration);
         Assert.Equal(8, options.EmailVerification.CodeLength);
+        Assert.Equal((2, "k2"), (options.Mfa.SecretKeys.ActiveKeySlot, options.Mfa.SecretKeys.ActiveKey));
         Assert.Equal(SelfRegistration.Closed, new IdentityOptions().SelfRegistration);
     }
 
@@ -51,9 +54,10 @@ public sealed class ServiceRegistrationTests
     [InlineData("LoginPolicy", "MaxFailedAttempts must be at least 1")]
     [InlineData("EmailVerification", "CodeLength must be between 4 and 10")]
     [InlineData("PasswordReset", "TokenLifetime must be positive")]
+    [InlineData("Mfa", "SecretKeys: No key is configured for the active slot 1: set Keys:1")]
     public void Each_concern_says_what_is_wrong_with_it(string concern, string error)
     {
-        var options = new IdentityOptions { PasswordHasher = { Pepper = "p" } };
+        var options = Valid();
         switch (concern)
         {
             case "PasswordHasher": options.PasswordHasher.Iterations = 10; break;
@@ -61,19 +65,23 @@ public sealed class ServiceRegistrationTests
             case "LoginPolicy": options.LoginPolicy.MaxFailedAttempts = 0; break;
             case "EmailVerification": options.EmailVerification.CodeLength = 12; break;
             case "PasswordReset": options.PasswordReset.TokenLifetime = TimeSpan.Zero; break;
+            case "Mfa": options.Mfa.SecretKeys = new KeySlots(); break;
         }
 
         Assert.Equal($"{concern}: {error}.", options.FindError());
-        Assert.Null(new IdentityOptions { PasswordHasher = { Pepper = "p" } }.FindError());
+        Assert.Null(Valid().FindError());
     }
+
+    private static IdentityOptions Valid()
+        => new() { PasswordHasher = { Pepper = "p" }, Mfa = { SecretKeys = new KeySlots { Keys = { [1] = "k" } } } };
 
     [Fact]
     public void Every_registration_declares_the_module_once_and_resolves_every_service()
     {
         using var host = new TestHost();
         var services = new ServiceCollection()
-            .AddStellaegisIdentityInMemory(o => o.PasswordHasher.Pepper = "p")
-            .AddStellaegisIdentity(o => o.PasswordHasher.Pepper = "p");
+            .AddStellaegisIdentityInMemory(o => { o.PasswordHasher.Pepper = "p"; o.Mfa.SecretKeys = new KeySlots { Keys = { [1] = "k" } }; })
+            .AddStellaegisIdentity(o => { o.PasswordHasher.Pepper = "p"; o.Mfa.SecretKeys = new KeySlots { Keys = { [1] = "k" } }; });
         using var provider = services.BuildServiceProvider();
 
         var declared = Assert.Single(provider.GetStellaegisModules());

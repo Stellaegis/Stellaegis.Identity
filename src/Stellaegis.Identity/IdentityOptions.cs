@@ -1,3 +1,4 @@
+using Stellaegis.Primitives;
 using Stellaegis.Primitives.Hosting;
 
 namespace Stellaegis.Identity;
@@ -53,6 +54,7 @@ public sealed class IdentityOptions : IValidatableOptions
         => Prefix(nameof(PasswordHasher), PasswordHasher.FindError())
         ?? Prefix(nameof(PasswordPolicy), PasswordPolicy.FindError())
         ?? Prefix(nameof(LoginPolicy), LoginPolicy.FindError())
+        ?? Prefix(nameof(Mfa), Mfa.FindError())
         ?? Prefix(nameof(EmailVerification), EmailVerification.FindError())
         ?? Prefix(nameof(PasswordReset), PasswordReset.FindError())
         ?? Prefix(nameof(Activation), Activation.FindError())
@@ -147,10 +149,24 @@ public sealed class LoginPolicyOptions : IValidatableOptions
 /// second factor is asked to set one up before the login completes, <see cref="LoginStep.RequiresMfaSetup"/>;
 /// otherwise the second factor is the person's own choice.
 /// </summary>
-public sealed class MfaPolicyOptions
+public sealed class MfaPolicyOptions : IValidatableOptions
 {
     /// <summary>Whether every account must have a second factor. No unless set.</summary>
     public bool RequireForAllUsers { get; set; }
+
+    /// <summary>
+    /// The keys the TOTP secrets are protected with at rest (<see cref="TotpSecretProtector"/>), in two slots for a
+    /// rotation without a cut: required, from a secret store, like the pepper. A secret read under the other slot is
+    /// protected again under the active one at its next use.
+    /// <code>
+    /// Stellaegis:Identity:Mfa:SecretKeys:ActiveKeySlot = 1
+    /// Stellaegis:Identity:Mfa:SecretKeys:Keys:1 = …
+    /// </code>
+    /// </summary>
+    public KeySlots SecretKeys { get; set; } = new();
+
+    /// <inheritdoc/>
+    public string? FindError() => SecretKeys.FindError() is { } error ? $"{nameof(SecretKeys)}: {error}" : null;
 }
 
 /// <summary>The codes sent to verify an e-mail.</summary>

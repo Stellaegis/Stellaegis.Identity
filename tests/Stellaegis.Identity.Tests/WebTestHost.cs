@@ -32,6 +32,7 @@ internal static class WebTestHost
         builder.Services.AddStellaegisIdentityInMemory(options =>
         {
             options.PasswordHasher.Pepper = Pepper;
+            options.Mfa.SecretKeys = new KeySlots { Keys = { [1] = "test-totp-key" } };
             options.PasswordHasher.Iterations = 1000;
             options.LoginPolicy.MinResponseTime = TimeSpan.Zero;
             options.SelfRegistration = SelfRegistration.Open;

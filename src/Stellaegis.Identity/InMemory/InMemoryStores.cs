@@ -156,17 +156,36 @@ internal sealed class InMemoryEmailVerificationStore(InMemoryIdentityData data) 
 
 internal sealed class InMemoryMfaStore(InMemoryIdentityData data) : IMfaStore
 {
+    private readonly Lock _gate = new();
+
+    public Task ReplaceTotpSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken = default)
+    {
+        data.Mfa.AddOrUpdate(userUniqueId, _ => new MfaRecord { UserUniqueId = userUniqueId }, (_, old) => old with { TotpSecret = protectedSecret });
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> TryUseStepAsync(Guid userUniqueId, long step, CancellationToken cancellationToken = default)
+    {
+        lock (_gate)
+        {
+            if (!data.Mfa.TryGetValue(userUniqueId, out var record) || record.LastUsedStep >= step)
+                return Task.FromResult(false);
+            data.Mfa[userUniqueId] = record with { LastUsedStep = step };
+            return Task.FromResult(true);
+        }
+    }
+
     public Task<MfaRecord?> GetAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
         => Task.FromResult(data.Mfa.TryGetValue(userUniqueId, out var record) ? record : null);
 
     public Task<IReadOnlySet<Guid>> GetEnabledUserIdsAsync(IReadOnlyCollection<Guid> userUniqueIds, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlySet<Guid>>(userUniqueIds.Where(id => data.Mfa.TryGetValue(id, out var record) && record.IsEnabled).ToHashSet());
 
-    public Task SetPendingSecretAsync(Guid userUniqueId, string secretBase32, CancellationToken cancellationToken = default)
+    public Task SetPendingSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken = default)
     {
         data.Mfa.AddOrUpdate(userUniqueId,
-            _ => new MfaRecord { UserUniqueId = userUniqueId, PendingSecret = secretBase32 },
-            (_, old) => old with { PendingSecret = secretBase32 });
+            _ => new MfaRecord { UserUniqueId = userUniqueId, PendingSecret = protectedSecret },
+            (_, old) => old with { PendingSecret = protectedSecret });
         return Task.CompletedTask;
     }
 

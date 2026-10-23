@@ -205,11 +205,24 @@ internal sealed class PostgreSqlIdentityStore
         return await uow.Repo<MfaRepository>().ListEnabledAsync(userUniqueIds, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task IMfaStore.SetPendingSecretAsync(Guid userUniqueId, string secretBase32, CancellationToken cancellationToken)
+    async Task IMfaStore.SetPendingSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken)
     {
-        Guard.NotWhiteSpace(secretBase32);
+        Guard.NotWhiteSpace(protectedSecret);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await uow.Repo<MfaRepository>().SetPendingSecretAsync(userUniqueId, secretBase32, cancellationToken).ConfigureAwait(false);
+        await uow.Repo<MfaRepository>().SetPendingSecretAsync(userUniqueId, protectedSecret, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task IMfaStore.ReplaceTotpSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken)
+    {
+        Guard.NotWhiteSpace(protectedSecret);
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await uow.Repo<MfaRepository>().ReplaceTotpSecretAsync(userUniqueId, protectedSecret, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<bool> IMfaStore.TryUseStepAsync(Guid userUniqueId, long step, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<MfaRepository>().TryUseStepAsync(userUniqueId, step, cancellationToken).ConfigureAwait(false);
     }
 
     async Task IMfaStore.EnableAsync(Guid userUniqueId, DateTimeOffset enabledAt, CancellationToken cancellationToken)

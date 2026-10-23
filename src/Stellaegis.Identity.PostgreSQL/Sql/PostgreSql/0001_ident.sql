@@ -139,8 +139,9 @@ create index ix_login_events_user_date on ident.login_events (user_unique_id, cr
 
 create table ident.user_mfa (
   user_unique_id  uuid         not null,
-  pending_secret  varchar(64),            -- base32 secret during setup, until a first code confirms it
-  totp_secret     varchar(64),            -- base32 active secret, set when enabled by authenticator
+  pending_secret  varchar(200),           -- protected secret during setup, until a first code confirms it
+  totp_secret     varchar(200),           -- protected active secret, set when enabled by authenticator
+  last_used_step  bigint,                 -- time step of the last code accepted: a code is good once
   is_enabled      boolean      not null default false,
   enabled_at      timestamptz,
   method          varchar(10)  not null default 'totp',

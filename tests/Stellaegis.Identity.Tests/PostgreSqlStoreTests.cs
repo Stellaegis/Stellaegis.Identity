@@ -245,6 +245,19 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IDisposab
         Assert.Equal(new HashSet<Guid> { user.UserUniqueId }, await Mfa.GetEnabledUserIdsAsync([user.UserUniqueId, other.UserUniqueId], Ct));
         Assert.Empty(await Mfa.GetEnabledUserIdsAsync([], Ct));
 
+        // A code is accepted once: the step recorded only moves forward, atomically.
+        Assert.Null(enabled.LastUsedStep);
+        Assert.True(await Mfa.TryUseStepAsync(user.UserUniqueId, 100, Ct));
+        Assert.False(await Mfa.TryUseStepAsync(user.UserUniqueId, 100, Ct));
+        Assert.False(await Mfa.TryUseStepAsync(user.UserUniqueId, 99, Ct));
+        Assert.True(await Mfa.TryUseStepAsync(user.UserUniqueId, 101, Ct));
+        Assert.Equal(101, (await Mfa.GetAsync(user.UserUniqueId, Ct))!.LastUsedStep);
+
+        // A protected secret — a slot, a nonce, a ciphertext and a tag — fits, and is replaced under another key.
+        var protectedSecret = "2:" + Convert.ToBase64String(new byte[12 + 32 + 16]);
+        await Mfa.ReplaceTotpSecretAsync(user.UserUniqueId, protectedSecret, Ct);
+        Assert.Equal(protectedSecret, (await Mfa.GetAsync(user.UserUniqueId, Ct))!.TotpSecret);
+
         await Mfa.EnableEmailAsync(other.UserUniqueId, enabledAt, Ct);
         var byEmail = await Mfa.GetAsync(other.UserUniqueId, Ct);
         Assert.Equal(MfaMethod.Email, byEmail!.Method);

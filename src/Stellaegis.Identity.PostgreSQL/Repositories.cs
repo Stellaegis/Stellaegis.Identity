@@ -399,7 +399,7 @@ internal sealed class MfaRepository(DbConnection connection, Func<DbTransaction?
     public async Task<MfaRecord?> FindAsync(Guid userUniqueId, CancellationToken cancellationToken)
     {
         var row = await connection.QuerySingleOrDefaultAsync<MfaRow>(new CommandDefinition(
-            "select user_unique_id, pending_secret, totp_secret, is_enabled, enabled_at, method from ident.user_mfa where user_unique_id = @userUniqueId",
+            "select user_unique_id, pending_secret, totp_secret, is_enabled, enabled_at, method, last_used_step from ident.user_mfa where user_unique_id = @userUniqueId",
             new { userUniqueId }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return row?.ToRecord();
     }
@@ -412,14 +412,24 @@ internal sealed class MfaRepository(DbConnection connection, Func<DbTransaction?
         return ids.ToHashSet();
     }
 
-    public Task SetPendingSecretAsync(Guid userUniqueId, string secretBase32, CancellationToken cancellationToken)
+    public Task SetPendingSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
             """
             insert into ident.user_mfa (user_unique_id, pending_secret)
-            values (@userUniqueId, @secretBase32)
+            values (@userUniqueId, @protectedSecret)
             on conflict (user_unique_id) do update set pending_secret = excluded.pending_secret
             """,
-            new { userUniqueId, secretBase32 }, transaction(), cancellationToken: cancellationToken));
+            new { userUniqueId, protectedSecret }, transaction(), cancellationToken: cancellationToken));
+
+    public Task ReplaceTotpSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            "update ident.user_mfa set totp_secret = @protectedSecret where user_unique_id = @userUniqueId and totp_secret is not null",
+            new { userUniqueId, protectedSecret }, transaction(), cancellationToken: cancellationToken));
+
+    public async Task<bool> TryUseStepAsync(Guid userUniqueId, long step, CancellationToken cancellationToken)
+        => await connection.ExecuteAsync(new CommandDefinition(
+            "update ident.user_mfa set last_used_step = @step where user_unique_id = @userUniqueId and (last_used_step is null or last_used_step < @step)",
+            new { userUniqueId, step }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false) == 1;
 
     public Task EnableAsync(Guid userUniqueId, DateTimeOffset enabledAt, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
@@ -457,6 +467,7 @@ internal sealed class MfaRepository(DbConnection connection, Func<DbTransaction?
         public bool IsEnabled { get; set; }
         public DateTimeOffset? EnabledAt { get; set; }
         public string Method { get; set; } = MfaMethod.Totp;
+        public long? LastUsedStep { get; set; }
 
         public MfaRecord ToRecord() => new()
         {
@@ -466,6 +477,7 @@ internal sealed class MfaRepository(DbConnection connection, Func<DbTransaction?
             IsEnabled = IsEnabled,
             EnabledAt = EnabledAt,
             Method = Method,
+            LastUsedStep = LastUsedStep,
         };
     }
 }

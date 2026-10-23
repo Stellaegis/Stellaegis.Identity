@@ -96,6 +96,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IEventPublisher>(NullEventPublisher.Instance);
         services.TryAddSingleton<PasswordHasher>();
+        services.TryAddSingleton<TotpSecretProtector>();
         services.TryAddSingleton<PasswordStrengthEvaluator>();
         services.TryAddSingleton<PasswordGenerator>();
         services.TryAddSingleton<LoginOtpService>();

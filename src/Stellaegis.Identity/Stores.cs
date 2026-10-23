@@ -89,7 +89,17 @@ public interface IMfaStore
     Task<IReadOnlySet<Guid>> GetEnabledUserIdsAsync(IReadOnlyCollection<Guid> userUniqueIds, CancellationToken cancellationToken = default);
 
     /// <summary>Keeps a TOTP secret just generated, until a first code confirms it.</summary>
-    Task SetPendingSecretAsync(Guid userUniqueId, string secretBase32, CancellationToken cancellationToken = default);
+    Task SetPendingSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken = default);
+
+    /// <summary>Replaces the active TOTP secret by the same one protected again, under another key.</summary>
+    Task ReplaceTotpSecretAsync(Guid userUniqueId, string protectedSecret, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records <paramref name="step"/> as the time step of the last code accepted, if it comes after the one recorded:
+    /// <see langword="false"/> when a code of that step or a later one was accepted already — a replay. The check
+    /// and the set are one, so that one code is never accepted twice.
+    /// </summary>
+    Task<bool> TryUseStepAsync(Guid userUniqueId, long step, CancellationToken cancellationToken = default);
 
     /// <summary>Makes the pending secret the active one, and enables the second factor by authenticator, at <paramref name="enabledAt"/>.</summary>
     Task EnableAsync(Guid userUniqueId, DateTimeOffset enabledAt, CancellationToken cancellationToken = default);

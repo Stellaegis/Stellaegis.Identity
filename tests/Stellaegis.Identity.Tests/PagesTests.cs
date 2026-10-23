@@ -107,7 +107,8 @@ public sealed class PagesTests
         Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
         Assert.Contains("Wrong or expired code", browser.Html);
 
-        var done = await browser.PostFormAsync("/login/mfa", new Dictionary<string, string> { ["Code"] = Code(secret) }, Ct);
+        // The code of the setup is spent: the login takes the next one.
+        var done = await browser.PostFormAsync("/login/mfa", new Dictionary<string, string> { ["Code"] = Code(secret, next: true) }, Ct);
         Assert.Equal(HttpStatusCode.Redirect, done.StatusCode);
         Assert.Equal("/account", done.Headers.Location!.ToString());
         Assert.True(browser.HasCookie(IdentityCookie.CookieName));
@@ -389,5 +390,6 @@ public sealed class PagesTests
         Assert.Contains("Enabled, by authenticator app", browser.Html);
     }
 
-    private static string Code(string secretBase32) => new Totp(Base32Encoding.ToBytes(secretBase32)).ComputeTotp();
+    private static string Code(string secretBase32, bool next = false)
+        => new Totp(Base32Encoding.ToBytes(secretBase32)).ComputeTotp(DateTime.UtcNow.AddSeconds(next ? 30 : 0));
 }

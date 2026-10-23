@@ -26,6 +26,7 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
         {
             ["Stellaegis:Identity:PostgreSQL:ConnectionString"] = database.AppConnectionString,
             ["Stellaegis:Identity:PasswordHasher:Pepper"] = "test-pepper",
+            ["Stellaegis:Identity:Mfa:SecretKeys:Keys:1"] = "test-totp-key",
             ["Stellaegis:Identity:PasswordHasher:Iterations"] = "1000",
             ["Stellaegis:Identity:LoginPolicy:MinResponseTime"] = "00:00:00",
         });
@@ -62,7 +63,11 @@ public sealed class PostgreSqlHostTests(PostgreSqlFixture database)
             .AddStellaegisDatabaseVerification()
             .AddStellaegisIdentityPostgreSQL(
                 options => options.ConnectionString = database.AppConnectionString,
-                options => options.PasswordHasher.Pepper = "test-pepper");
+                options =>
+                {
+                    options.PasswordHasher.Pepper = "test-pepper";
+                    options.Mfa.SecretKeys = new KeySlots { Keys = { [1] = "test-totp-key" } };
+                });
         using var host = builder.Build();
         await using (var connection = await database.OpenAsync(asApplication: false, Ct))
         await using (var command = connection.CreateCommand())

@@ -134,11 +134,14 @@ public sealed record MfaRecord
     /// <summary>The account.</summary>
     public Guid UserUniqueId { get; init; }
 
-    /// <summary>The TOTP secret generated at setup, base32, until the first code confirms it.</summary>
+    /// <summary>The TOTP secret generated at setup, protected (<see cref="TotpSecretProtector"/>), until the first code confirms it.</summary>
     public string? PendingSecret { get; init; }
 
-    /// <summary>The active TOTP secret, base32; set only when the second factor is enabled by authenticator.</summary>
+    /// <summary>The active TOTP secret, protected (<see cref="TotpSecretProtector"/>); set only when the second factor is enabled by authenticator.</summary>
     public string? TotpSecret { get; init; }
+
+    /// <summary>The time step of the last code accepted, or <see langword="null"/>: a code is accepted once, and never one of an earlier step.</summary>
+    public long? LastUsedStep { get; init; }
 
     /// <summary>Whether a second factor is required at login.</summary>
     public bool IsEnabled { get; init; }

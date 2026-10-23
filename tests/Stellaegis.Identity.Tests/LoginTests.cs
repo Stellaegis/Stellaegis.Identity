@@ -87,7 +87,9 @@ public sealed class LoginTests
         Assert.Equal(LoginStep.RequiresMfa, result.Step);
         Assert.Equal(id, result.UserUniqueId);
         Assert.Equal("jane@acme.test", result.Email);
-        Assert.True(await mfa.ValidateCodeAsync(id, code));
+        Assert.False(await mfa.ValidateCodeAsync(id, code));   // spent by the setup
+        host.Clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.True(await mfa.ValidateCodeAsync(id, new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp(host.Clock.Now.UtcDateTime)));
         Assert.False(await mfa.ValidateCodeAsync(id, "000000"));
         var principal = await host.Get<LoginService>().CreatePrincipalAsync(id, AuthenticationMethods.PasswordAndCode);
         Assert.Equal(id.ToString("N"), principal!.FindFirst("sub")!.Value);
@@ -157,6 +159,53 @@ public sealed class MfaTests
         await mfa.DisableAsync(id);
         Assert.False(await mfa.IsEnabledAsync(id));
         Assert.False(await mfa.ValidateCodeAsync(id, code));
+    }
+
+    [Fact]
+    public async Task A_code_is_accepted_once_and_never_one_of_an_earlier_step()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var mfa = host.Get<MfaService>();
+        var secret = await mfa.BeginSetupAsync(id);
+        string CodeAt(DateTimeOffset at) => new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp(at.UtcDateTime);
+        var enrolled = host.Clock.Now;
+        Assert.True((await mfa.ConfirmSetupAsync(id, CodeAt(enrolled))).IsSuccess);
+
+        host.Clock.Advance(TimeSpan.FromSeconds(30));
+        var current = CodeAt(host.Clock.Now);
+        var both = await Task.WhenAll(mfa.ValidateCodeAsync(id, current), mfa.ValidateCodeAsync(id, current));
+        Assert.Equal(1, both.Count(accepted => accepted));       // two uses at once: one passes
+        Assert.False(await mfa.ValidateCodeAsync(id, current));  // a replay
+        Assert.False(await mfa.ValidateCodeAsync(id, CodeAt(enrolled)));   // still within the window, but earlier
+
+        host.Clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.True(await mfa.ValidateCodeAsync(id, CodeAt(host.Clock.Now)));
+    }
+
+    [Fact]
+    public async Task The_secret_is_kept_protected_bound_to_its_account_and_protected_again_under_a_new_key_at_its_use()
+    {
+        using var host = new TestHost(o => o.Mfa.SecretKeys = new KeySlots { ActiveKeySlot = 1, Keys = { [1] = "k1", [2] = "k2" } });
+        var id = await host.CreateUserAsync();
+        var mfa = host.Get<MfaService>();
+        var secret = await mfa.BeginSetupAsync(id);
+        Assert.True((await mfa.ConfirmSetupAsync(id, new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp(host.Clock.Now.UtcDateTime))).IsSuccess);
+
+        var stored = (await mfa.GetStatusAsync(id))!.TotpSecret!;
+        Assert.StartsWith("1:", stored);
+        Assert.DoesNotContain(secret, stored);
+        var protector = host.Get<TotpSecretProtector>();
+        Assert.Equal((secret, 1), protector.Unprotect(id, stored));
+        Assert.ThrowsAny<System.Security.Cryptography.CryptographicException>(() => protector.Unprotect(Guid.NewGuid(), stored));
+
+        // The key rotates: the secret written under slot 1 still opens, and is protected again under slot 2 at its use.
+        host.Get<Microsoft.Extensions.Options.IOptions<IdentityOptions>>().Value.Mfa.SecretKeys = new KeySlots { ActiveKeySlot = 2, Keys = { [1] = "k1", [2] = "k2" } };
+        host.Clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.True(await mfa.ValidateCodeAsync(id, new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp(host.Clock.Now.UtcDateTime)));
+        var rotated = (await mfa.GetStatusAsync(id))!.TotpSecret!;
+        Assert.StartsWith("2:", rotated);
+        Assert.Equal((secret, 2), protector.Unprotect(id, rotated));
     }
 
     [Fact]
