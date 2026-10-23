@@ -5,7 +5,7 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="Account.Delete.Explain" xml:space="preserve">
-    <value>Votre compte est désactivé immédiatement et toutes vos sessions prennent fin. Contactez un administrateur pour le rétablir.</value>
+    <value>Le compte est désactivé immédiatement et toutes ses sessions prennent fin. Un administrateur peut le rétablir.</value>
   </data>
   <data name="Account.Delete.Irreversible" xml:space="preserve">
     <value>Cette action est irréversible.</value>
@@ -17,7 +17,7 @@
     <value>Supprimer le compte</value>
   </data>
   <data name="Account.Email.CodeSent" xml:space="preserve">
-    <value>Un code a été envoyé à {0}. Saisissez-le pour confirmer la nouvelle adresse.</value>
+    <value>Un code a été envoyé à {0}. Le saisir pour confirmer la nouvelle adresse.</value>
   </data>
   <data name="Account.Email.Confirm" xml:space="preserve">
     <value>Confirmer</value>
@@ -50,7 +50,7 @@
     <value>La vérification en deux étapes est activée.</value>
   </data>
   <data name="Account.Mfa.AppHelp" xml:space="preserve">
-    <value>Des codes générés sur votre téléphone par Google Authenticator, Authy, Bitwarden, 1Password… Fonctionne hors ligne.</value>
+    <value>Des codes générés sur le téléphone par Google Authenticator, Authy, Bitwarden, 1Password… Fonctionne hors ligne.</value>
   </data>
   <data name="Account.Mfa.AppSetup" xml:space="preserve">
     <value>Configurer</value>
@@ -62,7 +62,7 @@
     <value>Désactiver</value>
   </data>
   <data name="Account.Mfa.DisableHelp" xml:space="preserve">
-    <value>Pour désactiver la vérification en deux étapes, confirmez votre mot de passe.</value>
+    <value>Pour désactiver la vérification en deux étapes, confirmer le mot de passe.</value>
   </data>
   <data name="Account.Mfa.Disabled" xml:space="preserve">
     <value>La vérification en deux étapes est désactivée.</value>
@@ -74,7 +74,7 @@
     <value>La vérification en deux étapes par e-mail est activée.</value>
   </data>
   <data name="Account.Mfa.EmailHelp" xml:space="preserve">
-    <value>Un code vous est envoyé par e-mail à chaque connexion.</value>
+    <value>Un code est envoyé par e-mail à chaque connexion.</value>
   </data>
   <data name="Account.Mfa.EmailNoMailer" xml:space="preserve">
     <value>Le code par e-mail n'est pas disponible : ce serveur n'envoie aucun courrier.</value>
@@ -83,7 +83,7 @@
     <value>Code par e-mail</value>
   </data>
   <data name="Account.Mfa.Explain" xml:space="preserve">
-    <value>La vérification en deux étapes ajoute une protection : en plus de votre mot de passe, un code à usage unique vous est demandé à chaque connexion.</value>
+    <value>La vérification en deux étapes ajoute une protection : en plus du mot de passe, un code à usage unique est demandé à chaque connexion.</value>
   </data>
   <data name="Account.Mfa.Since" xml:space="preserve">
     <value>depuis le {0:g}</value>
@@ -125,10 +125,10 @@
     <value>Vue d'ensemble</value>
   </data>
   <data name="Account.OverviewHelp" xml:space="preserve">
-    <value>Utilisez le menu pour gérer votre profil, votre sécurité et votre compte.</value>
+    <value>Le menu donne accès au profil, à la sécurité et au compte.</value>
   </data>
   <data name="Account.Password.Changed" xml:space="preserve">
-    <value>Votre mot de passe est modifié.</value>
+    <value>Le mot de passe est modifié.</value>
   </data>
   <data name="Account.Password.Submit" xml:space="preserve">
     <value>Enregistrer</value>
@@ -140,7 +140,7 @@
     <value>Échec</value>
   </data>
   <data name="Account.Security.Help" xml:space="preserve">
-    <value>Les 20 dernières tentatives de connexion à votre compte.</value>
+    <value>Les 20 dernières tentatives de connexion au compte.</value>
   </data>
   <data name="Account.Security.LockedOut" xml:space="preserve">
     <value>Compte verrouillé</value>
@@ -164,7 +164,7 @@
     <value>Ce compte est bloqué.</value>
   </data>
   <data name="Error.Account.LockedOut" xml:space="preserve">
-    <value>Trop de tentatives : le compte est verrouillé pour un moment. Réessayez plus tard.</value>
+    <value>Trop de tentatives : le compte est verrouillé pour un moment. Réessayer plus tard.</value>
   </data>
   <data name="Error.Account.NotFound" xml:space="preserve">
     <value>Le compte est introuvable.</value>
@@ -179,7 +179,7 @@
     <value>L'adresse e-mail n'est pas vérifiée.</value>
   </data>
   <data name="Error.Email.Same" xml:space="preserve">
-    <value>C'est déjà votre adresse e-mail.</value>
+    <value>C'est déjà l'adresse e-mail du compte.</value>
   </data>
   <data name="Error.Email.Taken" xml:space="preserve">
     <value>Un autre compte a cette adresse e-mail.</value>
@@ -206,25 +206,25 @@
     <value>Les inscriptions sont fermées.</value>
   </data>
   <data name="Error.Verification.Expired" xml:space="preserve">
-    <value>Le code a expiré. Demandez-en un nouveau.</value>
+    <value>Le code a expiré. En demander un nouveau.</value>
   </data>
   <data name="Error.Verification.Invalid" xml:space="preserve">
     <value>Code incorrect.</value>
   </data>
   <data name="Error.Verification.NotPending" xml:space="preserve">
-    <value>Aucune vérification n'est en cours. Recommencez.</value>
+    <value>Aucune vérification n'est en cours. Recommencer.</value>
   </data>
   <data name="Error.Verification.TooManyAttempts" xml:space="preserve">
-    <value>Trop de codes incorrects. Demandez-en un nouveau.</value>
+    <value>Trop de codes incorrects. En demander un nouveau.</value>
   </data>
   <data name="Field.AppCode" xml:space="preserve">
-    <value>Code affiché par votre application</value>
+    <value>Code affiché par l'application d'authentification</value>
   </data>
   <data name="Field.Code" xml:space="preserve">
     <value>Code de vérification</value>
   </data>
   <data name="Field.Code.Required" xml:space="preserve">
-    <value>Saisissez le code.</value>
+    <value>Saisir le code.</value>
   </data>
   <data name="Field.ConfirmPassword" xml:space="preserve">
     <value>Confirmer le mot de passe</value>
@@ -233,13 +233,13 @@
     <value>Les mots de passe ne correspondent pas.</value>
   </data>
   <data name="Field.ConfirmWithPassword" xml:space="preserve">
-    <value>Confirmez avec votre mot de passe</value>
+    <value>Confirmer avec le mot de passe</value>
   </data>
   <data name="Field.CurrentPassword" xml:space="preserve">
     <value>Mot de passe actuel</value>
   </data>
   <data name="Field.CurrentPassword.Required" xml:space="preserve">
-    <value>Saisissez votre mot de passe actuel.</value>
+    <value>Saisir le mot de passe actuel.</value>
   </data>
   <data name="Field.DisplayName" xml:space="preserve">
     <value>Nom d'affichage</value>
@@ -251,7 +251,7 @@
     <value>Adresse e-mail</value>
   </data>
   <data name="Field.Email.Invalid" xml:space="preserve">
-    <value>Saisissez une adresse e-mail valide.</value>
+    <value>Saisir une adresse e-mail valide.</value>
   </data>
   <data name="Field.NewEmail" xml:space="preserve">
     <value>Nouvelle adresse e-mail</value>
@@ -269,16 +269,16 @@
     <value>Réinitialiser le mot de passe</value>
   </data>
   <data name="Forgot.Help" xml:space="preserve">
-    <value>Saisissez votre adresse e-mail. Si un compte lui est associé, vous recevrez un lien de réinitialisation.</value>
+    <value>Saisir l'adresse e-mail du compte. Si un compte lui est associé, un lien de réinitialisation y est envoyé.</value>
   </data>
   <data name="Forgot.SentHeading" xml:space="preserve">
-    <value>Vérifiez votre boîte mail</value>
+    <value>Vérifier la boîte mail</value>
   </data>
   <data name="Forgot.SentHelp" xml:space="preserve">
     <value>Si un compte est associé à cette adresse, un message contenant un lien de réinitialisation est en route. Le lien est valable {0} heure(s).</value>
   </data>
   <data name="Forgot.SentSpam" xml:space="preserve">
-    <value>Rien après quelques minutes ? Vérifiez votre dossier de courrier indésirable.</value>
+    <value>Rien après quelques minutes ? Regarder dans le dossier du courrier indésirable.</value>
   </data>
   <data name="Forgot.Submit" xml:space="preserve">
     <value>Envoyer le lien</value>
@@ -293,13 +293,13 @@
     <value>Besoin d'aide ?</value>
   </data>
   <data name="Login.AccountDeleted" xml:space="preserve">
-    <value>Votre compte est supprimé.</value>
+    <value>Le compte est supprimé.</value>
   </data>
   <data name="Login.CodeNotSent" xml:space="preserve">
-    <value>Le code de connexion n'a pas pu être envoyé. Contactez votre administrateur.</value>
+    <value>Le code de connexion n'a pas pu être envoyé. Contacter un administrateur.</value>
   </data>
   <data name="Login.EmailChanged" xml:space="preserve">
-    <value>Votre adresse e-mail est modifiée. Reconnectez-vous avec la nouvelle.</value>
+    <value>L'adresse e-mail est modifiée. Se reconnecter avec la nouvelle.</value>
   </data>
   <data name="Login.Forgot" xml:space="preserve">
     <value>Mot de passe oublié ?</value>
@@ -308,19 +308,19 @@
     <value>Connexion</value>
   </data>
   <data name="Login.Help" xml:space="preserve">
-    <value>Saisissez votre adresse e-mail et votre mot de passe.</value>
+    <value>Saisir l'adresse e-mail et le mot de passe.</value>
   </data>
   <data name="Login.Register" xml:space="preserve">
     <value>Créer un compte</value>
   </data>
   <data name="Login.Registered" xml:space="preserve">
-    <value>Votre compte est créé. Vous pouvez vous connecter.</value>
+    <value>Le compte est créé et prêt pour la connexion.</value>
   </data>
   <data name="Login.RememberMe" xml:space="preserve">
     <value>Rester connecté</value>
   </data>
   <data name="Login.Required" xml:space="preserve">
-    <value>Saisissez votre adresse e-mail et votre mot de passe.</value>
+    <value>Saisir l'adresse e-mail et le mot de passe.</value>
   </data>
   <data name="Login.Submit" xml:space="preserve">
     <value>Se connecter</value>
@@ -329,22 +329,22 @@
     <value>Connexion</value>
   </data>
   <data name="Mfa.CodeInvalid" xml:space="preserve">
-    <value>Code incorrect ou expiré. Réessayez.</value>
+    <value>Code incorrect ou expiré. Réessayer.</value>
   </data>
   <data name="Mfa.CodeRequired" xml:space="preserve">
-    <value>Saisissez le code.</value>
+    <value>Saisir le code.</value>
   </data>
   <data name="Mfa.Heading" xml:space="preserve">
     <value>Code de vérification</value>
   </data>
   <data name="Mfa.HelpApp" xml:space="preserve">
-    <value>Saisissez le code affiché par votre application d'authentification.</value>
+    <value>Saisir le code affiché par l'application d'authentification.</value>
   </data>
   <data name="Mfa.HelpEmail" xml:space="preserve">
-    <value>Un code vous a été envoyé par e-mail. Saisissez-le ci-dessous.</value>
+    <value>Un code a été envoyé par e-mail. Le saisir ci-dessous.</value>
   </data>
   <data name="Mfa.RecoveryHint" xml:space="preserve">
-    <value>Application indisponible ? Saisissez l'un de vos codes de secours à la place.</value>
+    <value>Application indisponible ? Un code de secours la remplace.</value>
   </data>
   <data name="Mfa.Submit" xml:space="preserve">
     <value>Vérifier</value>
@@ -353,7 +353,7 @@
     <value>Vérification en deux étapes</value>
   </data>
   <data name="MfaSetup.CodeInvalid" xml:space="preserve">
-    <value>Code incorrect. Vérifiez l'heure de votre téléphone et réessayez.</value>
+    <value>Code incorrect. Vérifier l'heure du téléphone et réessayer.</value>
   </data>
   <data name="MfaSetup.Confirm" xml:space="preserve">
     <value>Confirmer et activer</value>
@@ -362,7 +362,7 @@
     <value>Confirmer et se connecter</value>
   </data>
   <data name="MfaSetup.Help" xml:space="preserve">
-    <value>Scannez ce QR code avec votre application d'authentification (Google Authenticator, Authy, Bitwarden, 1Password…), puis saisissez le code qu'elle affiche.</value>
+    <value>Scanner ce QR code avec une application d'authentification (Google Authenticator, Authy, Bitwarden, 1Password…), puis saisir le code qu'elle affiche.</value>
   </data>
   <data name="MfaSetup.ManualKey" xml:space="preserve">
     <value>Saisir la clé à la main</value>
@@ -374,7 +374,7 @@
     <value>La vérification en deux étapes est obligatoire</value>
   </data>
   <data name="MfaSetup.RequiredHelp" xml:space="preserve">
-    <value>La vérification en deux étapes est obligatoire ici. Scannez ce QR code avec votre application d'authentification, puis saisissez le code qu'elle affiche pour terminer la connexion.</value>
+    <value>La vérification en deux étapes est obligatoire ici. Scanner ce QR code avec une application d'authentification, puis saisir le code qu'elle affiche pour terminer la connexion.</value>
   </data>
   <data name="MfaSetup.Title" xml:space="preserve">
     <value>Configurer la vérification en deux étapes</value>
@@ -416,13 +416,13 @@
     <value>Faible</value>
   </data>
   <data name="RecoveryCodes.Explain" xml:space="preserve">
-    <value>Chacun ne fonctionne qu'une fois et permet de vous connecter si votre application est indisponible. Ils ne seront plus jamais affichés.</value>
+    <value>Chacun ne sert qu'une fois et permet de se connecter quand l'application d'authentification est indisponible. Ils ne seront plus jamais affichés.</value>
   </data>
   <data name="RecoveryCodes.Heading" xml:space="preserve">
-    <value>Vos codes de secours</value>
+    <value>Codes de secours</value>
   </data>
   <data name="RecoveryCodes.KeepNow" xml:space="preserve">
-    <value>Conservez ces codes de secours dès maintenant.</value>
+    <value>Conserver ces codes de secours dès maintenant.</value>
   </data>
   <data name="RecoveryCodes.Noted" xml:space="preserve">
     <value>J'ai noté mes codes — continuer</value>
@@ -440,7 +440,7 @@
     <value>Codes de secours restants : {0}</value>
   </data>
   <data name="RecoveryCodes.ShownOnce" xml:space="preserve">
-    <value>Les codes de secours permettent de vous connecter si votre application est indisponible. Ils ne sont affichés qu'à leur génération.</value>
+    <value>Les codes de secours permettent de se connecter quand l'application d'authentification est indisponible. Ils ne sont affichés qu'à leur génération.</value>
   </data>
   <data name="RecoveryCodes.Title" xml:space="preserve">
     <value>Codes de secours</value>
@@ -449,13 +449,13 @@
     <value>Les inscriptions sont fermées</value>
   </data>
   <data name="Register.ClosedHelp" xml:space="preserve">
-    <value>Les comptes sont créés par un administrateur. Connectez-vous avec celui qui vous a été remis.</value>
+    <value>Les comptes sont créés par un administrateur, qui en remet les accès.</value>
   </data>
   <data name="Register.Heading" xml:space="preserve">
     <value>Créer un compte</value>
   </data>
   <data name="Register.Help" xml:space="preserve">
-    <value>Renseignez vos informations pour créer votre compte.</value>
+    <value>Renseigner ces informations pour créer le compte.</value>
   </data>
   <data name="Register.Submit" xml:space="preserve">
     <value>Créer mon compte</value>
@@ -470,10 +470,10 @@
     <value>Mot de passe modifié</value>
   </data>
   <data name="Reset.DoneHelp" xml:space="preserve">
-    <value>Votre mot de passe est réinitialisé. Vous pouvez vous connecter avec le nouveau.</value>
+    <value>Le mot de passe est réinitialisé. La connexion se fait désormais avec le nouveau.</value>
   </data>
   <data name="Reset.Heading" xml:space="preserve">
-    <value>Choisissez un nouveau mot de passe</value>
+    <value>Choisir un nouveau mot de passe</value>
   </data>
   <data name="Reset.InvalidHeading" xml:space="preserve">
     <value>Lien invalide</value>
@@ -491,10 +491,10 @@
     <value>Modifier mes informations</value>
   </data>
   <data name="VerifyEmail.Heading" xml:space="preserve">
-    <value>Vérifiez votre adresse e-mail</value>
+    <value>Vérifier l'adresse e-mail</value>
   </data>
   <data name="VerifyEmail.Help" xml:space="preserve">
-    <value>Un code a été envoyé à {0}. Saisissez-le ci-dessous pour créer votre compte.</value>
+    <value>Un code a été envoyé à {0}. Le saisir ci-dessous pour créer le compte.</value>
   </data>
   <data name="VerifyEmail.Resend" xml:space="preserve">
     <value>Renvoyer le code</value>
@@ -503,7 +503,7 @@
     <value>Un nouveau code a été envoyé.</value>
   </data>
   <data name="VerifyEmail.SendFailed" xml:space="preserve">
-    <value>Le code n'a pas pu être envoyé. Utilisez Renvoyer le code ci-dessous.</value>
+    <value>Le code n'a pas pu être envoyé. Utiliser Renvoyer le code ci-dessous.</value>
   </data>
   <data name="VerifyEmail.Submit" xml:space="preserve">
     <value>Vérifier et créer le compte</value>
