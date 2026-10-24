@@ -120,6 +120,22 @@ public interface IMfaStore
     Task DisableAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Where the avatars are kept, one per account that has one.</summary>
+public interface IAvatarStore
+{
+    /// <summary>The avatar of an account, or <see langword="null"/> when it has none.</summary>
+    Task<AccountAvatar?> GetAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
+
+    /// <summary>When the avatar of an account was set, without reading the image, or <see langword="null"/> when it has none.</summary>
+    Task<DateTimeOffset?> GetModifiedAtAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets the avatar of an account, replacing the one it had.</summary>
+    Task SetAsync(AccountAvatar avatar, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes the avatar of an account. <see langword="false"/> when it had none.</summary>
+    Task<bool> DeleteAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Where the recovery codes are kept, as hashes only, like passwords.</summary>
 public interface IRecoveryCodeStore
 {

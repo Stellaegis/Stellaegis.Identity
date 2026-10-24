@@ -9,8 +9,8 @@ namespace Stellaegis.Identity.SqlServer;
 internal sealed class UserRepository(DbConnection connection, Func<DbTransaction?> transaction)
 {
     private const string Columns =
-        "user_unique_id, email, display_name, password_hash, is_enabled, email_verified, failed_login_count, failed_login_last, " +
-        "blocked_until, created_at, created_by, modified_at, modified_by, last_login, is_deleted, deleted_at, deleted_by";
+        "user_unique_id, email, display_name, password_hash, is_enabled, email_verified, locale, time_zone, failed_login_count, " +
+        "failed_login_last, blocked_until, created_at, created_by, modified_at, modified_by, last_login, is_deleted, deleted_at, deleted_by";
 
     static UserRepository()
     {
@@ -72,12 +72,12 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         => connection.ExecuteAsync(new CommandDefinition(
             """
             insert into ident.users (
-                user_unique_id, email, display_name, password_hash, is_enabled, email_verified,
+                user_unique_id, email, display_name, password_hash, is_enabled, email_verified, locale, time_zone,
                 failed_login_count, failed_login_last, blocked_until,
                 created_at, created_by, modified_at, modified_by, last_login,
                 is_deleted, deleted_at, deleted_by)
             values (
-                @UserUniqueId, @Email, @DisplayName, @PasswordHash, @IsEnabled, @EmailVerified,
+                @UserUniqueId, @Email, @DisplayName, @PasswordHash, @IsEnabled, @EmailVerified, @Locale, @TimeZone,
                 @FailedLoginCount, @FailedLoginLast, @BlockedUntil,
                 @CreatedAt, @CreatedBy, @ModifiedAt, @ModifiedBy, @LastLogin,
                 @IsDeleted, @DeletedAt, @DeletedBy)
@@ -94,6 +94,8 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
                 password_hash = @PasswordHash,
                 is_enabled = @IsEnabled,
                 email_verified = @EmailVerified,
+                locale = @Locale,
+                time_zone = @TimeZone,
                 failed_login_count = @FailedLoginCount,
                 failed_login_last = @FailedLoginLast,
                 blocked_until = @BlockedUntil,
@@ -127,6 +129,8 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         public string? PasswordHash { get; set; }
         public bool IsEnabled { get; set; }
         public bool EmailVerified { get; set; }
+        public string? Locale { get; set; }
+        public string? TimeZone { get; set; }
         public int FailedLoginCount { get; set; }
         public DateTimeOffset? FailedLoginLast { get; set; }
         public DateTimeOffset? BlockedUntil { get; set; }
@@ -147,6 +151,8 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             PasswordHash = user.PasswordHash,
             IsEnabled = user.IsEnabled,
             EmailVerified = user.EmailVerified,
+            Locale = user.Locale,
+            TimeZone = user.TimeZone,
             FailedLoginCount = user.FailedLoginCount,
             FailedLoginLast = user.FailedLoginLast,
             BlockedUntil = user.BlockedUntil,
@@ -168,6 +174,8 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             PasswordHash = PasswordHash,
             IsEnabled = IsEnabled,
             EmailVerified = EmailVerified,
+            Locale = Locale,
+            TimeZone = TimeZone,
             FailedLoginCount = FailedLoginCount,
             FailedLoginLast = FailedLoginLast,
             BlockedUntil = BlockedUntil,
@@ -404,6 +412,77 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
             Attempts = Attempts,
             IsVerified = IsVerified,
             IpAddress = IpAddress,
+        };
+    }
+}
+
+/// <summary>The rows of <c>ident.user_avatars</c>, one per account that has an avatar.</summary>
+internal sealed class AvatarRepository(DbConnection connection, Func<DbTransaction?> transaction)
+{
+    static AvatarRepository()
+    {
+        PrimitiveTypeHandlers.Register();
+        SnakeCaseTypeMap<AvatarRow>.Register();
+        SnakeCaseTypeMap<StampRow>.Register();
+    }
+
+    public async Task<AccountAvatar?> FindAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        var row = await connection.QuerySingleOrDefaultAsync<AvatarRow>(new CommandDefinition(
+            "select user_unique_id, image, modified_at, modified_by from ident.user_avatars where user_unique_id = @userUniqueId",
+            new { userUniqueId }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row?.ToAvatar();
+    }
+
+    public async Task<DateTimeOffset?> FindModifiedAtAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        var row = await connection.QuerySingleOrDefaultAsync<StampRow>(new CommandDefinition(
+            "select modified_at from ident.user_avatars where user_unique_id = @userUniqueId",
+            new { userUniqueId }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row?.ModifiedAt;
+    }
+
+    public Task UpsertAsync(AccountAvatar avatar, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            """
+            begin try
+                update ident.user_avatars set image = @Image, modified_at = @ModifiedAt, modified_by = @ModifiedBy
+                where user_unique_id = @UserUniqueId;
+                if @@rowcount = 0
+                    insert into ident.user_avatars (user_unique_id, image, modified_at, modified_by)
+                    values (@UserUniqueId, @Image, @ModifiedAt, @ModifiedBy);
+            end try
+            begin catch
+                if error_number() not in (2601, 2627) throw;
+                update ident.user_avatars set image = @Image, modified_at = @ModifiedAt, modified_by = @ModifiedBy
+                where user_unique_id = @UserUniqueId;
+            end catch
+            """,
+            avatar, transaction(), cancellationToken: cancellationToken));
+
+    public async Task<bool> DeleteAsync(Guid userUniqueId, CancellationToken cancellationToken)
+        => await connection.ExecuteAsync(new CommandDefinition(
+            "delete from ident.user_avatars where user_unique_id = @userUniqueId",
+            new { userUniqueId }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+
+    private sealed class StampRow
+    {
+        public DateTimeOffset ModifiedAt { get; set; }
+    }
+
+    private sealed class AvatarRow
+    {
+        public Guid UserUniqueId { get; set; }
+        public byte[] Image { get; set; } = [];
+        public DateTimeOffset ModifiedAt { get; set; }
+        public Actor ModifiedBy { get; set; } = null!;
+
+        public AccountAvatar ToAvatar() => new()
+        {
+            UserUniqueId = UserUniqueId,
+            Image = Image,
+            ModifiedAt = ModifiedAt,
+            ModifiedBy = ModifiedBy,
         };
     }
 }

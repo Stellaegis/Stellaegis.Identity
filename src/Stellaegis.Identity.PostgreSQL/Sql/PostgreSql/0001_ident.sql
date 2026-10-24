@@ -26,6 +26,10 @@ create table ident.users (
   is_enabled           boolean       not null,
   email_verified       boolean       not null,
 
+  -- What the person chose for themselves; null while they chose nothing.
+  locale               varchar(35),            -- a culture name, such as fr or en-GB: the locale claim
+  time_zone            varchar(64),            -- an IANA name, such as Europe/Paris: the zoneinfo claim
+
   -- Lockout after failed logins; not a block at the door.
   failed_login_count   integer       not null default 0,
   failed_login_last    timestamptz,
@@ -46,6 +50,8 @@ create table ident.users (
   constraint pk_users primary key (user_unique_id),
   constraint ux_users_email unique (email),
   constraint ck_users_failed_login_count check (failed_login_count >= 0),
+  constraint ck_users_locale check (char_length(locale) between 2 and 35),
+  constraint ck_users_time_zone check (char_length(time_zone) between 1 and 64),
   constraint ck_users_deleted check (
     (is_deleted = false and deleted_at is null and deleted_by is null)
     or (is_deleted = true and deleted_at is not null and deleted_by is not null))
@@ -54,6 +60,8 @@ create table ident.users (
 comment on table  ident.users                is 'The accounts: who can sign in, with which e-mail and which password. The second factor and the recovery codes are kept apart.';
 comment on column ident.users.user_unique_id is 'The identity of the account, which its sub claim carries. Never reused: a deleted account stays, marked.';
 comment on column ident.users.email          is 'Lowercase and trimmed by the module before it reaches the store. Unique among the accounts, deleted ones included.';
+comment on column ident.users.locale         is 'The language the person chose, a culture name the module checks: the locale claim. Null while they chose none.';
+comment on column ident.users.time_zone      is 'The time zone the person chose, an IANA name the module checks: the zoneinfo claim. Null while they chose none.';
 comment on column ident.users.email_verified is 'Whether the e-mail was proven: a code, or a link the system sent there. While it was not, no reset link is sent to it.';
 comment on column ident.users.created_by     is 'The actor who created the account: the person themselves, or an administrator. Never a default.';
 comment on column ident.users.deleted_by     is 'The actor who deleted the account; null while it is not deleted.';
@@ -137,6 +145,24 @@ create index ix_login_events_user_date on ident.login_events (user_unique_id, cr
 
 -- The purge of the attempts past their retention, every day.
 create index ix_login_events_date on ident.login_events (created_at);
+
+-- ── Avatars ──────────────────────────────────────────────────────────────────
+-- The image an account shows: a PNG of 256 by 256 pixels, which the module checks and strips of every
+-- chunk but the image's own before it reaches the store. One row per account that has one, apart
+-- from the account so that reading an account never carries it, and so that removing it is deleting
+-- a row: the image identifies the person.
+
+create table ident.user_avatars (
+  user_unique_id  uuid          not null,
+  image           bytea         not null,
+  modified_at     timestamptz   not null,
+  modified_by     varchar(128)  not null,
+
+  constraint pk_user_avatars primary key (user_unique_id),
+  constraint fk_user_avatars_user
+    foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade,
+  constraint ck_user_avatars_image check (octet_length(image) between 8 and 262144)
+);
 
 -- ── Second factor ────────────────────────────────────────────────────────────
 

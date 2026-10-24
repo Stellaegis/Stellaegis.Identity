@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IAccountTokenStore>(provider => provider.GetRequiredService<SqlServerIdentityStore>());
         services.TryAddSingleton<IEmailVerificationStore>(provider => provider.GetRequiredService<SqlServerIdentityStore>());
         services.TryAddSingleton<IMfaStore>(provider => provider.GetRequiredService<SqlServerIdentityStore>());
+        services.TryAddSingleton<IAvatarStore>(provider => provider.GetRequiredService<SqlServerIdentityStore>());
         services.TryAddSingleton<IRecoveryCodeStore>(provider => provider.GetRequiredService<SqlServerIdentityStore>());
         services.AddStellaegisModuleDatabase(IdentityDatabase.Value,
             (provider, cancellationToken) => provider.GetRequiredService<SqlServerIdentityStore>().OpenConnectionAsync(cancellationToken));

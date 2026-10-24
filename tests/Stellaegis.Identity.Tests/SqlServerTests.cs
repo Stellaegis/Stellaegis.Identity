@@ -7,7 +7,7 @@ using Stellaegis.Primitives.Data;
 namespace Stellaegis.Identity.Tests;
 
 /// <summary>
-/// The six stores on SQL Server (<see cref="IdentityStoreTests"/>), in a case-insensitive database, their
+/// The seven stores on SQL Server (<see cref="IdentityStoreTests"/>), in a case-insensitive database, their
 /// connections running as the application's user.
 /// </summary>
 [Collection(SqlServerCollection.Name)]

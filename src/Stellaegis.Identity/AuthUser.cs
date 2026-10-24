@@ -3,8 +3,9 @@ using Stellaegis.Primitives;
 namespace Stellaegis.Identity;
 
 /// <summary>
-/// An account of the application: who can sign in, with which e-mail and which password. The second factor and
-/// the recovery codes are kept apart, by <see cref="IMfaStore"/> and <see cref="IRecoveryCodeStore"/>.
+/// An account of the application: who can sign in, with which e-mail and which password. The second factor, the
+/// recovery codes and the avatar are kept apart, by <see cref="IMfaStore"/>, <see cref="IRecoveryCodeStore"/> and
+/// <see cref="IAvatarStore"/>.
 /// </summary>
 public sealed class AuthUser
 {
@@ -31,6 +32,18 @@ public sealed class AuthUser
     /// holds it.
     /// </summary>
     public bool EmailVerified { get; set; }
+
+    /// <summary>
+    /// The language the person chose, a culture name such as <c>fr</c> or <c>en-GB</c> — the <c>locale</c> claim —, or
+    /// <see langword="null"/> while they chose none: the pages and the applications then follow the request.
+    /// </summary>
+    public string? Locale { get; set; }
+
+    /// <summary>
+    /// The time zone the person chose, an IANA name such as <c>Europe/Paris</c> — the <c>zoneinfo</c> claim —, or
+    /// <see langword="null"/> while they chose none: an application then shows dates in the browser's.
+    /// </summary>
+    public string? TimeZone { get; set; }
 
     /// <summary>Whether the account has a password: created by its person, or activated.</summary>
     public bool IsActivated => PasswordHash is not null;

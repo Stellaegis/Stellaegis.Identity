@@ -86,6 +86,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IAccountTokenStore, InMemoryAccountTokenStore>();
         services.TryAddSingleton<IEmailVerificationStore, InMemoryEmailVerificationStore>();
         services.TryAddSingleton<IMfaStore, InMemoryMfaStore>();
+        services.TryAddSingleton<IAvatarStore, InMemoryAvatarStore>();
         services.TryAddSingleton<IRecoveryCodeStore, InMemoryRecoveryCodeStore>();
         return services;
     }

@@ -37,7 +37,7 @@ public enum Refusal
 }
 
 /// <summary>
-/// The six stores against a real engine, under the application's role: what the schema and the queries
+/// The seven stores against a real engine, under the application's role: what the schema and the queries
 /// guarantee, each port covered. Every engine runs the same scenarios; a derived class says only how its store is
 /// built and how its engine refuses.
 /// </summary>
@@ -68,6 +68,7 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
     private IAccountTokenStore Tokens => (IAccountTokenStore)Store();
     private IEmailVerificationStore Verifications => (IEmailVerificationStore)Store();
     private IMfaStore Mfa => (IMfaStore)Store();
+    private IAvatarStore Avatars => (IAvatarStore)Store();
     private IRecoveryCodeStore RecoveryCodes => (IRecoveryCodeStore)Store();
 
     /// <summary>The declaration of the database of the engine.</summary>
@@ -108,10 +109,14 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         Assert.Equal(_clock.Now, byId.CreatedAt);
         Assert.Null(byId.DeletedBy);
         Assert.False(byId.EmailVerified);
+        Assert.Null(byId.Locale);
+        Assert.Null(byId.TimeZone);
         Assert.Equal(user.UserUniqueId, byEmail!.UserUniqueId);
 
         byId.DisplayName = "Jane Doe";
         byId.EmailVerified = true;
+        byId.Locale = "en-GB";
+        byId.TimeZone = "America/Argentina/ComodRivadavia";
         byId.FailedLoginCount = 2;
         byId.BlockedUntil = _clock.Now.AddMinutes(15);
         byId.LastLogin = _clock.Now;
@@ -121,6 +126,8 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         Assert.Equal("Jane Doe", updated!.DisplayName);
         Assert.Equal(2, updated.FailedLoginCount);
         Assert.True(updated.EmailVerified);
+        Assert.Equal("en-GB", updated.Locale);
+        Assert.Equal("America/Argentina/ComodRivadavia", updated.TimeZone);
         Assert.Equal(_clock.Now.AddMinutes(15), updated.BlockedUntil);
         Assert.Equal(byId.AsActor(), updated.ModifiedBy);
 
@@ -128,6 +135,58 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         Assert.Empty(await Users.ListByUniqueIdsAsync([], Ct));
         Assert.True(await Users.CountAsync(cancellationToken: Ct) >= 1);
         Assert.Contains((await Users.ListAsync(0, 1000, cancellationToken: Ct)).Select(u => u.UserUniqueId), id => id == user.UserUniqueId);
+    }
+
+    [Fact]
+    public async Task A_language_or_a_time_zone_out_of_its_bounds_is_refused_by_the_schema()
+    {
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+
+        user.Locale = "f";
+        await AssertRefusedAsync(() => Users.UpdateAsync(user, Ct), Refusal.Check);
+        user.Locale = null;
+        user.TimeZone = "";
+        await AssertRefusedAsync(() => Users.UpdateAsync(user, Ct), Refusal.Check);
+    }
+
+    [Fact]
+    public async Task An_avatar_is_set_replaced_read_back_and_removed()
+    {
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+        Assert.Null(await Avatars.GetAsync(user.UserUniqueId, Ct));
+        Assert.Null(await Avatars.GetModifiedAtAsync(user.UserUniqueId, Ct));
+
+        byte[] first = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3];
+        await Avatars.SetAsync(new AccountAvatar { UserUniqueId = user.UserUniqueId, Image = first, ModifiedAt = _clock.Now, ModifiedBy = user.AsActor() }, Ct);
+        var stored = await Avatars.GetAsync(user.UserUniqueId, Ct);
+        Assert.Equal(first, stored!.Image);
+        Assert.Equal(_clock.Now, stored.ModifiedAt);
+        Assert.Equal(user.AsActor(), stored.ModifiedBy);
+
+        var replacedAt = _clock.Now.AddMinutes(5);
+        var second = new byte[AccountAvatar.MaxImageLength];
+        await Avatars.SetAsync(new AccountAvatar { UserUniqueId = user.UserUniqueId, Image = second, ModifiedAt = replacedAt, ModifiedBy = Actor.Parse("admin") }, Ct);
+        Assert.Equal(second, (await Avatars.GetAsync(user.UserUniqueId, Ct))!.Image);
+        Assert.Equal(replacedAt, await Avatars.GetModifiedAtAsync(user.UserUniqueId, Ct));
+
+        Assert.True(await Avatars.DeleteAsync(user.UserUniqueId, Ct));
+        Assert.False(await Avatars.DeleteAsync(user.UserUniqueId, Ct));
+        Assert.Null(await Avatars.GetAsync(user.UserUniqueId, Ct));
+    }
+
+    [Fact]
+    public async Task An_avatar_is_refused_by_the_schema_beyond_its_bounds_or_without_an_account()
+    {
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+        AccountAvatar Avatar(byte[] image, Guid? owner = null)
+            => new() { UserUniqueId = owner ?? user.UserUniqueId, Image = image, ModifiedAt = _clock.Now, ModifiedBy = user.AsActor() };
+
+        await AssertRefusedAsync(() => Avatars.SetAsync(Avatar(new byte[AccountAvatar.MaxImageLength + 1]), Ct), Refusal.Check);
+        await AssertRefusedAsync(() => Avatars.SetAsync(Avatar([1, 2, 3]), Ct), Refusal.Check);
+        await AssertRefusedAsync(() => Avatars.SetAsync(Avatar(new byte[16], Guid.NewGuid()), Ct), Refusal.MissingAccount);
     }
 
     [Fact]

@@ -7,14 +7,14 @@ using Stellaegis.Primitives.Data;
 namespace Stellaegis.Identity.SqlServer;
 
 /// <summary>
-/// The six stores of the accounts on SQL Server, in the schema <c>ident</c>: one object, one connection string, the
+/// The seven stores of the accounts on SQL Server, in the schema <c>ident</c>: one object, one connection string, the
 /// repositories of <see cref="IdentityDatabase"/> handed out by a unit of work of <c>Stellaegis.Primitives.Data</c>.
 /// Each operation opens its own unit of work and closes it: no connection outlives a call, and none is shared
 /// between two. The only operation that writes several rows at once, the replacement of the recovery codes,
 /// runs in a transaction. The pool of the connections is <c>Microsoft.Data.SqlClient</c>'s, by connection string.
 /// </summary>
 internal sealed class SqlServerIdentityStore
-    : IAuthUserStore, ILoginEventStore, IAccountTokenStore, IEmailVerificationStore, IMfaStore, IRecoveryCodeStore
+    : IAuthUserStore, ILoginEventStore, IAccountTokenStore, IEmailVerificationStore, IMfaStore, IAvatarStore, IRecoveryCodeStore
 {
     private readonly Func<CancellationToken, Task<DbConnection>> _open;
     private readonly AdoUnitOfWorkFactory<IdentityDatabase> _units;
@@ -39,6 +39,7 @@ internal sealed class SqlServerIdentityStore
             .Add<AccountTokenRepository>((connection, transaction) => new AccountTokenRepository(connection, transaction))
             .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository(connection, transaction))
             .Add<MfaRepository>((connection, transaction) => new MfaRepository(connection, transaction))
+            .Add<AvatarRepository>((connection, transaction) => new AvatarRepository(connection, transaction))
             .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository(connection, transaction));
 
         _units = new AdoUnitOfWorkFactory<IdentityDatabase>(_open, registry);
@@ -282,6 +283,33 @@ internal sealed class SqlServerIdentityStore
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
         await uow.Repo<MfaRepository>().DisableAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+    }
+
+    // ── Avatars ──────────────────────────────────────────────────────────────
+
+    async Task<AccountAvatar?> IAvatarStore.GetAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AvatarRepository>().FindAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<DateTimeOffset?> IAvatarStore.GetModifiedAtAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AvatarRepository>().FindModifiedAtAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task IAvatarStore.SetAsync(AccountAvatar avatar, CancellationToken cancellationToken)
+    {
+        Guard.NotNull(avatar);
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await uow.Repo<AvatarRepository>().UpsertAsync(avatar, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<bool> IAvatarStore.DeleteAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AvatarRepository>().DeleteAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
     }
 
     // ── Recovery codes ───────────────────────────────────────────────────────

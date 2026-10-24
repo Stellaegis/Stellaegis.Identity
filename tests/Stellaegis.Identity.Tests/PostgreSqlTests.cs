@@ -7,7 +7,7 @@ using Stellaegis.Primitives.Data;
 
 namespace Stellaegis.Identity.Tests;
 
-/// <summary>The six stores on PostgreSQL (<see cref="IdentityStoreTests"/>), connected under the application's role.</summary>
+/// <summary>The seven stores on PostgreSQL (<see cref="IdentityStoreTests"/>), connected under the application's role.</summary>
 [Collection(PostgreSqlCollection.Name)]
 public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IdentityStoreTests(database)
 {

@@ -39,6 +39,10 @@ create table ident.users (
   is_enabled           bit               not null,
   email_verified       bit               not null,
 
+  -- What the person chose for themselves; null while they chose nothing.
+  locale               nvarchar(35)      null,     -- a culture name, such as fr or en-GB: the locale claim
+  time_zone            nvarchar(64)      null,     -- an IANA name, such as Europe/Paris: the zoneinfo claim
+
   -- Lockout after failed logins; not a block at the door.
   failed_login_count   int               not null constraint df_users_failed_login_count default 0,
   failed_login_last    datetimeoffset(3) null,
@@ -59,6 +63,8 @@ create table ident.users (
   constraint pk_users primary key clustered (user_unique_id),
   constraint ux_users_email unique (email),
   constraint ck_users_failed_login_count check (failed_login_count >= 0),
+  constraint ck_users_locale check (len(locale) between 2 and 35),
+  constraint ck_users_time_zone check (len(time_zone) between 1 and 64),
   constraint ck_users_deleted check (
     (is_deleted = 0 and deleted_at is null and deleted_by is null)
     or (is_deleted = 1 and deleted_at is not null and deleted_by is not null))
@@ -140,6 +146,24 @@ create index ix_login_events_user_date on ident.login_events (user_unique_id, cr
 
 -- The purge of the attempts past their retention, every day.
 create index ix_login_events_date on ident.login_events (created_at);
+
+-- ── Avatars ──────────────────────────────────────────────────────────────────
+-- The image an account shows: a PNG of 256 by 256 pixels, which the module checks and strips of every
+-- chunk but the image's own before it reaches the store. One row per account that has one, apart
+-- from the account so that reading an account never carries it, and so that removing it is deleting
+-- a row: the image identifies the person.
+
+create table ident.user_avatars (
+  user_unique_id  uniqueidentifier  not null,
+  image           varbinary(max)    not null,
+  modified_at     datetimeoffset(3) not null,
+  modified_by     nvarchar(128)     not null,
+
+  constraint pk_user_avatars primary key clustered (user_unique_id),
+  constraint fk_user_avatars_user
+    foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade,
+  constraint ck_user_avatars_image check (datalength(image) between 8 and 262144)
+);
 
 -- ── Second factor ────────────────────────────────────────────────────────────
 

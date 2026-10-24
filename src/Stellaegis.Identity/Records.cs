@@ -128,6 +128,28 @@ public sealed class EmailVerification
     public string? IpAddress { get; set; }
 }
 
+/// <summary>
+/// The image an account shows, as <see cref="IAvatarStore"/> keeps it: a PNG of 256 by 256 pixels, checked and
+/// stripped of every chunk but the image's own before it reaches the store.
+/// </summary>
+public sealed record AccountAvatar
+{
+    /// <summary>The largest image a store keeps, in bytes.</summary>
+    public const int MaxImageLength = 262144;
+
+    /// <summary>The account.</summary>
+    public Guid UserUniqueId { get; init; }
+
+    /// <summary>The image, a PNG.</summary>
+    public required byte[] Image { get; init; }
+
+    /// <summary>When the image was set: it versions the address it is served at.</summary>
+    public DateTimeOffset ModifiedAt { get; init; }
+
+    /// <summary>Who set it: the person, or an administrator.</summary>
+    public required Actor ModifiedBy { get; init; }
+}
+
 /// <summary>The second factor of an account, as <see cref="IMfaStore"/> keeps it.</summary>
 public sealed record MfaRecord
 {

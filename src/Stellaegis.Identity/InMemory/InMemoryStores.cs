@@ -11,6 +11,7 @@ public sealed class InMemoryIdentityData
     internal ConcurrentDictionary<string, AccountToken> AccountTokens { get; } = new(StringComparer.Ordinal);
     internal ConcurrentDictionary<Guid, ConcurrentQueue<LoginEvent>> LoginEvents { get; } = new();
     internal ConcurrentDictionary<Guid, MfaRecord> Mfa { get; } = new();
+    internal ConcurrentDictionary<Guid, AccountAvatar> Avatars { get; } = new();
     internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, bool>> RecoveryCodes { get; } = new();
 }
 
@@ -186,6 +187,27 @@ internal sealed class InMemoryEmailVerificationStore(InMemoryIdentityData data) 
         data.EmailVerifications.TryRemove(email, out _);
         return Task.CompletedTask;
     }
+}
+
+internal sealed class InMemoryAvatarStore(InMemoryIdentityData data) : IAvatarStore
+{
+    public Task<AccountAvatar?> GetAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.Avatars.TryGetValue(userUniqueId, out var avatar) ? avatar : null);
+
+    public Task<DateTimeOffset?> GetModifiedAtAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.Avatars.TryGetValue(userUniqueId, out var avatar) ? avatar.ModifiedAt : (DateTimeOffset?)null);
+
+    public Task SetAsync(AccountAvatar avatar, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(avatar);
+        if (!data.Users.ContainsKey(avatar.UserUniqueId))
+            throw new InvalidOperationException($"No account has the id {avatar.UserUniqueId:N}.");
+        data.Avatars[avatar.UserUniqueId] = avatar with { Image = [.. avatar.Image] };
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> DeleteAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.Avatars.TryRemove(userUniqueId, out _));
 }
 
 internal sealed class InMemoryMfaStore(InMemoryIdentityData data) : IMfaStore
