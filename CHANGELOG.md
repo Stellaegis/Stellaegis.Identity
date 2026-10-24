@@ -7,6 +7,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [6.1.0] — 2026-10-24
+
+What a person chooses of their own account: the language of the pages, a time zone, the name, an avatar. The pages
+follow the person rather than the browser alone, and the session carries what an application needs to show dates
+and names as the person wants them.
+
+### Added
+
+- **`ProfileService`**: the name, the language — a culture name in its canonical form —, the time zone — an IANA
+  name —, read and changed by the person; the avatar, a PNG of 256 by 256 pixels, checked and rebuilt from the chunks
+  that draw it, without an image library. `AccountProfile`, `IAvatarStore` and `AccountAvatar`, kept apart from the
+  account in `ident.user_avatars`, removed with it. `UserProfileChangedEvent` when the name or the avatar changes.
+- **The claims of the profile**, `ProfileClaims`: `locale` and `zoneinfo` when the person chose them, `picture` when
+  the host declares `Stellaegis:Identity:AvatarUrl`.
+- **The language of the pages** follows, unless `Pages:Culture` imposes one: the account, the `ui_locales` of the
+  authorization request, the choice made on the pages — kept in `.AspNetCore.Culture` and the account —, the host's
+  request localization or the browser, then `Pages:DefaultCulture`. A row of buttons offers the languages with texts.
+- **The account page** changes the profile in place, the time zone of the browser suggested, and carries the avatar
+  editor: a file, or a Gravatar asked by the browser behind `Pages:GravatarImport`, off unless set.
+  `/account/avatar` serves the avatar to its person. `Pages:AvatarCornerRadius` rounds it, a circle unless set.
+- **The registration** keeps the time zone of the browser.
+- **`MapIdentityAccountEndpoints()`**: `GET` and `PUT identity/account/profile`, on oneself, under the cookie.
+- **`CookieSignIn.RefreshAsync`** signs the session in again from the account, keeping its `amr` and its lifetime.
+
+### Fixed
+
+- The danger button reads in the dark theme: `--si-danger-text`.
+
+### Updating from 6.0.0
+
+1. **Reinstall the schema.** `0001_ident.sql` is corrected in place, with the language, the time zone and the
+   avatars: drop the schema `ident` and run the installation again. The verification at startup refuses the 6.0.0
+   schema, and says so.
+2. **Without `Pages:Culture`, the pages no longer follow the host's request localization first**: the account, the
+   `ui_locales` and the choice made on the pages come before it. A host that wants a single language sets `Culture`.
+3. **A registration in progress during the update** restarts: what waits between its two pages changed.
+4. **`MapIdentityAccountEndpoints()`** needs the startup check of Primitives registered, as the administration routes do.
+
 ## [6.0.0] — 2026-10-23
 
 The creation of the accounts reviewed for its security, and the stores on SQL Server. An administrator no
@@ -24,7 +62,7 @@ they are, and what identifies a person is removed once it no longer serves.
    `Keys:<slot>`, secrets of the deployment. The startup refuses a host without it.
 3. **`Registration:Posture` becomes `SelfRegistration`**, `Closed` or `Open`, `Closed` unless set.
    `RegistrationPosture`, `ByInvitation` and the `invited` flag of the registration are gone: an invitation will be
-   a port of its own (6.1.0).
+   a port of its own, in a later version.
 4. **`AccountAdministrationService.CreateAsync(email, displayName, delivery, actor)`** creates the account without
    a password and answers a `PendingAccount` carrying its activation token. `ChangePasswordAsync` and the route
    `POST identity/users/{id}/change-password` are gone: `IssuePasswordResetAsync` and

@@ -100,9 +100,10 @@ history or the list of processes. Run again, it changes nothing but a new link f
 
 An account is an `AuthUser`: its identity `UserUniqueId`, a random GUID that its `sub` claim carries and that is
 never reused; its e-mail, normalized and unique among the accounts, and whether that address was proven; its
-display name; the hash of its password, absent while the account waits for its activation; whether it is enabled;
-its failed logins and its lockout; who created, modified and deleted it, as `Actor`s, never a default. A deleted
-account stays, marked, so that its identity is never given to someone else.
+display name; the language and the time zone its person chose, absent while they chose none; the hash of its
+password, absent while the account waits for its activation; whether it is enabled; its failed logins and its
+lockout; who created, modified and deleted it, as `Actor`s, never a default. A deleted account stays, marked, so
+that its identity is never given to someone else. Its avatar is kept apart, and goes with it.
 
 The services do what a person or an administrator does to accounts, and answer a `Result` whose `Error` carries
 a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Account.Blocked`, `Email.Taken`,
@@ -110,10 +111,11 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 
 | Service | What it does |
 | --- | --- |
-| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due, and builds the principal — `sub`, `email`, `name` — a host signs in |
+| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due, and builds the principal — `sub`, `email`, `name`, and `locale`, `zoneinfo`, `picture` when the person chose them — a host signs in |
 | `RegistrationService` | Creates an account when the self-registration is open, after the e-mail was proved by a code |
 | `ActivationService` | Lets the person of an account an administrator created choose its first password, by the link of its activation |
 | `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, verifies a password |
+| `ProfileService` | Reads and changes what a person chose of their own profile: the name of the account, the language, the time zone, the avatar |
 | `PasswordResetService` | Issues a reset link sent by e-mail to a proven address, and spends its token once |
 | `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read |
 | `MfaService`, `LoginOtpService` | Enrolls an authenticator app (TOTP) or the e-mail as second factor, checks a code |
@@ -122,7 +124,7 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 | `IdentityRetentionService` | Removes what identifies a person once it no longer serves: the trace of the logins, the expired tokens and verifications |
 
 The stores are ports, each atomic: `IAuthUserStore`, `IEmailVerificationStore`, `IAccountTokenStore`,
-`ILoginEventStore`, `IMfaStore`, `IRecoveryCodeStore`. `AddStellaegisIdentityInMemory` registers their in-memory
+`ILoginEventStore`, `IMfaStore`, `IAvatarStore`, `IRecoveryCodeStore`. `AddStellaegisIdentityInMemory` registers their in-memory
 form, for development and tests; `AddStellaegisIdentityPostgreSQL` and `AddStellaegisIdentitySqlServer` those of
 the two engines.
 
@@ -145,6 +147,26 @@ The principal of a session carries one `amr` claim per method, with the values o
 alone; `pwd`, `otp` and `mfa` after the code of an authenticator or one sent by e-mail; `pwd` and `mfa` after a
 recovery code. `AuthenticationMethods` names them. An issuer carries the claim into its tokens, so that a decision
 asks whether a second factor was used for this session, not whether the account has one.
+
+### The profile
+
+What a person chooses of their account, through `ProfileService`:
+
+- **the name** of the account, 1 to 200 characters — the pages ask 2 to 100, as at the registration;
+- **the language**, a culture name in its canonical form: `en-GB`, never `en-gb`. The pages follow it, and the
+  session carries it as `locale`;
+- **the time zone**, an IANA name the system knows, as written: `Europe/Paris`, never a Windows name. The session
+  carries it as `zoneinfo`, for an application that shows dates — a server in a container runs in UTC;
+- **the avatar**, a PNG of 256 by 256 pixels. `SetAvatarAsync` checks its structure and its checksums, and keeps it
+  rebuilt from the chunks that draw the image — `IHDR`, `PLTE`, `tRNS`, `IDAT`, `IEND` —: a text, an EXIF profile, a
+  position go, without an image library. It is kept apart from the account, `IAvatarStore`, so that reading an
+  account never carries it, and it is removed with the account.
+
+The claims are the session's, taken at the login: a change reaches the tokens of an issuer at the next one. A page
+that has just written the profile signs the session in again, `CookieSignIn.RefreshAsync`, and shows it at once.
+`picture` carries `IdentityOptions.AvatarUrl`, versioned by the time the avatar was set, when the host declares
+that address — the module does not know where the host maps the pages. It answers the person's own session: an
+application on the same site shows it, one on another site reads the avatars of others from its registry.
 
 ### What is kept, and for how long
 
@@ -176,6 +198,7 @@ Stellaegis:Identity:Links:HandDelivery             false; true lets an administr
 Stellaegis:Identity:SelfRegistration               Closed, or Open
 Stellaegis:Identity:Retention:LoginEvents          180 days, and never less
 Stellaegis:Identity:Retention:Expired              30 days past their expiry, and never less
+Stellaegis:Identity:AvatarUrl                      none; the absolute address of /account/avatar, for picture
 ```
 
 `SelfRegistration` is `Closed` unless set: a host whose people are created by its administration — an
@@ -183,8 +206,10 @@ enterprise, a solution installed for one organization — opens nothing. `Open` 
 
 ### Events
 
-The module publishes three events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
-with its reason, `UserUnblocked` —, records implementing `IEvent`. It publishes to whatever bus the host
+The module publishes four events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
+with its reason, `UserUnblocked`, and `UserProfileChanged` when what others see of the person changes, the name or
+the avatar —, records implementing `IEvent`. A registry that keeps a copy of the name and the avatar for the
+people who share a compartment with the person refreshes it on the last one. It publishes to whatever bus the host
 registered, and nowhere when the host registered none; it subscribes to nothing. A host that wants a block to
 apply at once connects its bus to the admission (below).
 
@@ -222,6 +247,20 @@ refuses a route labelled with one the module does not declare, and so that a hos
 declarations. `AddStellaegisIdentityAdministration()` registers that startup check: a module without compartments
 registers it from its own registration, since no request context does.
 
+## The routes of one's own account
+
+`MapIdentityAccountEndpoints()` maps what a signed-in person calls on their own account from a client of the host,
+under `identity/account`, for whoever the cookie signed in: under no operation and no role, on oneself only.
+
+| Route | What it does |
+| --- | --- |
+| `GET identity/account/profile` | the profile, `AccountProfile` |
+| `PUT identity/account/profile` | `{ "displayName", "locale", "timeZone" }`, every field replaced; the session signed in again; 400 with the code of the refusal |
+
+A write is a `PUT` with a JSON body, which a browser does not send cross-site without a preflight the host's CORS
+policy answers. The routes belong to the module, and the startup check of Primitives checks them: the host
+registers it, `AddStellaegisStartupCheck()` or `AddStellaegisIdentityAdministration()`.
+
 ## The admission of actors
 
 A resource server refuses the requests of a blocked account at the door, before any route runs.
@@ -248,8 +287,9 @@ from its own `IEventPublisher`; with several, from a subscription to `Stellaegis
 ## The pages
 
 `Stellaegis.Identity.Server` is a Razor class library: `/login`, `/login/mfa`, `/login/mfa-setup`, `/register`,
-`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, and under `/account` the overview, the password, the
-e-mail, the second factor and its recovery codes, the sign-in history, the deletion. The host mounts them beside
+`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, `/language`, and under `/account` the overview — the
+avatar and the profile —, the avatar itself, the password, the e-mail, the second factor and its recovery codes, the
+sign-in history, the deletion. The host mounts them beside
 what it serves:
 
 ```csharp
@@ -280,21 +320,42 @@ From the lightest gesture to the heaviest, each one leaving the others untouched
 
 | Gesture | How |
 | --- | --- |
-| The name, the logo, a support link, the culture | `IdentityPagesOptions`: `ApplicationName`, `LogoPath`, `SupportUrl`, `Culture`; also `RedirectRoot`, `DefaultReturnUrl`, `PasswordResetEnabled`, `RateLimitingPolicy` |
+| The name, the logo, a support link, the culture | `IdentityPagesOptions`: `ApplicationName`, `LogoPath`, `SupportUrl`, `Culture`, `DefaultCulture`; also `RedirectRoot`, `DefaultReturnUrl`, `PasswordResetEnabled`, `RateLimitingPolicy`, `AvatarCornerRadius`, `GravatarImport` |
 | A text or several | `Texts`, per culture, in the configuration: `Stellaegis:Identity:Pages:Texts:fr:Login.Title = Bienvenue`. The keys are those of `IdentityPagesResources.resx` |
 | The colors, the typography, the spacing | a stylesheet of the host that redefines the CSS variables of `identity.css`, named in `StylesheetPath` — or served at the same path, which wins over the package's |
 | A layout, a page | a file of the host at the same path — `Pages/Shared/_Layout.cshtml`, `_AuthLayout.cshtml`, `_AccountLayout.cshtml`, `Pages/Login.cshtml` — replaces the package's: ASP.NET Core resolves a page in the host first, then in the libraries |
 
 The texts come in English and in French, and the pages follow the light or dark scheme of the device. The French
 texts address nobody — the infinitive or an impersonal turn, never « vous » nor « tu » —: the address of a person
-is the host's to choose, and a text of the package never contradicts it. `Culture`
-fixes one; otherwise the pages follow the culture of the request, which the host's request localization decides.
+is the host's to choose, and a text of the package never contradicts it.
+
+### The language of the pages
+
+`Culture` imposes one, and the pages offer no choice. Otherwise they are read in the first language they have
+texts for — English, French, and every culture the host gives `Texts` for — among: the language of the signed-in
+person's account; the `ui_locales` of the authorization request the login page returns to; the choice made on the
+pages; the culture the host's request localization decided, or the browser's `Accept-Language` when the host
+decides none; `DefaultCulture`. The choice is a row of buttons at the bottom of the pages, which posts to
+`/language`: it goes to the culture cookie of ASP.NET Core, `.AspNetCore.Culture` — the host's request
+localization reads the same, and shows its own pages in it —, and to the account of whoever is signed in.
+
+### The avatar
+
+The account page carries an editor: an image from a file, or a Gravatar when the host turns on `GravatarImport`,
+moved and zoomed under a circular mask, exported by the browser as a PNG of 256 by 256 pixels, which the server
+checks again. The Gravatar is asked by the person's browser, on their gesture, from an address they choose —
+the account's unless they change it —: Automattic receives that address's hash and the person's IP once, and the
+image is kept here. The server makes no call. A host that sets a Content-Security-Policy allows
+`https://gravatar.com` in `img-src` before turning it on. `/account/avatar` serves the avatar to its person, private
+and sandboxed; `AvatarCornerRadius` rounds it where it is shown, from 0 for a square to 50, the default, for a
+circle.
 
 ### What waits between two pages
 
 A login whose password held and awaits its second factor, a registration that awaits its code, a change of
 e-mail that awaits its code: each waits in a cookie of its own, protected by the data protection of the host, out
-of scripts, for ten to fifteen minutes. The registration keeps the password there until the code proves the e-mail.
+of scripts, for ten to fifteen minutes. The registration keeps the password there until the code proves the e-mail,
+and the time zone of the browser, written into the account at its creation.
 
 ## Tests
 
