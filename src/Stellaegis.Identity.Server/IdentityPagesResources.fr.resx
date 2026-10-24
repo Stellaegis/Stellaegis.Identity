@@ -550,4 +550,19 @@
   <data name="Account.Email.Verify" xml:space="preserve">
     <value>Vérifier l'adresse</value>
   </data>
+  <data name="Layout.Language" xml:space="preserve">
+    <value>Langue</value>
+  </data>
+  <data name="Error.Profile.NameInvalid" xml:space="preserve">
+    <value>Le nom doit compter de 1 à 200 caractères.</value>
+  </data>
+  <data name="Error.Profile.LocaleInvalid" xml:space="preserve">
+    <value>Langue non reconnue.</value>
+  </data>
+  <data name="Error.Profile.TimeZoneInvalid" xml:space="preserve">
+    <value>Fuseau horaire non reconnu.</value>
+  </data>
+  <data name="Error.Avatar.Invalid" xml:space="preserve">
+    <value>L'image doit être un PNG de 256 × 256 pixels.</value>
+  </data>
 </root>

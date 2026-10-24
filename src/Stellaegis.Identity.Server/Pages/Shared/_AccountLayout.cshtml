@@ -40,6 +40,7 @@
                 <a href="/account/delete" class="account-nav-item danger@(activeIf("/account/delete"))">@T["Account.Nav.Delete"]</a>
             </div>
             <div class="account-sidebar-footer">
+                <partial name="_LanguagePicker" />
                 <form method="post" action="/account?handler=Logout">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="account-logout-btn">@T["Account.Logout"]</button>

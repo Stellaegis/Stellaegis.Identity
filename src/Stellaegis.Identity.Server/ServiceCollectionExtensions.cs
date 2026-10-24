@@ -64,6 +64,7 @@ public static class IdentityPagesServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddScoped<CookieSignIn>();
         services.TryAddSingleton<IdentityTexts>();
+        services.TryAddSingleton<PagesCulture>();
         services.TryAddSingleton<PendingStates>();
         services.TryAddSingleton<PasswordRules>();
         services.AddRazorPages()
@@ -112,7 +113,7 @@ public static class IdentityPagesEndpointRouteBuilderExtensions
 
 /// <summary>
 /// What the package asks of its own pages, and of no other page of the host: the rate limiting policy named in the
-/// options, and the culture they are read in.
+/// options, and the culture they are read in (<see cref="PagesCulture"/>).
 /// </summary>
 internal sealed class IdentityPagesConventions(IOptions<IdentityPagesOptions> options) : IConfigureOptions<RazorPagesOptions>
 {
@@ -127,22 +128,24 @@ internal sealed class IdentityPagesConventions(IOptions<IdentityPagesOptions> op
                 return;
             if (!string.IsNullOrWhiteSpace(options.RateLimitingPolicy))
                 model.EndpointMetadata.Add(new EnableRateLimitingAttribute(options.RateLimitingPolicy));
-            if (!string.IsNullOrEmpty(options.Culture))
-                model.Filters.Add(new CultureFilter(CultureInfo.GetCultureInfo(options.Culture)));
+            model.Filters.Add(new CultureFilter());
         }
     }
 
     /// <summary>
-    /// Reads the pages in the culture the options name, whatever the host decided for the request: a resource
-    /// filter, because it wraps the handler and the rendering of the page alike — a page filter would leave the
-    /// rendering in the culture of the request.
+    /// Reads the pages in the culture <see cref="PagesCulture"/> resolves: a resource filter, because it wraps the
+    /// handler and the rendering of the page alike — a page filter would leave the rendering in the culture of the
+    /// request.
     /// </summary>
-    private sealed class CultureFilter(CultureInfo culture) : IAsyncResourceFilter
+    private sealed class CultureFilter : IAsyncResourceFilter
     {
         public Task OnResourceExecutionAsync(ResourceExecutingContext context, ResourceExecutionDelegate next)
         {
-            CultureInfo.CurrentCulture = culture;
-            CultureInfo.CurrentUICulture = culture;
+            if (context.HttpContext.RequestServices.GetRequiredService<PagesCulture>().Resolve(context.HttpContext) is { } culture)
+            {
+                CultureInfo.CurrentCulture = culture;
+                CultureInfo.CurrentUICulture = culture;
+            }
             return next();
         }
     }

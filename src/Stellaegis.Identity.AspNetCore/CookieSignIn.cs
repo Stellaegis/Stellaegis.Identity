@@ -99,6 +99,29 @@ public sealed class CookieSignIn(LoginService login)
         return Result.Success();
     }
 
+    /// <summary>
+    /// Signs the signed-in person in again from their account, as it is now — a name or a language just changed —,
+    /// keeping how they proved who they are and how long the cookie lasts. Fails with
+    /// <see cref="IdentityErrors.AccountBlocked"/>, and signs the person out, when the account is gone or blocked at
+    /// the door since.
+    /// </summary>
+    public async Task<Result> RefreshAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(httpContext);
+        var current = await httpContext.AuthenticateAsync(IdentityCookie.Scheme);
+        if (!current.Succeeded || !Guid.TryParse(current.Principal.FindFirst("sub")?.Value, out var userUniqueId))
+            return Result.Failure(IdentityErrors.AccountBlocked);
+        var methods = current.Principal.FindAll(AuthenticationMethods.ClaimType).Select(claim => claim.Value).ToList();
+        var principal = methods.Count == 0 ? null : await login.CreatePrincipalAsync(userUniqueId, methods, IdentityCookie.Scheme, cancellationToken);
+        if (principal is null)
+        {
+            await SignOutAsync(httpContext);
+            return Result.Failure(IdentityErrors.AccountBlocked);
+        }
+        await httpContext.SignInAsync(IdentityCookie.Scheme, principal, current.Properties);
+        return Result.Success();
+    }
+
     /// <summary>Signs the person out: the cookie is removed.</summary>
     public Task SignOutAsync(HttpContext httpContext)
     {

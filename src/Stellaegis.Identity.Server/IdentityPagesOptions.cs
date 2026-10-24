@@ -21,7 +21,7 @@ namespace Stellaegis.Identity.Server;
 /// </list>
 /// <code>
 /// Stellaegis:Identity:Pages:ApplicationName = Durand SA
-/// Stellaegis:Identity:Pages:Culture = fr
+/// Stellaegis:Identity:Pages:DefaultCulture = fr
 /// Stellaegis:Identity:Pages:Texts:fr:Login.Title = Bienvenue
 /// </code>
 /// </summary>
@@ -49,11 +49,18 @@ public sealed class IdentityPagesOptions : IValidatableOptions
     public string? SupportUrl { get; set; }
 
     /// <summary>
-    /// The culture of the pages, <c>fr</c> or <c>en-GB</c>: the texts and the dates follow it. Unless set, the
-    /// pages follow the culture of the request, which the host's request localization decides, or the culture of
-    /// the process when the host decides nothing.
+    /// The culture imposed on the pages, <c>fr</c> or <c>en-GB</c>: the texts and the dates follow it, whatever the
+    /// person chose. Unless set, the pages follow the person: the language of their account, the one asked by the
+    /// application they sign in to, the one chosen on the pages, the browser's — the first the pages have texts
+    /// for —, then <see cref="DefaultCulture"/>.
     /// </summary>
     public string? Culture { get; set; }
+
+    /// <summary>
+    /// The culture of the pages when nothing the person said is one they have texts for, <c>fr</c> for instance.
+    /// Unless set, the culture of the request. <see cref="Culture"/>, when set, wins over it.
+    /// </summary>
+    public string? DefaultCulture { get; set; }
 
     /// <summary>
     /// The name of a rate limiting policy of the host applied to every page — <c>identity_auth</c> in the
@@ -90,6 +97,8 @@ public sealed class IdentityPagesOptions : IValidatableOptions
             return $"{nameof(SupportUrl)} must be an absolute path, an http(s) URL or a mailto: address.";
         if (!string.IsNullOrEmpty(Culture) && !IsCulture(Culture))
             return $"{nameof(Culture)} must name a known culture, such as fr or en-GB.";
+        if (!string.IsNullOrEmpty(DefaultCulture) && !IsCulture(DefaultCulture))
+            return $"{nameof(DefaultCulture)} must name a known culture, such as fr or en-GB.";
         if (string.IsNullOrWhiteSpace(DefaultReturnUrl) || !DefaultReturnUrl.StartsWith('/'))
             return $"{nameof(DefaultReturnUrl)} must be a local path.";
         if (RateLimitingPolicy is not null && string.IsNullOrWhiteSpace(RateLimitingPolicy))

@@ -15,6 +15,7 @@
     --si-accent-text: #ffffff;
     --si-danger: #a4262c;
     --si-danger-bg: #fdf3f3;
+    --si-danger-text: #ffffff;
     --si-success: #1f6f3a;
     --si-success-bg: #eef8f1;
     --si-warning: #8a5a00;
@@ -45,6 +46,7 @@
         --si-accent-text: #0f1419;
         --si-danger: #f08a8e;
         --si-danger-bg: #3a1f21;
+        --si-danger-text: #1b1f24;
         --si-success: #7cd49a;
         --si-success-bg: #1d3326;
         --si-warning: #f0c36b;
@@ -94,7 +96,7 @@
 .auth-btn:hover { background: var(--si-accent-hover); }
 .auth-btn-secondary { color: var(--si-accent); background: transparent; border-color: var(--si-border); }
 .auth-btn-secondary:hover { background: var(--si-bg); }
-.auth-btn-danger { color: #ffffff; background: var(--si-danger); }
+.auth-btn-danger { color: var(--si-danger-text); background: var(--si-danger); }
 .auth-btn-danger:hover { filter: brightness(0.9); background: var(--si-danger); }
 .auth-link { background: none; border: none; padding: 0; font: inherit; color: var(--si-accent); cursor: pointer; text-decoration: underline; }
 .auth-links { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 18px; }
@@ -134,7 +136,13 @@
 .account-nav-item:hover { background: var(--si-bg); }
 .account-nav-item.active { background: var(--si-bg); font-weight: 600; color: var(--si-accent); }
 .account-nav-item.danger { color: var(--si-danger); }
-.account-sidebar-footer { margin-top: auto; }
+.account-sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Language ──────────────────────────────────────────────────────────────── */
+.language-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.language-option { padding: 2px 8px; font: inherit; font-size: 12px; color: var(--si-muted); background: transparent; border: 1px solid var(--si-border); border-radius: var(--si-radius); cursor: pointer; }
+.language-option:hover { color: var(--si-text); }
+.language-option.active { color: var(--si-text); border-color: var(--si-accent); }
 .account-logout-btn { width: 100%; padding: 8px 10px; font: inherit; color: var(--si-text); background: transparent; border: 1px solid var(--si-border); border-radius: var(--si-radius); cursor: pointer; }
 .account-content { flex: 1; padding: 24px; max-width: 760px; }
 .account-page-title { margin: 0 0 16px; font-size: 22px; font-weight: 600; }

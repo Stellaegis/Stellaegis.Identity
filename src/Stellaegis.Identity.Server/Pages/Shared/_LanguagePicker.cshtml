@@ -1,0 +1,25 @@
+@*
+    The languages the pages have texts for, one button each: the choice is posted to /language, which keeps it and
+    returns to this page. Absent when the host imposes a culture, or when the pages have texts for one language only.
+*@
+@using System.Globalization
+@inject PagesCulture Cultures
+@{
+    var cultures = Cultures.Supported;
+    var current = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    var back = $"{Context.Request.PathBase}{Context.Request.Path}{Context.Request.QueryString}";
+}
+@if (string.IsNullOrEmpty(PagesOptions.Value.Culture) && cultures.Count > 1)
+{
+    <form method="post" action="/language" class="language-picker" aria-label="@T["Layout.Language"]">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="back" value="@back" />
+        @foreach (var culture in cultures)
+        {
+            var active = culture.TwoLetterISOLanguageName == current;
+            var name = culture.NativeName;
+            <button type="submit" name="culture" value="@culture.Name" lang="@culture.Name"
+                    class="language-option@(active ? " active" : "")" aria-pressed="@(active ? "true" : "false")">@(char.ToUpper(name[0], culture) + name[1..])</button>
+        }
+    </form>
+}

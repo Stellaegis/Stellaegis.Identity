@@ -19,7 +19,8 @@ internal static class PagesTestHost
         Action<IdentityPagesOptions>? pages = null,
         Action<IdentityOptions>? identity = null,
         bool mailer = true,
-        bool hostPagesFirst = false)
+        bool hostPagesFirst = false,
+        Action<WebApplication>? beforePages = null)
     {
         var builder = WebTestHost.Builder();
         if (identity is not null)
@@ -36,6 +37,7 @@ internal static class PagesTestHost
         if (mailer)
             builder.Services.AddStellaegisInMemoryIdentityMailer();
         var app = builder.Build();
+        beforePages?.Invoke(app);
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapStellaegisIdentityPages();
@@ -60,6 +62,9 @@ internal sealed class Browser(WebApplication app)
     private readonly Dictionary<string, string> _cookies = new(StringComparer.Ordinal);
 
     public string Html { get; private set; } = "";
+
+    /// <summary>The languages the browser asks for, as its <c>Accept-Language</c> header; none unless set.</summary>
+    public string? AcceptLanguage { get; set; }
 
     public bool HasCookie(string name) => _cookies.ContainsKey(name);
 
@@ -87,6 +92,8 @@ internal sealed class Browser(WebApplication app)
 
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
+        if (AcceptLanguage is not null)
+            request.Headers.Add("Accept-Language", AcceptLanguage);
         if (_cookies.Count > 0)
             request.Headers.Add("Cookie", string.Join("; ", _cookies.Select(pair => $"{pair.Key}={pair.Value}")));
         var response = await _client.SendAsync(request, ct);
