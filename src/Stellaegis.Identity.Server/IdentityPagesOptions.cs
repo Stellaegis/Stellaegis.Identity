@@ -75,6 +75,20 @@ public sealed class IdentityPagesOptions : IValidatableOptions
     /// <summary>Where a person lands after signing in when nothing says where they came from. <c>/account</c> unless set.</summary>
     public string DefaultReturnUrl { get; set; } = "/account";
 
+    /// <summary>
+    /// The rounding of an avatar's corners, in percent of its side: 50 makes a circle, 0 a square. 50 unless set. The
+    /// image keeps its corners; the rounding is applied where it is shown, at every size.
+    /// </summary>
+    public int AvatarCornerRadius { get; set; } = 50;
+
+    /// <summary>
+    /// Whether the avatar editor offers to take a Gravatar. No unless set. The image is asked of Gravatar
+    /// (Automattic) by the person's browser, on their gesture, from an address they choose, then cropped and exported
+    /// by the editor like a file: the server makes no call. A host that sets a Content-Security-Policy allows
+    /// <c>https://gravatar.com</c> in <c>img-src</c>.
+    /// </summary>
+    public bool GravatarImport { get; set; }
+
     /// <summary>Whether a person can reset a forgotten password by e-mail. Yes unless set; a host whose accounts come from elsewhere turns it off.</summary>
     public bool PasswordResetEnabled { get; set; } = true;
 
@@ -101,6 +115,8 @@ public sealed class IdentityPagesOptions : IValidatableOptions
             return $"{nameof(DefaultCulture)} must name a known culture, such as fr or en-GB.";
         if (string.IsNullOrWhiteSpace(DefaultReturnUrl) || !DefaultReturnUrl.StartsWith('/'))
             return $"{nameof(DefaultReturnUrl)} must be a local path.";
+        if (AvatarCornerRadius is < 0 or > 50)
+            return $"{nameof(AvatarCornerRadius)} is a percent of the side, from 0 for a square to 50 for a circle.";
         if (RateLimitingPolicy is not null && string.IsNullOrWhiteSpace(RateLimitingPolicy))
             return $"{nameof(RateLimitingPolicy)} must name a policy, or be absent.";
         return null;

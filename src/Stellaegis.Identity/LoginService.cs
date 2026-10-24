@@ -18,7 +18,8 @@ public sealed class LoginService(
     PasswordHasher hasher,
     IOptions<IdentityOptions> options,
     TimeProvider clock,
-    ILogger<LoginService> logger)
+    ILogger<LoginService> logger,
+    IAvatarStore? avatars = null)
 {
     /// <summary>The authentication type of the principal unless the host says otherwise: the cookie scheme's.</summary>
     public const string DefaultAuthenticationType = "Cookies";
@@ -107,7 +108,7 @@ public sealed class LoginService(
             }
 
             logger.LogInformation("Login of {Email}", user.Email);
-            return LoginResult.Success(BuildPrincipal(user, AuthenticationMethods.PasswordOnly, authenticationType));
+            return LoginResult.Success(await BuildPrincipalAsync(user, AuthenticationMethods.PasswordOnly, authenticationType, cancellationToken));
         }
         finally
         {
@@ -127,10 +128,10 @@ public sealed class LoginService(
     {
         Guard.Satisfies(Guard.NotNull(methods), m => m.Count > 0, "A principal says how the person proved who they are.");
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        return user is null || user.IsBlockedAtDoor ? null : BuildPrincipal(user, methods, authenticationType);
+        return user is null || user.IsBlockedAtDoor ? null : await BuildPrincipalAsync(user, methods, authenticationType, cancellationToken);
     }
 
-    private static ClaimsPrincipal BuildPrincipal(AuthUser user, IReadOnlyCollection<string> methods, string authenticationType)
+    private async Task<ClaimsPrincipal> BuildPrincipalAsync(AuthUser user, IReadOnlyCollection<string> methods, string authenticationType, CancellationToken cancellationToken)
     {
         Guard.NotWhiteSpace(authenticationType);
         var subject = user.Subject;
@@ -145,6 +146,10 @@ public sealed class LoginService(
             claims.Add(new Claim(ProfileClaims.Locale, locale));
         if (user.TimeZone is { } timeZone)
             claims.Add(new Claim(ProfileClaims.TimeZone, timeZone));
+        // The address is versioned by the time the avatar was set, so that a client caching it sees a new one.
+        if (options.Value.AvatarUrl is { } url && avatars is not null
+            && await avatars.GetModifiedAtAsync(user.UserUniqueId, cancellationToken) is { } setAt)
+            claims.Add(new Claim(ProfileClaims.Picture, $"{url}?v={setAt.ToUnixTimeMilliseconds()}"));
         claims.AddRange(methods.Select(method => new Claim(AuthenticationMethods.ClaimType, method)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType));
     }

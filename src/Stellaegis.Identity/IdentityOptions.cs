@@ -52,6 +52,15 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>How long what identifies a person is kept once it no longer serves (<see cref="IdentityRetentionService"/>).</summary>
     public RetentionOptions Retention { get; set; } = new();
 
+    /// <summary>
+    /// The address the avatar of the signed-in person is served at, absolute — the account page's,
+    /// <c>https://id.acme.test/account/avatar</c> —, which the session carries in its <c>picture</c> claim, versioned
+    /// by the time the avatar was set. None unless set: the module does not know where the host maps its pages, and
+    /// emits no <c>picture</c> without it. The address answers the person's own session: an application on the same
+    /// site as the pages shows it, one on another site reads the avatars of others from its registry.
+    /// </summary>
+    public string? AvatarUrl { get; set; }
+
     /// <inheritdoc/>
     public string? FindError()
         => Prefix(nameof(PasswordHasher), PasswordHasher.FindError())
@@ -62,7 +71,10 @@ public sealed class IdentityOptions : IValidatableOptions
         ?? Prefix(nameof(PasswordReset), PasswordReset.FindError())
         ?? Prefix(nameof(Activation), Activation.FindError())
         ?? Prefix(nameof(Links), Links.FindError())
-        ?? Prefix(nameof(Retention), Retention.FindError());
+        ?? Prefix(nameof(Retention), Retention.FindError())
+        ?? (AvatarUrl is null || Uri.TryCreate(AvatarUrl, UriKind.Absolute, out var avatar) && (avatar.Scheme == Uri.UriSchemeHttps || avatar.Scheme == Uri.UriSchemeHttp) && avatar.Query.Length == 0
+            ? null
+            : $"{nameof(AvatarUrl)} must be an absolute http(s) URL without a query, or absent.");
 
     private static string? Prefix(string section, string? error) => error is null ? null : $"{section}: {error}";
 }

@@ -5,6 +5,7 @@
     Layout = "_AccountLayout";
     var name = Model.Input.DisplayName ?? "";
     var initial = name.Length > 0 ? name[..1].ToUpperInvariant() : "?";
+    var o = PagesOptions.Value;
 }
 
 @if (TempData["Notice"] is string notice)
@@ -13,13 +14,71 @@
 }
 
 <div class="account-profile">
-    <div class="account-avatar" aria-hidden="true">@initial</div>
+    @if (Model.AvatarVersion is { } version)
+    {
+        <img class="account-avatar" src="/account/avatar?v=@version" alt="" width="48" height="48" />
+    }
+    else
+    {
+        <div class="account-avatar" aria-hidden="true">@initial</div>
+    }
     <div>
         <div class="account-display-name">@name</div>
         <div class="account-email">@Model.Email</div>
     </div>
 </div>
 <p class="auth-help">@T["Account.OverviewHelp"]</p>
+
+@if (TempData["AvatarError"] is string avatarError)
+{
+    <div class="auth-errors" role="alert">@avatarError</div>
+}
+
+<h2 class="auth-h2">@T["Account.Avatar.Title"]</h2>
+<section class="avatar-editor" data-avatar-editor
+         data-error-read="@T["Account.Avatar.ReadError"]" data-error-gravatar="@T["Account.Avatar.GravatarMissing"]">
+    <div class="avatar-actions">
+        <label class="auth-btn auth-btn-secondary avatar-choose">
+            @T["Account.Avatar.Choose"]
+            <input type="file" accept="image/*" data-avatar-file class="avatar-file" />
+        </label>
+        @if (Model.AvatarVersion is not null)
+        {
+            <form method="post" action="/account/avatar?handler=Remove">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="auth-link">@T["Account.Avatar.Remove"]</button>
+            </form>
+        }
+    </div>
+    @if (o.GravatarImport)
+    {
+        <div class="avatar-gravatar">
+            <label class="auth-label" for="avatar-gravatar-email">@T["Account.Avatar.GravatarEmail"]</label>
+            <div class="avatar-gravatar-row">
+                <input class="auth-input" id="avatar-gravatar-email" type="email" value="@Model.Email" autocomplete="off" data-avatar-gravatar-email />
+                <button type="button" class="auth-btn auth-btn-secondary" data-avatar-gravatar>@T["Account.Avatar.Gravatar"]</button>
+            </div>
+            <div class="auth-rules">@T["Account.Avatar.GravatarNotice"]</div>
+        </div>
+    }
+    <div class="auth-errors" role="alert" data-avatar-message hidden></div>
+    <form method="post" action="/account/avatar" class="avatar-crop" data-avatar-crop hidden>
+        @Html.AntiForgeryToken()
+        <div class="avatar-viewport" tabindex="0" aria-label="@T["Account.Avatar.Frame"]" data-avatar-viewport>
+            <canvas width="256" height="256" data-avatar-canvas></canvas>
+            <div class="avatar-mask" aria-hidden="true"></div>
+        </div>
+        <label class="auth-label avatar-zoom">
+            @T["Account.Avatar.Zoom"]
+            <input type="range" min="1" max="4" step="0.01" value="1" data-avatar-zoom />
+        </label>
+        <input type="hidden" name="Image" data-avatar-image />
+        <div class="avatar-actions">
+            <button class="auth-btn" type="submit">@T["Account.Avatar.Save"]</button>
+            <button type="button" class="auth-link" data-avatar-cancel>@T["Account.Avatar.Cancel"]</button>
+        </div>
+    </form>
+</section>
 
 <h2 class="auth-h2">@T["Account.Profile.Title"]</h2>
 <form class="auth-form account-form" method="post">

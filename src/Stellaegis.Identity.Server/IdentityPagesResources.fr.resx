@@ -589,4 +589,46 @@
   <data name="Field.TimeZone.UseBrowser" xml:space="preserve">
     <value>Reprendre celui du navigateur</value>
   </data>
+  <data name="Account.Avatar.Title" xml:space="preserve">
+    <value>Avatar</value>
+  </data>
+  <data name="Account.Avatar.Choose" xml:space="preserve">
+    <value>Choisir une image</value>
+  </data>
+  <data name="Account.Avatar.Remove" xml:space="preserve">
+    <value>Retirer l'avatar</value>
+  </data>
+  <data name="Account.Avatar.Frame" xml:space="preserve">
+    <value>L'image sous le masque : la faire glisser, ou la déplacer avec les flèches</value>
+  </data>
+  <data name="Account.Avatar.Zoom" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="Account.Avatar.Save" xml:space="preserve">
+    <value>Enregistrer l'avatar</value>
+  </data>
+  <data name="Account.Avatar.Cancel" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Account.Avatar.Saved" xml:space="preserve">
+    <value>Avatar enregistré.</value>
+  </data>
+  <data name="Account.Avatar.Removed" xml:space="preserve">
+    <value>Avatar retiré.</value>
+  </data>
+  <data name="Account.Avatar.ReadError" xml:space="preserve">
+    <value>Image illisible par le navigateur.</value>
+  </data>
+  <data name="Account.Avatar.Gravatar" xml:space="preserve">
+    <value>Utiliser un Gravatar</value>
+  </data>
+  <data name="Account.Avatar.GravatarEmail" xml:space="preserve">
+    <value>Adresse e-mail du Gravatar</value>
+  </data>
+  <data name="Account.Avatar.GravatarNotice" xml:space="preserve">
+    <value>L'image est demandée une fois à Gravatar (Automattic) par ce navigateur, puis gardée ici.</value>
+  </data>
+  <data name="Account.Avatar.GravatarMissing" xml:space="preserve">
+    <value>Aucun Gravatar pour cette adresse.</value>
+  </data>
 </root>

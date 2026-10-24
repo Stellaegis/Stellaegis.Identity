@@ -159,6 +159,9 @@ public sealed record AccountAvatar
     /// <summary>The largest image a store keeps, in bytes.</summary>
     public const int MaxImageLength = 262144;
 
+    /// <summary>The largest file <see cref="ProfileService.SetAvatarAsync"/> reads, before the chunks besides the image are dropped.</summary>
+    public const int MaxFileLength = 4 * MaxImageLength;
+
     /// <summary>The account.</summary>
     public Guid UserUniqueId { get; init; }
 

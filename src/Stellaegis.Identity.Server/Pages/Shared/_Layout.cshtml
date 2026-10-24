@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="@o.StylesheetPath" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body class="stellaegis-identity">
+<body class="stellaegis-identity" style="--si-avatar-radius: @(o.AvatarCornerRadius)%">
     @RenderBody()
     @await RenderSectionAsync("Scripts", required: false)
 </body>

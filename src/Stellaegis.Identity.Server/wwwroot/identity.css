@@ -21,6 +21,7 @@
     --si-warning: #8a5a00;
     --si-warning-bg: #fff8e6;
     --si-radius: 8px;
+    --si-avatar-radius: 50%;
     --si-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     --si-font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     --si-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -147,7 +148,23 @@
 .account-content { flex: 1; padding: 24px; max-width: 760px; }
 .account-page-title { margin: 0 0 16px; font-size: 22px; font-weight: 600; }
 .account-profile { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-.account-avatar { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: var(--si-accent); color: var(--si-accent-text); font-weight: 600; font-size: 20px; }
+.account-avatar { width: 48px; height: 48px; display: grid; place-items: center; border-radius: var(--si-avatar-radius); background: var(--si-accent); color: var(--si-accent-text); font-weight: 600; font-size: 20px; object-fit: cover; }
+
+/* ── Avatar editor ─────────────────────────────────────────────────────────── */
+.avatar-editor { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.avatar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.avatar-choose { position: relative; width: auto; cursor: pointer; }
+.avatar-file { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.avatar-gravatar-row { display: flex; gap: 8px; }
+.avatar-gravatar-row .auth-input { flex: 1; min-width: 0; }
+.avatar-gravatar-row .auth-btn { width: auto; white-space: nowrap; }
+.avatar-crop { display: flex; flex-direction: column; gap: 12px; }
+.avatar-crop[hidden] { display: none; }
+.avatar-viewport { position: relative; width: 256px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--si-radius); background: var(--si-border); touch-action: none; cursor: grab; }
+.avatar-viewport:focus-visible { outline: 2px solid var(--si-accent); outline-offset: 2px; }
+.avatar-viewport canvas { display: block; width: 100%; height: 100%; }
+.avatar-mask { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); pointer-events: none; }
+.avatar-zoom { display: flex; flex-direction: column; gap: 6px; max-width: 256px; }
 .account-display-name { font-weight: 600; }
 .account-email { color: var(--si-muted); font-size: 13px; }
 .account-events { display: flex; flex-direction: column; gap: 6px; }

@@ -15,6 +15,9 @@ internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService prof
 
     public string Email { get; private set; } = "";
 
+    /// <summary>The version of the avatar, which its address carries; <see langword="null"/> when the account has none.</summary>
+    public long? AvatarVersion { get; private set; }
+
     public IReadOnlyList<CultureInfo> Languages => cultures.Supported;
 
     public IReadOnlyList<string> TimeZones => TimeZoneNames.Suggested;
@@ -32,16 +35,16 @@ internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService prof
     {
         if (this.UserId() is not { } userId || (await profiles.GetAsync(userId, cancellationToken)).Value is not { } profile)
             return Forbid();
-        Email = profile.Email;
+        Show(profile);
         Input = new InputModel { DisplayName = profile.DisplayName, Locale = profile.Locale, TimeZone = profile.TimeZone };
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        if (this.UserId() is not { } userId)
+        if (this.UserId() is not { } userId || (await profiles.GetAsync(userId, cancellationToken)).Value is not { } current)
             return Forbid();
-        Email = this.UserEmail();
+        Show(current);
         var displayName = (Input.DisplayName ?? "").Trim();
         if (displayName.Length is < 2 or > 100)
             ModelState.AddModelError("Input.DisplayName", texts["Field.DisplayName.Invalid"]);
@@ -59,6 +62,12 @@ internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService prof
         await signIn.RefreshAsync(HttpContext, cancellationToken);
         TempData["Notice"] = "Account.Profile.Saved";
         return Redirect("/account");
+    }
+
+    private void Show(AccountProfile profile)
+    {
+        Email = profile.Email;
+        AvatarVersion = profile.AvatarModifiedAt?.ToUnixTimeMilliseconds();
     }
 
     public async Task<IActionResult> OnPostLogoutAsync()

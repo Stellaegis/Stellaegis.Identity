@@ -1,5 +1,6 @@
-// Stellaegis.Identity.Server — what the pages do in the browser: the strength meter of a new password, and the
-// QR code of an authenticator enrollment. Nothing here decides anything: the server checks the policy again.
+// Stellaegis.Identity.Server — what the pages do in the browser: the strength meter of a new password, the time
+// zone of the browser, the avatar editor, and the QR code of an authenticator enrollment. Nothing here decides
+// anything: the server checks again.
 (function () {
     "use strict";
 
@@ -71,6 +72,116 @@
             button.textContent = button.textContent + " (" + zone + ")";
             button.hidden = false;
             button.addEventListener("click", function () { field.value = zone; button.hidden = true; });
+        });
+    }
+
+    // The avatar editor: an image from a file or from Gravatar, moved and zoomed under a circular mask, exported as
+    // a PNG of 256 by 256 pixels into the form. The server checks the PNG again and keeps only what draws it.
+    var editor = document.querySelector("[data-avatar-editor]");
+    if (editor) {
+        var crop = editor.querySelector("[data-avatar-crop]");
+        var canvas = editor.querySelector("[data-avatar-canvas]");
+        var context = canvas.getContext("2d");
+        var zoom = editor.querySelector("[data-avatar-zoom]");
+        var message = editor.querySelector("[data-avatar-message]");
+        var viewport = editor.querySelector("[data-avatar-viewport]");
+        var side = canvas.width;
+        var image = null, base = 1, scale = 1, x = 0, y = 0, drag = null;
+
+        var say = function (text) { message.textContent = text || ""; message.hidden = !text; };
+        var clamp = function () {
+            x = Math.min(0, Math.max(side - image.width * scale, x));
+            y = Math.min(0, Math.max(side - image.height * scale, y));
+        };
+        var draw = function () {
+            context.clearRect(0, 0, side, side);
+            context.imageSmoothingQuality = "high";
+            context.drawImage(image, x, y, image.width * scale, image.height * scale);
+        };
+        var load = function (loaded) {
+            if (!loaded.width || !loaded.height) { say(editor.dataset.errorRead); return; }
+            image = loaded;
+            base = Math.max(side / image.width, side / image.height);
+            scale = base;
+            zoom.value = "1";
+            x = (side - image.width * scale) / 2;
+            y = (side - image.height * scale) / 2;
+            say("");
+            crop.hidden = false;
+            draw();
+            viewport.focus();
+        };
+        var open = function (source, failure, crossOrigin) {
+            var loading = new Image();
+            if (crossOrigin) loading.crossOrigin = "anonymous";
+            loading.onload = function () { load(loading); };
+            loading.onerror = function () { say(failure); };
+            loading.src = source;
+        };
+
+        editor.querySelector("[data-avatar-file]").addEventListener("change", function () {
+            var file = this.files && this.files[0];
+            if (!file) return;
+            var url = URL.createObjectURL(file);
+            open(url, editor.dataset.errorRead, false);
+            this.value = "";
+            setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        });
+
+        var gravatar = editor.querySelector("[data-avatar-gravatar]");
+        if (gravatar && window.crypto && crypto.subtle) {
+            gravatar.addEventListener("click", function () {
+                var address = editor.querySelector("[data-avatar-gravatar-email]").value.trim().toLowerCase();
+                if (!address) return;
+                crypto.subtle.digest("SHA-256", new TextEncoder().encode(address)).then(function (digest) {
+                    var hash = Array.prototype.map.call(new Uint8Array(digest), function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+                    open("https://gravatar.com/avatar/" + hash + "?s=512&d=404", editor.dataset.errorGravatar, true);
+                });
+            });
+        }
+
+        zoom.addEventListener("input", function () {
+            var previous = scale;
+            scale = base * parseFloat(zoom.value);
+            x = side / 2 - (side / 2 - x) * scale / previous;
+            y = side / 2 - (side / 2 - y) * scale / previous;
+            clamp();
+            draw();
+        });
+        canvas.addEventListener("pointerdown", function (event) {
+            if (!image) return;
+            drag = { x: event.clientX, y: event.clientY };
+            canvas.setPointerCapture(event.pointerId);
+        });
+        canvas.addEventListener("pointermove", function (event) {
+            if (!drag) return;
+            var ratio = side / canvas.clientWidth;
+            x += (event.clientX - drag.x) * ratio;
+            y += (event.clientY - drag.y) * ratio;
+            drag = { x: event.clientX, y: event.clientY };
+            clamp();
+            draw();
+        });
+        canvas.addEventListener("pointerup", function () { drag = null; });
+        canvas.addEventListener("pointercancel", function () { drag = null; });
+        viewport.addEventListener("keydown", function (event) {
+            if (!image) return;
+            var moves = { ArrowLeft: [8, 0], ArrowRight: [-8, 0], ArrowUp: [0, 8], ArrowDown: [0, -8] };
+            var move = moves[event.key];
+            if (!move) return;
+            event.preventDefault();
+            x += move[0];
+            y += move[1];
+            clamp();
+            draw();
+        });
+        crop.addEventListener("submit", function () {
+            crop.querySelector("[data-avatar-image]").value = canvas.toDataURL("image/png");
+        });
+        editor.querySelector("[data-avatar-cancel]").addEventListener("click", function () {
+            crop.hidden = true;
+            image = null;
+            say("");
         });
     }
 

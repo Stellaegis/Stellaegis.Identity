@@ -19,9 +19,6 @@ internal static class AvatarImage
     /// <summary>The side of an avatar, in pixels.</summary>
     public const int Side = 256;
 
-    /// <summary>The largest file read before its chunks are dropped, in bytes.</summary>
-    public const int MaxInputLength = 4 * AccountAvatar.MaxImageLength;
-
     private static readonly byte[] Signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
     private static readonly HashSet<string> Kept = new(StringComparer.Ordinal) { "IHDR", "PLTE", "tRNS", "IDAT", "IEND" };
     private static readonly uint[] CrcTable = BuildCrcTable();
@@ -29,7 +26,7 @@ internal static class AvatarImage
     /// <summary>The image rebuilt from the chunks that draw it, or <see cref="IdentityErrors.InvalidAvatar"/>.</summary>
     public static Result<byte[]> Normalize(byte[]? file)
     {
-        if (file is null || file.Length < Signature.Length || file.Length > MaxInputLength || !file.AsSpan(0, Signature.Length).SequenceEqual(Signature))
+        if (file is null || file.Length < Signature.Length || file.Length > AccountAvatar.MaxFileLength || !file.AsSpan(0, Signature.Length).SequenceEqual(Signature))
             return Result.Failure<byte[]>(IdentityErrors.InvalidAvatar);
 
         using var output = new MemoryStream(file.Length);
