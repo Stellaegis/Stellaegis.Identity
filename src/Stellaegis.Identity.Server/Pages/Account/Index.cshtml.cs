@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -5,18 +6,59 @@ using Stellaegis.Identity.AspNetCore;
 
 namespace Stellaegis.Identity.Server.Pages;
 
-/// <summary>The account of the signed-in person, and the way out.</summary>
+/// <summary>The account of the signed-in person: their profile, changed in place, and the way out.</summary>
 [Authorize]
-internal sealed class AccountIndexModel(CookieSignIn signIn) : PageModel
+internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService profiles, PagesCulture cultures, IdentityTexts texts) : PageModel
 {
-    public string DisplayName { get; private set; } = "";
+    [BindProperty]
+    public InputModel Input { get; set; } = new();
 
     public string Email { get; private set; } = "";
 
-    public void OnGet()
+    public IReadOnlyList<CultureInfo> Languages => cultures.Supported;
+
+    public IReadOnlyList<string> TimeZones => TimeZoneNames.Suggested;
+
+    public sealed class InputModel
     {
-        DisplayName = this.UserName();
+        public string? DisplayName { get; set; }
+
+        public string? Locale { get; set; }
+
+        public string? TimeZone { get; set; }
+    }
+
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    {
+        if (this.UserId() is not { } userId || (await profiles.GetAsync(userId, cancellationToken)).Value is not { } profile)
+            return Forbid();
+        Email = profile.Email;
+        Input = new InputModel { DisplayName = profile.DisplayName, Locale = profile.Locale, TimeZone = profile.TimeZone };
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
+    {
+        if (this.UserId() is not { } userId)
+            return Forbid();
         Email = this.UserEmail();
+        var displayName = (Input.DisplayName ?? "").Trim();
+        if (displayName.Length is < 2 or > 100)
+            ModelState.AddModelError("Input.DisplayName", texts["Field.DisplayName.Invalid"]);
+        if (!string.IsNullOrEmpty(Input.Locale) && cultures.Supports(Input.Locale) is null)
+            ModelState.AddModelError("Input.Locale", texts.Describe(IdentityErrors.InvalidLocale));
+        if (!ModelState.IsValid)
+            return Page();
+
+        var changed = await profiles.UpdateAsync(userId, displayName, Input.Locale, Input.TimeZone?.Trim(), cancellationToken);
+        if (changed.IsFailure)
+        {
+            ModelState.AddModelError(string.Empty, texts.Describe(changed.Error!));
+            return Page();
+        }
+        await signIn.RefreshAsync(HttpContext, cancellationToken);
+        TempData["Notice"] = "Account.Profile.Saved";
+        return Redirect("/account");
     }
 
     public async Task<IActionResult> OnPostLogoutAsync()

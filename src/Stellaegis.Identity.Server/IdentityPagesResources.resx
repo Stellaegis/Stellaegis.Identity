@@ -565,4 +565,28 @@
   <data name="Error.Avatar.Invalid" xml:space="preserve">
     <value>The image must be a PNG of 256 × 256 pixels.</value>
   </data>
+  <data name="Account.Profile.Title" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="Account.Profile.Submit" xml:space="preserve">
+    <value>Save the profile</value>
+  </data>
+  <data name="Account.Profile.Saved" xml:space="preserve">
+    <value>The profile is saved.</value>
+  </data>
+  <data name="Field.Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Field.Language.Browser" xml:space="preserve">
+    <value>The browser's</value>
+  </data>
+  <data name="Field.TimeZone" xml:space="preserve">
+    <value>Time zone</value>
+  </data>
+  <data name="Field.TimeZone.Help" xml:space="preserve">
+    <value>An IANA name, such as Europe/Paris. Empty: the dates follow the browser.</value>
+  </data>
+  <data name="Field.TimeZone.UseBrowser" xml:space="preserve">
+    <value>Use the browser's</value>
+  </data>
 </root>

@@ -3,14 +3,57 @@
 @{
     ViewData["Title"] = T["Account.Overview"];
     Layout = "_AccountLayout";
-    var initial = Model.DisplayName.Length > 0 ? Model.DisplayName[..1].ToUpperInvariant() : "?";
+    var name = Model.Input.DisplayName ?? "";
+    var initial = name.Length > 0 ? name[..1].ToUpperInvariant() : "?";
+}
+
+@if (TempData["Notice"] is string notice)
+{
+    <div class="auth-success" role="status">@T[notice]</div>
 }
 
 <div class="account-profile">
     <div class="account-avatar" aria-hidden="true">@initial</div>
     <div>
-        <div class="account-display-name">@Model.DisplayName</div>
+        <div class="account-display-name">@name</div>
         <div class="account-email">@Model.Email</div>
     </div>
 </div>
 <p class="auth-help">@T["Account.OverviewHelp"]</p>
+
+<h2 class="auth-h2">@T["Account.Profile.Title"]</h2>
+<form class="auth-form account-form" method="post">
+    <div class="auth-field">
+        <label class="auth-label" for="Input_DisplayName">@T["Field.DisplayName"]</label>
+        <input class="auth-input" asp-for="Input.DisplayName" autocomplete="name" maxlength="100" />
+    </div>
+    <div class="auth-field">
+        <label class="auth-label" for="Input_Locale">@T["Field.Language"]</label>
+        <select class="auth-input" asp-for="Input.Locale">
+            <option value="">@T["Field.Language.Browser"]</option>
+            @foreach (var culture in Model.Languages)
+            {
+                var label = culture.NativeName;
+                <option value="@culture.Name" lang="@culture.Name">@(char.ToUpper(label[0], culture) + label[1..])</option>
+            }
+        </select>
+    </div>
+    <div class="auth-field">
+        <label class="auth-label" for="Input_TimeZone">@T["Field.TimeZone"]</label>
+        <input class="auth-input" asp-for="Input.TimeZone" list="time-zones" autocomplete="off" spellcheck="false" data-browser-time-zone="suggest" />
+        <button type="button" class="auth-link auth-small" data-use-browser-time-zone="Input_TimeZone" hidden>@T["Field.TimeZone.UseBrowser"]</button>
+        <datalist id="time-zones">
+            @foreach (var zone in Model.TimeZones)
+            {
+                <option value="@zone"></option>
+            }
+        </datalist>
+        <div class="auth-rules">@T["Field.TimeZone.Help"]</div>
+    </div>
+    <button class="auth-btn" type="submit">@T["Account.Profile.Submit"]</button>
+    <partial name="_Errors" />
+</form>
+
+@section Scripts {
+    <script src="@IdentityPagesOptions.ContentPath/identity.js"></script>
+}

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,6 +9,7 @@ using Stellaegis.Identity.AspNetCore;
 using Stellaegis.Identity.InMemory;
 using Stellaegis.Identity.Server;
 using Stellaegis.Identity.Tests.HostPages.Pages;
+using Stellaegis.Primitives.AspNetCore;
 
 namespace Stellaegis.Identity.Tests;
 
@@ -28,6 +30,7 @@ internal static class PagesTestHost
         if (hostPagesFirst)
             builder.Services.AddRazorPages().AddApplicationPart(typeof(HostLoginModel).Assembly);
         builder.Services.AddStellaegisIdentityCookie();
+        builder.Services.AddStellaegisStartupCheck();
         builder.Services.AddStellaegisIdentityPages(options =>
         {
             options.ApplicationName = "Acme";
@@ -41,6 +44,7 @@ internal static class PagesTestHost
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapStellaegisIdentityPages();
+        app.MapIdentityAccountEndpoints();
         // How the signed-in person proved who they are, as the session says it.
         app.MapGet("/test/amr", (HttpContext http) => string.Join(' ', http.User.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value))).RequireAuthorization();
         await app.StartAsync(ct);
@@ -71,6 +75,13 @@ internal sealed class Browser(WebApplication app)
     public async Task<HttpResponseMessage> GetAsync(string path, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        return await SendAsync(request, ct);
+    }
+
+    /// <summary>Sends <paramref name="body"/> as JSON to <paramref name="path"/>, with the cookies kept.</summary>
+    public async Task<HttpResponseMessage> SendJsonAsync(HttpMethod method, string path, object? body, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body) };
         return await SendAsync(request, ct);
     }
 

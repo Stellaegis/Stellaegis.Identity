@@ -54,6 +54,26 @@
         }
     }
 
+    // The time zone of the browser: written into a hidden field of the registration ("fill"), only suggested on the
+    // account ("suggest"), where an empty field is a choice — the button takes the browser's when the person wants it.
+    var zone = window.Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : "";
+    if (zone) {
+        document.querySelectorAll("input[data-browser-time-zone]").forEach(function (field) {
+            if (field.dataset.browserTimeZone === "fill") {
+                field.value = zone;
+            } else if (!field.value) {
+                field.placeholder = zone;
+            }
+        });
+        document.querySelectorAll("button[data-use-browser-time-zone]").forEach(function (button) {
+            var field = document.getElementById(button.dataset.useBrowserTimeZone);
+            if (!field || field.value === zone) return;
+            button.textContent = button.textContent + " (" + zone + ")";
+            button.hidden = false;
+            button.addEventListener("click", function () { field.value = zone; button.hidden = true; });
+        });
+    }
+
     // The QR code of an enrollment, drawn by qrcode.min.js when the page loads it.
     var qr = document.querySelector(".auth-qr[data-qr]");
     if (qr && typeof QRCode === "function") {

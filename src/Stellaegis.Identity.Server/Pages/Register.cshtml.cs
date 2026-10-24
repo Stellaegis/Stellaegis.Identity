@@ -41,6 +41,8 @@ internal sealed class RegisterModel(
         public string? Password { get; set; }
 
         public string? ConfirmPassword { get; set; }
+
+        public string? TimeZone { get; set; }
     }
 
     public IActionResult OnGet([FromQuery(Name = Links.ReturnUrlParameter)] string? returnUrl = null)
@@ -101,7 +103,9 @@ internal sealed class RegisterModel(
             }
         }
 
-        pending.Write(HttpContext, PendingStates.Registration, email, displayName, Input.Password ?? "", ReturnUrl ?? "");
+        // The browser's time zone, kept with the registration when it is one the system knows; nothing otherwise.
+        var timeZone = ProfileService.IsTimeZone(Input.TimeZone) ? Input.TimeZone : "";
+        pending.Write(HttpContext, PendingStates.Registration, email, displayName, Input.Password ?? "", ReturnUrl ?? "", timeZone!);
         return Redirect("/verify-email");
     }
 }

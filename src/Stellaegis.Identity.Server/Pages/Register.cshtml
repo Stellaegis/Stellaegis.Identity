@@ -51,6 +51,7 @@ else
             <label class="auth-label" for="Input_ConfirmPassword">@T["Field.ConfirmPassword"]</label>
             <input class="auth-input" asp-for="Input.ConfirmPassword" type="password" autocomplete="new-password" />
         </div>
+        <input type="hidden" asp-for="Input.TimeZone" data-browser-time-zone="fill" />
         <button class="auth-btn" type="submit">@T["Register.Submit"]</button>
         <partial name="_Errors" />
     </form>

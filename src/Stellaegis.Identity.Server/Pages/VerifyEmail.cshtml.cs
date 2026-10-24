@@ -9,6 +9,7 @@ namespace Stellaegis.Identity.Server.Pages;
 internal sealed class VerifyEmailModel(
     EmailVerificationService verification,
     RegistrationService registration,
+    ProfileService profiles,
     PendingStates pending,
     IdentityTexts texts,
     IOptions<IdentityOptions> identity,
@@ -54,6 +55,8 @@ internal sealed class VerifyEmailModel(
             return Page();
         }
 
+        if (state.TimeZone is { } timeZone)
+            await profiles.UpdateAsync(created.Value, state.DisplayName, null, timeZone, cancellationToken);
         pending.Clear(HttpContext, PendingStates.Registration);
         TempData["Notice"] = "Login.Registered";
         return Redirect(Links.WithReturnUrl("/login", ReturnUrl));
@@ -86,10 +89,10 @@ internal sealed class VerifyEmailModel(
         return Redirect("/verify-email");
     }
 
-    private (string Email, string DisplayName, string Password, string? ReturnUrl)? ReadPending()
+    private (string Email, string DisplayName, string Password, string? ReturnUrl, string? TimeZone)? ReadPending()
     {
-        if (pending.Read(HttpContext, PendingStates.Registration) is not { Length: 4 } parts || parts[0].Length == 0)
+        if (pending.Read(HttpContext, PendingStates.Registration) is not { Length: 5 } parts || parts[0].Length == 0)
             return null;
-        return (parts[0], parts[1], parts[2], Links.Local(Url, parts[3]));
+        return (parts[0], parts[1], parts[2], Links.Local(Url, parts[3]), parts[4].Length == 0 ? null : parts[4]);
     }
 }
