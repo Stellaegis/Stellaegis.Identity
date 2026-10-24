@@ -22,6 +22,26 @@ public sealed record UserRegisteredEvent : IEvent
 }
 
 /// <summary>
+/// Published when what others see of an account changes: its name, or its avatar. A registry that keeps a copy of
+/// them for the people who share a compartment with the person refreshes it; the host connects the subscription,
+/// and reads the image from <see cref="IAvatarStore"/> when it needs it.
+/// </summary>
+public sealed record UserProfileChangedEvent : IEvent
+{
+    /// <inheritdoc/>
+    public required DateTimeOffset OccurredAt { get; init; }
+
+    /// <summary>The identity of the account, which its <c>sub</c> claim carries.</summary>
+    public required Guid UserUniqueId { get; init; }
+
+    /// <summary>The display name of the account.</summary>
+    public required string DisplayName { get; init; }
+
+    /// <summary>When the avatar was set, or <see langword="null"/> when the account has none.</summary>
+    public DateTimeOffset? AvatarModifiedAt { get; init; }
+}
+
+/// <summary>
 /// Published when an account stops being admitted: disabled by an administrator, or deleted. A resource server
 /// that caches the blocked accounts refuses the subject from then on; an issuer revokes its tokens.
 /// </summary>

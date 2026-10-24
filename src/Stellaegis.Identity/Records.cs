@@ -128,6 +128,28 @@ public sealed class EmailVerification
     public string? IpAddress { get; set; }
 }
 
+/// <summary>What a person reads and changes of their own account, as <see cref="ProfileService"/> gives it.</summary>
+public sealed record AccountProfile
+{
+    /// <summary>The identity of the account.</summary>
+    public required Guid UserUniqueId { get; init; }
+
+    /// <summary>The e-mail the person signs in with.</summary>
+    public required string Email { get; init; }
+
+    /// <summary>The name of the account.</summary>
+    public required string DisplayName { get; init; }
+
+    /// <summary>The language the person chose, or <see langword="null"/>.</summary>
+    public string? Locale { get; init; }
+
+    /// <summary>The time zone the person chose, or <see langword="null"/>.</summary>
+    public string? TimeZone { get; init; }
+
+    /// <summary>When the avatar was set, or <see langword="null"/> when the account has none.</summary>
+    public DateTimeOffset? AvatarModifiedAt { get; init; }
+}
+
 /// <summary>
 /// The image an account shows, as <see cref="IAvatarStore"/> keeps it: a PNG of 256 by 256 pixels, checked and
 /// stripped of every chunk but the image's own before it reaches the store.

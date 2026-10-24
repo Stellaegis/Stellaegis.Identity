@@ -10,8 +10,8 @@ namespace Stellaegis.Identity.SqlServer;
 /// The seven stores of the accounts on SQL Server, in the schema <c>ident</c>: one object, one connection string, the
 /// repositories of <see cref="IdentityDatabase"/> handed out by a unit of work of <c>Stellaegis.Primitives.Data</c>.
 /// Each operation opens its own unit of work and closes it: no connection outlives a call, and none is shared
-/// between two. The only operation that writes several rows at once, the replacement of the recovery codes,
-/// runs in a transaction. The pool of the connections is <c>Microsoft.Data.SqlClient</c>'s, by connection string.
+/// between two. The two operations that write several rows at once — the replacement of the recovery codes, the
+/// deletion of an account with its avatar — run in a transaction. The pool of the connections is <c>Microsoft.Data.SqlClient</c>'s, by connection string.
 /// </summary>
 internal sealed class SqlServerIdentityStore
     : IAuthUserStore, ILoginEventStore, IAccountTokenStore, IEmailVerificationStore, IMfaStore, IAvatarStore, IRecoveryCodeStore
@@ -129,8 +129,12 @@ internal sealed class SqlServerIdentityStore
     async Task<bool> IAuthUserStore.SoftDeleteAsync(Guid userUniqueId, Actor deletedBy, CancellationToken cancellationToken)
     {
         Guard.NotNull(deletedBy);
-        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await uow.Repo<UserRepository>().SoftDeleteAsync(userUniqueId, deletedBy, _clock.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+        await using var uow = await _units.OpenAndBeginAsync(cancellationToken).ConfigureAwait(false);
+        if (!await uow.Repo<UserRepository>().SoftDeleteAsync(userUniqueId, deletedBy, _clock.GetUtcNow(), cancellationToken).ConfigureAwait(false))
+            return false;
+        await uow.Repo<AvatarRepository>().DeleteAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+        await uow.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     // ── Login events ─────────────────────────────────────────────────────────

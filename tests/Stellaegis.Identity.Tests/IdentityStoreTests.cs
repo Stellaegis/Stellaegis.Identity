@@ -174,6 +174,11 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         Assert.True(await Avatars.DeleteAsync(user.UserUniqueId, Ct));
         Assert.False(await Avatars.DeleteAsync(user.UserUniqueId, Ct));
         Assert.Null(await Avatars.GetAsync(user.UserUniqueId, Ct));
+
+        // The account stays when it is deleted; its avatar goes with it, in the same transaction.
+        await Avatars.SetAsync(new AccountAvatar { UserUniqueId = user.UserUniqueId, Image = first, ModifiedAt = _clock.Now, ModifiedBy = user.AsActor() }, Ct);
+        Assert.True(await Users.SoftDeleteAsync(user.UserUniqueId, user.AsActor(), Ct));
+        Assert.Null(await Avatars.GetAsync(user.UserUniqueId, Ct));
     }
 
     [Fact]

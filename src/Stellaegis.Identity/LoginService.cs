@@ -141,6 +141,10 @@ public sealed class LoginService(
             new("email", user.Email),
             new("name", user.DisplayName),
         ];
+        if (user.Locale is { } locale)
+            claims.Add(new Claim(ProfileClaims.Locale, locale));
+        if (user.TimeZone is { } timeZone)
+            claims.Add(new Claim(ProfileClaims.TimeZone, timeZone));
         claims.AddRange(methods.Select(method => new Claim(AuthenticationMethods.ClaimType, method)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType));
     }

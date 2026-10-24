@@ -104,6 +104,7 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<LoginService>();
         services.TryAddScoped<RegistrationService>();
         services.TryAddScoped<AccountService>();
+        services.TryAddScoped<ProfileService>();
         services.TryAddScoped<AccountAdministrationService>();
         services.TryAddScoped<PasswordResetService>();
         services.TryAddScoped<ActivationService>();

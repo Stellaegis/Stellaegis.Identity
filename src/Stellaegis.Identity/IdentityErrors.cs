@@ -80,6 +80,18 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="InvalidMfaCode"/>: the one-time code is wrong.</summary>
     public const string InvalidMfaCodeCode = "Mfa.Invalid";
 
+    /// <summary>The code of <see cref="InvalidDisplayName"/>: the name is empty, or longer than the store keeps.</summary>
+    public const string InvalidDisplayNameCode = "Profile.NameInvalid";
+
+    /// <summary>The code of <see cref="InvalidLocale"/>: the language is not a culture name in its canonical form.</summary>
+    public const string InvalidLocaleCode = "Profile.LocaleInvalid";
+
+    /// <summary>The code of <see cref="InvalidTimeZone"/>: the time zone is not an IANA name the system knows.</summary>
+    public const string InvalidTimeZoneCode = "Profile.TimeZoneInvalid";
+
+    /// <summary>The code of <see cref="InvalidAvatar"/>: the image is not a sound PNG of 256 by 256 pixels.</summary>
+    public const string InvalidAvatarCode = "Avatar.Invalid";
+
     /// <summary>The e-mail or the password is wrong, or the account is disabled or unknown: one message for all.</summary>
     public static Error InvalidCredentials { get; } =
         Error.Unauthorized(InvalidCredentialsCode, "The e-mail or the password is incorrect.");
@@ -172,4 +184,20 @@ public static class IdentityErrors
     /// <summary>The one-time code is wrong.</summary>
     public static Error InvalidMfaCode { get; } =
         Error.Unauthorized(InvalidMfaCodeCode, "The code is incorrect.");
+
+    /// <summary>The name is empty, or longer than the store keeps.</summary>
+    public static Error InvalidDisplayName { get; } =
+        Error.Validation(InvalidDisplayNameCode, "The name must have 1 to 200 characters.");
+
+    /// <summary>The language is not a culture name in its canonical form.</summary>
+    public static Error InvalidLocale { get; } =
+        Error.Validation(InvalidLocaleCode, "The language is not recognized.");
+
+    /// <summary>The time zone is not an IANA name the system knows.</summary>
+    public static Error InvalidTimeZone { get; } =
+        Error.Validation(InvalidTimeZoneCode, "The time zone is not recognized.");
+
+    /// <summary>The image is not a sound PNG of 256 by 256 pixels.</summary>
+    public static Error InvalidAvatar { get; } =
+        Error.Validation(InvalidAvatarCode, "The image must be a PNG of 256 by 256 pixels.");
 }

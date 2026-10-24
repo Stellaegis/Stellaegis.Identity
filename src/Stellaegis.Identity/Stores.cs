@@ -27,7 +27,11 @@ public interface IAuthUserStore
     /// <summary>Writes the account back. <see langword="false"/> when no account with that id exists, or it is deleted.</summary>
     Task<bool> UpdateAsync(AuthUser user, CancellationToken cancellationToken = default);
 
-    /// <summary>Marks the account deleted, by <paramref name="deletedBy"/>. <see langword="false"/> when no account with that id exists, or it is deleted already.</summary>
+    /// <summary>
+    /// Marks the account deleted, by <paramref name="deletedBy"/>, and removes its avatar in the same gesture: the
+    /// account stays so that its id is never reused, the image goes since it identifies the person.
+    /// <see langword="false"/> when no account with that id exists, or it is deleted already.
+    /// </summary>
     Task<bool> SoftDeleteAsync(Guid userUniqueId, Primitives.Actor deletedBy, CancellationToken cancellationToken = default);
 }
 
