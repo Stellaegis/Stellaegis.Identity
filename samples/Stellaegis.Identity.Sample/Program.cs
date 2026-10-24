@@ -50,7 +50,8 @@ builder.Services.AddSingleton<IIdentityMailer, LoggingMailer>();
 builder.Services.AddSingleton<IEventPublisher, AdmissionEventPublisher>();
 builder.Services.AddSampleAdministrators(builder.Configuration);
 
-// The pages follow the culture of the request: French and English, French when the browser says nothing.
+// The request localization of the host: French and English, French when the browser says nothing. The pages of
+// Identity take it after what the person chose — the language of their account, the one chosen on the pages.
 builder.Services.AddRequestLocalization(options => options
     .SetDefaultCulture("fr")
     .AddSupportedCultures("fr", "en")
@@ -68,6 +69,7 @@ app.UseStellaegisActorAdmission();   // of Primitives: every admission registere
 app.UseAuthorization();
 
 app.MapStellaegisIdentityPages();
+app.MapIdentityAccountEndpoints();   // what a signed-in person calls on their own account
 app.MapGroup("/api/admin")
     .MapIdentityAdminEndpoints()
     .RequireAuthorizationPerOperation(operation => operation.ToString());
