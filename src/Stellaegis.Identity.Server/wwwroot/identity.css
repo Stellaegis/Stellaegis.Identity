@@ -72,7 +72,7 @@
 .auth-brand-title { font-weight: 600; font-size: 17px; }
 .auth-brand-subtitle { font-size: 13px; color: var(--si-muted); }
 .auth-card-body { padding: 24px; }
-.auth-footer { display: flex; justify-content: space-between; gap: 12px; padding: 12px 24px; border-top: 1px solid var(--si-border); font-size: 12px; color: var(--si-muted); }
+.auth-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 12px 24px; border-top: 1px solid var(--si-border); font-size: 12px; color: var(--si-muted); }
 .auth-h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
 .auth-help { margin: 0 0 16px; color: var(--si-muted); }
 .auth-small { font-size: 13px; }
@@ -140,10 +140,11 @@
 .account-sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
 
 /* ── Language ──────────────────────────────────────────────────────────────── */
-.language-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
-.language-option { padding: 2px 8px; font: inherit; font-size: 12px; color: var(--si-muted); background: transparent; border: 1px solid var(--si-border); border-radius: var(--si-radius); cursor: pointer; }
-.language-option:hover { color: var(--si-text); }
-.language-option.active { color: var(--si-text); border-color: var(--si-accent); }
+.language-picker { display: flex; align-items: center; gap: 6px; margin: 0; }
+.language-select { padding: 2px 6px; font: inherit; font-size: 12px; color: var(--si-text); background: var(--si-surface); border: 1px solid var(--si-border); border-radius: var(--si-radius); }
+.language-select:focus { outline: 2px solid var(--si-accent); outline-offset: 1px; }
+.language-apply { padding: 2px 8px; font: inherit; font-size: 12px; color: var(--si-muted); background: transparent; border: 1px solid var(--si-border); border-radius: var(--si-radius); cursor: pointer; }
+.language-apply:hover { color: var(--si-text); }
 .account-logout-btn { width: 100%; padding: 8px 10px; font: inherit; color: var(--si-text); background: transparent; border: 1px solid var(--si-border); border-radius: var(--si-radius); cursor: pointer; }
 .account-content { flex: 1; padding: 24px; max-width: 760px; }
 .account-page-title { margin: 0 0 16px; font-size: 22px; font-weight: 600; }

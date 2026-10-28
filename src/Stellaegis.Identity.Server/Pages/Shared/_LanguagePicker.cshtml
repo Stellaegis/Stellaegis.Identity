@@ -1,6 +1,8 @@
 @*
-    The languages the pages have texts for, one button each: the choice is posted to /language, which keeps it and
-    returns to this page. Absent when the host imposes a culture, or when the pages have texts for one language only.
+    The languages the pages have texts for, in a list named in its own language, and the button that applies the
+    choice: posted to /language, which keeps it and returns to this page. A button rather than a change of the list
+    sending it, which would move the page while a keyboard is still going through the list. Absent when the host
+    imposes a culture, or when the pages have texts for one language only.
 *@
 @using System.Globalization
 @inject PagesCulture Cultures
@@ -11,15 +13,16 @@
 }
 @if (string.IsNullOrEmpty(PagesOptions.Value.Culture) && cultures.Count > 1)
 {
-    <form method="post" action="/language" class="language-picker" aria-label="@T["Layout.Language"]">
+    <form method="post" action="/language" class="language-picker">
         @Html.AntiForgeryToken()
         <input type="hidden" name="back" value="@back" />
-        @foreach (var culture in cultures)
-        {
-            var active = culture.TwoLetterISOLanguageName == current;
-            var name = culture.NativeName;
-            <button type="submit" name="culture" value="@culture.Name" lang="@culture.Name"
-                    class="language-option@(active ? " active" : "")" aria-pressed="@(active ? "true" : "false")">@(char.ToUpper(name[0], culture) + name[1..])</button>
-        }
+        <select name="culture" class="language-select" aria-label="@T["Layout.Language"]">
+            @foreach (var culture in cultures)
+            {
+                var name = culture.NativeName;
+                <option lang="@culture.Name" value="@culture.Name" selected="@(culture.TwoLetterISOLanguageName == current)">@(char.ToUpper(name[0], culture) + name[1..])</option>
+            }
+        </select>
+        <button type="submit" class="language-apply">@T["Layout.Language.Apply"]</button>
     </form>
 }

@@ -1,5 +1,8 @@
+using System.Collections;
 using System.Globalization;
 using System.Net;
+using System.Resources;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.Extensions.DependencyInjection;
@@ -136,5 +139,21 @@ public sealed class LanguageTests
 
         Assert.Equal("fr", Language(browser));
         Assert.DoesNotContain("language-picker", browser.Html);
+    }
+
+    [Fact]
+    public void The_french_texts_keep_their_high_punctuation_on_the_line_of_the_word_before_it()
+    {
+        // French puts a space before ? ! ; : and inside « » — one that never breaks, written as the character itself,
+        // since the pages encode the text: a narrow one before ? ! ;, a full one before : and inside the quotes.
+        var texts = new ResourceManager(typeof(Server.IdentityPagesResources).FullName!, typeof(Server.IdentityPagesResources).Assembly)
+            .GetResourceSet(CultureInfo.GetCultureInfo("fr"), createIfNotExists: true, tryParents: false);
+        Assert.NotNull(texts);
+        var wrong = new Regex(@"(?<!\u202F)[?!;]|(?<!\u00A0):(?=\s|$)|«(?!\u00A0)|(?<!\u00A0)»");
+
+        var values = texts.Cast<DictionaryEntry>().Select(entry => ((string)entry.Key, (string)entry.Value!)).ToList();
+
+        Assert.True(values.Count > 100, $"{values.Count} French texts read: the resource was not found.");
+        Assert.Empty(values.Where(text => wrong.IsMatch(text.Item2)).Select(text => $"{text.Item1}: {text.Item2}"));
     }
 }

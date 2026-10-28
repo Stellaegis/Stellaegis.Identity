@@ -23,10 +23,10 @@
     <value>Confirmer</value>
   </data>
   <data name="Account.Email.Current" xml:space="preserve">
-    <value>Adresse actuelle : {0}</value>
+    <value>Adresse actuelle : {0}</value>
   </data>
   <data name="Account.Email.NoMailer" xml:space="preserve">
-    <value>L'adresse e-mail ne peut pas être changée ici : ce serveur n'envoie aucun courrier.</value>
+    <value>L'adresse e-mail ne peut pas être changée ici : ce serveur n'envoie aucun courrier.</value>
   </data>
   <data name="Account.Email.SendCode" xml:space="preserve">
     <value>Envoyer le code de vérification</value>
@@ -77,13 +77,13 @@
     <value>Un code est envoyé par e-mail à chaque connexion.</value>
   </data>
   <data name="Account.Mfa.EmailNoMailer" xml:space="preserve">
-    <value>Le code par e-mail n'est pas disponible : ce serveur n'envoie aucun courrier.</value>
+    <value>Le code par e-mail n'est pas disponible : ce serveur n'envoie aucun courrier.</value>
   </data>
   <data name="Account.Mfa.EmailTitle" xml:space="preserve">
     <value>Code par e-mail</value>
   </data>
   <data name="Account.Mfa.Explain" xml:space="preserve">
-    <value>La vérification en deux étapes ajoute une protection : en plus du mot de passe, un code à usage unique est demandé à chaque connexion.</value>
+    <value>La vérification en deux étapes ajoute une protection : en plus du mot de passe, un code à usage unique est demandé à chaque connexion.</value>
   </data>
   <data name="Account.Mfa.Since" xml:space="preserve">
     <value>depuis le {0:g}</value>
@@ -164,7 +164,7 @@
     <value>Ce compte est bloqué.</value>
   </data>
   <data name="Error.Account.LockedOut" xml:space="preserve">
-    <value>Trop de tentatives : le compte est verrouillé pour un moment. Réessayer plus tard.</value>
+    <value>Trop de tentatives : le compte est verrouillé pour un moment. Réessayer plus tard.</value>
   </data>
   <data name="Error.Account.NotFound" xml:space="preserve">
     <value>Le compte est introuvable.</value>
@@ -278,7 +278,7 @@
     <value>Si un compte est associé à cette adresse, un message contenant un lien de réinitialisation est en route. Le lien est valable {0} heure(s).</value>
   </data>
   <data name="Forgot.SentSpam" xml:space="preserve">
-    <value>Rien après quelques minutes ? Regarder dans le dossier du courrier indésirable.</value>
+    <value>Rien après quelques minutes ? Regarder dans le dossier du courrier indésirable.</value>
   </data>
   <data name="Forgot.Submit" xml:space="preserve">
     <value>Envoyer le lien</value>
@@ -290,7 +290,7 @@
     <value>Connexion chiffrée (HTTPS).</value>
   </data>
   <data name="Layout.Support" xml:space="preserve">
-    <value>Besoin d'aide ?</value>
+    <value>Besoin d'aide ?</value>
   </data>
   <data name="Login.AccountDeleted" xml:space="preserve">
     <value>Le compte est supprimé.</value>
@@ -302,7 +302,7 @@
     <value>L'adresse e-mail est modifiée. Se reconnecter avec la nouvelle.</value>
   </data>
   <data name="Login.Forgot" xml:space="preserve">
-    <value>Mot de passe oublié ?</value>
+    <value>Mot de passe oublié ?</value>
   </data>
   <data name="Login.Heading" xml:space="preserve">
     <value>Connexion</value>
@@ -353,7 +353,7 @@
     <value>Un code a été envoyé par e-mail. Le saisir ci-dessous.</value>
   </data>
   <data name="Mfa.RecoveryHint" xml:space="preserve">
-    <value>Application indisponible ? Un code de secours la remplace.</value>
+    <value>Application indisponible ? Un code de secours la remplace.</value>
   </data>
   <data name="Mfa.Submit" xml:space="preserve">
     <value>Vérifier</value>
@@ -446,7 +446,7 @@
     <value>Un nouveau lot invalide immédiatement les codes précédents.</value>
   </data>
   <data name="RecoveryCodes.Remaining" xml:space="preserve">
-    <value>Codes de secours restants : {0}</value>
+    <value>Codes de secours restants : {0}</value>
   </data>
   <data name="RecoveryCodes.ShownOnce" xml:space="preserve">
     <value>Les codes de secours permettent de se connecter quand l'application d'authentification est indisponible. Ils ne sont affichés qu'à leur génération.</value>
@@ -524,13 +524,13 @@
     <value>Compte activé</value>
   </data>
   <data name="Activate.DoneHelp" xml:space="preserve">
-    <value>Le mot de passe est enregistré : le compte est prêt pour la connexion.</value>
+    <value>Le mot de passe est enregistré : le compte est prêt pour la connexion.</value>
   </data>
   <data name="Activate.Heading" xml:space="preserve">
     <value>Choisir le mot de passe</value>
   </data>
   <data name="Activate.Help" xml:space="preserve">
-    <value>Ce compte a été créé par un administrateur. Le choix de son mot de passe l'active : personne d'autre ne le connaît.</value>
+    <value>Ce compte a été créé par un administrateur. Le choix de son mot de passe l'active : personne d'autre ne le connaît.</value>
   </data>
   <data name="Activate.InvalidHeading" xml:space="preserve">
     <value>Lien invalide</value>
@@ -554,13 +554,16 @@
     <value>Cette adresse est vérifiée.</value>
   </data>
   <data name="Account.Email.Unverified" xml:space="preserve">
-    <value>Cette adresse n'a jamais été vérifiée : un mot de passe oublié ne peut pas être réinitialisé par e-mail tant qu'elle ne l'est pas.</value>
+    <value>Cette adresse n'a jamais été vérifiée : un mot de passe oublié ne peut pas être réinitialisé par e-mail tant qu'elle ne l'est pas.</value>
   </data>
   <data name="Account.Email.Verify" xml:space="preserve">
     <value>Vérifier l'adresse</value>
   </data>
   <data name="Layout.Language" xml:space="preserve">
     <value>Langue</value>
+  </data>
+  <data name="Layout.Language.Apply" xml:space="preserve">
+    <value>Appliquer</value>
   </data>
   <data name="Error.Profile.NameInvalid" xml:space="preserve">
     <value>Le nom doit compter de 1 à 200 caractères.</value>
@@ -593,7 +596,7 @@
     <value>Fuseau horaire</value>
   </data>
   <data name="Field.TimeZone.Help" xml:space="preserve">
-    <value>Un nom IANA, comme Europe/Paris. Vide : les dates suivent le navigateur.</value>
+    <value>Un nom IANA, comme Europe/Paris. Vide : les dates suivent le navigateur.</value>
   </data>
   <data name="Field.TimeZone.UseBrowser" xml:space="preserve">
     <value>Reprendre celui du navigateur</value>
@@ -608,7 +611,7 @@
     <value>Retirer l'avatar</value>
   </data>
   <data name="Account.Avatar.Frame" xml:space="preserve">
-    <value>L'image sous le masque : la faire glisser, ou la déplacer avec les flèches</value>
+    <value>L'image sous le masque : la faire glisser, ou la déplacer avec les flèches</value>
   </data>
   <data name="Account.Avatar.Zoom" xml:space="preserve">
     <value>Zoom</value>
