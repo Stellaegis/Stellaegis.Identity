@@ -148,6 +148,12 @@ alone; `pwd`, `otp` and `mfa` after the code of an authenticator or one sent by 
 recovery code. `AuthenticationMethods` names them. An issuer carries the claim into its tokens, so that a decision
 asks whether a second factor was used for this session, not whether the account has one.
 
+It carries the time of the login too, `auth_time`, in seconds since the epoch as OpenID Connect writes it
+(`AuthenticationTime`). The time is set at the login and kept for the whole session: a new reading of the account,
+`LoginService.RenewPrincipalAsync`, keeps it with the methods, so that an application asking for a recent
+authentication — `max_age` — is answered by the login, not by the last request. A session signed in before 6.3.0
+says no time, and keeps saying none until its next login.
+
 ### The profile
 
 What a person chooses of their account, through `ProfileService`:

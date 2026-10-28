@@ -7,6 +7,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [6.3.0] — 2026-10-28
+
+When the person proved who they are. The session said how, not when: an issuer had nothing to answer `max_age`
+with, nor a decision asking for a recent authentication.
+
+### Added
+
+- **`auth_time`** in the principal of a session, seconds since the epoch, set at the login and kept for the whole
+  session; `AuthenticationTime` names the claim and reads it.
+- **`LoginService.RenewPrincipalAsync`**: the principal of a session that goes on, its account read again, how and
+  when the person proved who they are kept. The validation of the cookie and `CookieSignIn.RefreshAsync` go through it.
+
+### Updating from 6.2.0
+
+1. **Nothing to install**: the schema is unchanged.
+2. **A session signed in before the update carries no `auth_time`** until its next login.
+
 ## [6.2.0] — 2026-10-28
 
 A session confronted with its account. The cookie was trusted for its whole lifetime: a session whose account had
