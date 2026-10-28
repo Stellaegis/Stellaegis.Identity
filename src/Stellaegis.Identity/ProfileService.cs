@@ -12,7 +12,7 @@ namespace Stellaegis.Identity;
 /// <remarks>
 /// A session carries the language and the time zone of the login (<see cref="ProfileClaims"/>): a change reaches the
 /// tokens of an issuer at the next login. A page that has just written the profile signs its session in again, from
-/// <see cref="LoginService.CreatePrincipalAsync"/>, and shows it at once.
+/// <see cref="LoginService.RenewPrincipalAsync"/>, and shows it at once.
 /// </remarks>
 public sealed class ProfileService(
     IAuthUserStore users,

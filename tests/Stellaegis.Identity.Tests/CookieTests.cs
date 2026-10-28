@@ -60,6 +60,7 @@ public sealed class CookieTests
         app.MapGet("/me", (HttpContext http) => Results.Text(http.User.FindFirst("sub")!.Value)).RequireAuthorization();
         app.MapGet("/amr", (HttpContext http) => Results.Text(string.Join(' ', http.User.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value)))).RequireAuthorization();
         app.MapGet("/name", (HttpContext http) => Results.Text(http.User.FindFirst("name")!.Value)).RequireAuthorization();
+        app.MapGet("/auth-time", (HttpContext http) => Results.Text(http.User.FindFirst(AuthenticationTime.ClaimType)!.Value)).RequireAuthorization();
         await app.StartAsync(Ct);
         return app;
     }
@@ -198,6 +199,7 @@ public sealed class CookieTests
         await using var app = await StartAsync(clock);
         var id = await app.CreateAccountAsync("jane@acme.test", ct: Ct);
         var client = app.GetTestClient();
+        var signedInAt = clock.Now;
         var cookie = await SignInAsync(client);
         using (var scope = app.Services.CreateScope())
             Assert.True((await scope.ServiceProvider.GetRequiredService<ProfileService>().UpdateAsync(id, "Jane Doe", null, null, Ct)).IsSuccess);
@@ -211,11 +213,12 @@ public sealed class CookieTests
         Assert.Equal("Jane Doe", await read.Content.ReadAsStringAsync(Ct));
         var renewed = Assert.Single(read.Headers.GetValues("Set-Cookie")).Split(';')[0];
 
-        // The renewed cookie keeps how the person proved who they are, and starts a new interval.
+        // The renewed cookie keeps how and when the person proved who they are, and starts a new interval.
         clock.Advance(TimeSpan.FromMinutes(4));
         var kept = await GetAsync(client, "/amr", renewed);
         Assert.Equal("pwd", await kept.Content.ReadAsStringAsync(Ct));
         Assert.False(kept.Headers.Contains("Set-Cookie"));
+        Assert.Equal(signedInAt.ToUnixTimeSeconds().ToString(), await (await GetAsync(client, "/auth-time", renewed)).Content.ReadAsStringAsync(Ct));
     }
 
     [Fact]

@@ -81,8 +81,8 @@ public static class CookieServiceCollectionExtensions
 /// Holds a session against its account, the mechanism of the security stamp validator of ASP.NET Core Identity: once
 /// <see cref="SessionPolicyOptions.ValidationInterval"/> elapsed since its last reading, the account is read again.
 /// A session whose account is gone — a database installed again under the same keys —, deleted or blocked is closed;
-/// the others carry the account as it is now, with how the person proved who they are, and the cookie is issued again
-/// with the time of the reading. A cookie without that time is dated by its issue.
+/// the others carry the account as it is now, with how and when the person proved who they are, and the cookie is
+/// issued again with the time of the reading. A cookie without that time is dated by its issue.
 /// </summary>
 internal static class SessionValidation
 {
@@ -99,10 +99,8 @@ internal static class SessionValidation
         if (interval > TimeSpan.Zero && validatedAt is { } last && now - last < interval)
             return;
 
-        var current = context.Principal;
-        var methods = current?.FindAll(AuthenticationMethods.ClaimType).Select(claim => claim.Value).ToList() ?? [];
-        var principal = methods.Count > 0 && Guid.TryParse(current!.FindFirst("sub")?.Value, out var userUniqueId)
-            ? await services.GetRequiredService<LoginService>().CreatePrincipalAsync(userUniqueId, methods, IdentityCookie.Scheme, context.HttpContext.RequestAborted)
+        var principal = context.Principal is { } current
+            ? await services.GetRequiredService<LoginService>().RenewPrincipalAsync(current, IdentityCookie.Scheme, context.HttpContext.RequestAborted)
             : null;
         if (principal is null)
         {
@@ -155,7 +153,7 @@ public sealed class CookieSignIn(LoginService login)
 
     /// <summary>
     /// Signs the signed-in person in again from their account, as it is now — a name or a language just changed —,
-    /// keeping how they proved who they are and how long the cookie lasts. Fails with
+    /// keeping how and when they proved who they are and how long the cookie lasts. Fails with
     /// <see cref="IdentityErrors.AccountBlocked"/>, and signs the person out, when the account is gone or blocked at
     /// the door since.
     /// </summary>
@@ -163,10 +161,9 @@ public sealed class CookieSignIn(LoginService login)
     {
         Guard.NotNull(httpContext);
         var current = await httpContext.AuthenticateAsync(IdentityCookie.Scheme);
-        if (!current.Succeeded || !Guid.TryParse(current.Principal.FindFirst("sub")?.Value, out var userUniqueId))
+        if (!current.Succeeded)
             return Result.Failure(IdentityErrors.AccountBlocked);
-        var methods = current.Principal.FindAll(AuthenticationMethods.ClaimType).Select(claim => claim.Value).ToList();
-        var principal = methods.Count == 0 ? null : await login.CreatePrincipalAsync(userUniqueId, methods, IdentityCookie.Scheme, cancellationToken);
+        var principal = await login.RenewPrincipalAsync(current.Principal, IdentityCookie.Scheme, cancellationToken);
         if (principal is null)
         {
             await SignOutAsync(httpContext);

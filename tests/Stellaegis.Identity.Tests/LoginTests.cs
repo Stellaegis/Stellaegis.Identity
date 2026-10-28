@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using OtpNet;
 using Stellaegis.Primitives;
 
@@ -20,6 +21,7 @@ public sealed class LoginTests
         Assert.Equal("jane@acme.test", result.Principal.FindFirst("email")!.Value);
         Assert.Equal([AuthenticationMethods.Password], result.Principal.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value));
         Assert.Equal(LoginService.DefaultAuthenticationType, result.Principal.Identity!.AuthenticationType);
+        Assert.Equal(host.Clock.Now.ToUnixTimeSeconds().ToString(), result.Principal.FindFirst(AuthenticationTime.ClaimType)!.Value);
         var user = await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id);
         Assert.Equal(host.Clock.Now, user!.LastLogin);
         var loginEvent = Assert.Single(await host.Get<ILoginEventStore>().GetRecentAsync(id));
@@ -129,6 +131,42 @@ public sealed class LoginTests
         code = otp.Generate(id);
         clock.Advance(TimeSpan.FromMinutes(11));
         Assert.False(otp.Validate(id, code));
+    }
+
+    [Fact]
+    public async Task A_renewed_session_carries_the_account_as_it_is_now_and_keeps_how_and_when_it_was_proved()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var login = host.Get<LoginService>();
+        var signedInAt = host.Clock.Now;
+        var session = await login.CreatePrincipalAsync(id, AuthenticationMethods.PasswordAndCode);
+        Assert.Equal(signedInAt.ToUnixTimeSeconds(), AuthenticationTime.Of(session!)!.Value.ToUnixTimeSeconds());
+
+        host.Clock.Advance(TimeSpan.FromHours(3));
+        Assert.True((await host.Get<ProfileService>().UpdateAsync(id, "Jane Doe", null, null)).IsSuccess);
+        var renewed = await login.RenewPrincipalAsync(session!);
+
+        Assert.Equal("Jane Doe", renewed!.FindFirst("name")!.Value);
+        Assert.Equal(AuthenticationMethods.PasswordAndCode, renewed.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value));
+        Assert.Equal(signedInAt.ToUnixTimeSeconds(), AuthenticationTime.Of(renewed)!.Value.ToUnixTimeSeconds());
+    }
+
+    [Fact]
+    public async Task A_session_that_does_not_say_when_it_was_proved_is_renewed_without_a_time_and_one_without_its_account_is_not()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var login = host.Get<LoginService>();
+        var older = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id.ToString("N")), new Claim(AuthenticationMethods.ClaimType, AuthenticationMethods.Password)], "test"));
+
+        var renewed = await login.RenewPrincipalAsync(older);
+        Assert.NotNull(renewed);
+        Assert.Null(renewed.FindFirst(AuthenticationTime.ClaimType));
+
+        Assert.Null(await login.RenewPrincipalAsync(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id.ToString("N"))], "test"))));
+        await host.Get<AccountAdministrationService>().DeleteAsync(id, Actor.Parse("admin"));
+        Assert.Null(await login.RenewPrincipalAsync(older));
     }
 }
 
