@@ -7,6 +7,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [6.2.0] — 2026-10-28
+
+A session confronted with its account. The cookie was trusted for its whole lifetime: a session whose account had
+been deleted, disabled, or lost with a database installed again under the same keys kept opening the pages, and a
+token issuer composed on them gave it tokens. And the login page followed any open session, whichever account it
+named.
+
+### Added
+
+- **The session is read against its account**, once `Stellaegis:Identity:Session:ValidationInterval` elapsed — five
+  minutes unless set, zero for every request —, the mechanism of the security stamp validator of ASP.NET Core
+  Identity: an account gone, deleted or disabled signs the session out; the others are issued again with the
+  account as it is now. `SessionPolicyOptions`, `IdentityOptions.Session`.
+- **`/login` shows an open session**, its avatar, name and address, with "Continue" and "Switch account".
+
+### Changed
+
+- **The default logo is the Stellaegis mark** on its own tile, which reads in light and dark alike.
+- **The languages are a list** with a button that applies the choice, for a large number of them. The classes
+  `language-select` and `language-apply` replace `language-option`.
+- **The footer of the card wraps**, its blocks centered vertically.
+- **The French texts carry their no-break spaces**: U+202F before ? ! ;, U+00A0 before : and inside « ».
+
+### Fixed
+
+- **The account page** answered a session whose account was gone or disabled with a 500; it signs it out.
+
+### Updating from 6.1.0
+
+1. **Nothing to install**: the schema is unchanged.
+2. **A session older than five minutes is read again at its first request** after the update, and one whose
+   account is no more is signed out.
+3. **A host that linked to `/login` for a signed-in person** to send them on now shows them the open session; a
+   link to the way back itself goes there directly.
+4. **A stylesheet of the host that styled `language-option`** styles `language-select` and `language-apply`.
+
 ## [6.1.0] — 2026-10-24
 
 What a person chooses of their own account: the language of the pages, a time zone, the name, an avatar. The pages

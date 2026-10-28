@@ -199,6 +199,7 @@ Stellaegis:Identity:SelfRegistration               Closed, or Open
 Stellaegis:Identity:Retention:LoginEvents          180 days, and never less
 Stellaegis:Identity:Retention:Expired              30 days past their expiry, and never less
 Stellaegis:Identity:AvatarUrl                      none; the absolute address of /account/avatar, for picture
+Stellaegis:Identity:Session:ValidationInterval     5 minutes; 00:00:00 reads the account on every request
 ```
 
 `SelfRegistration` is `Closed` unless set: a host whose people are created by its administration — an
@@ -221,6 +222,15 @@ challenge. `CookieSignIn` signs a person in — from the principal `LoginService
 account — and out. The pages of `Stellaegis.Identity.Server` use it; a host writing its own login page does the
 same. A host that authenticates its API otherwise, by a bearer token, registers that scheme too and chooses the
 default after this call.
+
+The cookie is held against its account, as the security stamp validator of ASP.NET Core Identity holds its own:
+it keeps the time its account was last read, and once `Session:ValidationInterval` elapsed — five minutes unless
+set —, the next request reads the account again. A session whose account is gone, deleted or disabled is signed
+out, and its person sent to `/login`; the others are issued again with the account as it is now, keeping how the
+person proved who they are. A cookie older than the interval is read again on its first request — one kept by a
+browser across a database installed again under the same keys, for instance. Zero reads the account on every
+request. An `OnValidatePrincipal` the host sets in `AddStellaegisIdentityCookie(options => …)` runs after that
+reading, and only when the account holds; an `EventsType` replaces these events, the validation with them.
 
 ## The administration routes
 
@@ -289,8 +299,10 @@ from its own `IEventPublisher`; with several, from a subscription to `Stellaegis
 `Stellaegis.Identity.Server` is a Razor class library: `/login`, `/login/mfa`, `/login/mfa-setup`, `/register`,
 `/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, `/language`, and under `/account` the overview — the
 avatar and the profile —, the avatar itself, the password, the e-mail, the second factor and its recovery codes, the
-sign-in history, the deletion. The host mounts them beside
-what it serves:
+sign-in history, the deletion. With a session open in the browser, `/login` shows it — the avatar, the name
+and the address of its account — with "Continue", to the way back, and "Switch account", which signs it out
+and shows the form, rather than following it: on a shared computer, or with an account kept for testing, the
+account a session names is not always the one meant. The host mounts the pages beside what it serves:
 
 ```csharp
 builder.Services.AddStellaegisIdentityCookie();
@@ -325,9 +337,12 @@ From the lightest gesture to the heaviest, each one leaving the others untouched
 | The colors, the typography, the spacing | a stylesheet of the host that redefines the CSS variables of `identity.css`, named in `StylesheetPath` — or served at the same path, which wins over the package's |
 | A layout, a page | a file of the host at the same path — `Pages/Shared/_Layout.cshtml`, `_AuthLayout.cshtml`, `_AccountLayout.cshtml`, `Pages/Login.cshtml` — replaces the package's: ASP.NET Core resolves a page in the host first, then in the libraries |
 
-The texts come in English and in French, and the pages follow the light or dark scheme of the device. The French
+The texts come in English and in French, and the pages follow the light or dark scheme of the device. The logo
+is the Stellaegis mark, on a tile that carries its own background, until `LogoPath` names the host's. The French
 texts address nobody — the infinitive or an impersonal turn, never « vous » nor « tu » —: the address of a person
-is the host's to choose, and a text of the package never contradicts it.
+is the host's to choose, and a text of the package never contradicts it. They carry the French spaces that do not
+break as characters, the pages encoding the text — U+202F before ? ! ;, U+00A0 before : and inside « » —, and a
+French text given in `Texts` writes them the same way.
 
 ### The language of the pages
 
@@ -335,8 +350,8 @@ is the host's to choose, and a text of the package never contradicts it.
 texts for — English, French, and every culture the host gives `Texts` for — among: the language of the signed-in
 person's account; the `ui_locales` of the authorization request the login page returns to; the choice made on the
 pages; the culture the host's request localization decided, or the browser's `Accept-Language` when the host
-decides none; `DefaultCulture`. The choice is a row of buttons at the bottom of the pages, which posts to
-`/language`: it goes to the culture cookie of ASP.NET Core, `.AspNetCore.Culture` — the host's request
+decides none; `DefaultCulture`. The choice is a list at the bottom of the pages, with a button that applies it,
+posted to `/language`: it goes to the culture cookie of ASP.NET Core, `.AspNetCore.Culture` — the host's request
 localization reads the same, and shows its own pages in it —, and to the account of whoever is signed in.
 
 ### The avatar
