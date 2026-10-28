@@ -42,12 +42,29 @@ internal sealed class LoginModel(
         public bool RememberMe { get; set; }
     }
 
+    /// <summary>The session already open in this browser, which the page shows rather than following it; <see langword="null"/> without one.</summary>
+    public OpenSession? Session { get; private set; }
+
+    /// <summary>Where the open session continues to: the way back, or the default one.</summary>
+    public string ContinueUrl => ReturnUrl ?? pages.Value.DefaultReturnUrl;
+
+    public sealed record OpenSession(string Name, string Email, string? Picture);
+
     public IActionResult OnGet([FromQuery(Name = Links.ReturnUrlParameter)] string? returnUrl = null)
     {
         ReturnUrl = Links.Local(Url, returnUrl);
+        // An open session is shown, not followed: on a shared computer, or with an account kept for testing, the one
+        // it names is not always the one meant.
         if (User.Identity?.IsAuthenticated == true)
-            return LocalRedirect(ReturnUrl ?? pages.Value.DefaultReturnUrl);
+            Session = new OpenSession(User.FindFirst("name")?.Value ?? "", User.FindFirst("email")?.Value ?? "", User.FindFirst(ProfileClaims.Picture)?.Value);
         return Page();
+    }
+
+    /// <summary>Closes the open session and shows the form, the way back kept.</summary>
+    public async Task<IActionResult> OnPostSwitchAsync([FromQuery(Name = Links.ReturnUrlParameter)] string? returnUrl = null)
+    {
+        await signIn.SignOutAsync(HttpContext);
+        return Redirect(Links.WithReturnUrl(IdentityCookie.LoginPath, Links.Local(Url, returnUrl)));
     }
 
     public async Task<IActionResult> OnPostAsync([FromQuery(Name = Links.ReturnUrlParameter)] string? returnUrl = null, CancellationToken cancellationToken = default)

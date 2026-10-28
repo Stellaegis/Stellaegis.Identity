@@ -66,6 +66,37 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task The_login_page_shows_an_open_session_and_continues_it_or_switches_to_another_account()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        await app.CreateAccountAsync(Email, Password, Ct);
+        await app.CreateAccountAsync("tester@acme.test", Password, Ct);
+        var browser = new Browser(app);
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+
+        // An open session is shown rather than followed, the way back on its "Continue".
+        const string Login = "/login?return_url=%2Faccount%2Fsecurity";
+        var shown = await browser.GetAsync(Login, Ct);
+        Assert.Equal(HttpStatusCode.OK, shown.StatusCode);
+        Assert.Contains("A session is already open in this browser.", browser.Html);
+        Assert.Contains(Email, browser.Html);
+        Assert.Contains("href=\"/account/security\"", browser.Html);
+        Assert.Contains("action=\"/login?return_url=%2Faccount%2Fsecurity&amp;handler=Switch\"", browser.Html);
+        Assert.DoesNotContain("Input.Password", browser.Html);
+
+        var switched = await browser.PostFormAsync(Login, new Dictionary<string, string>(), Ct, postPath: "/login?return_url=%2Faccount%2Fsecurity&handler=Switch");
+        Assert.Equal(HttpStatusCode.Redirect, switched.StatusCode);
+        Assert.Equal(Login, switched.Headers.Location!.ToString());
+        Assert.False(browser.HasCookie(IdentityCookie.CookieName));
+
+        var other = await browser.PostFormAsync(Login, new Dictionary<string, string> { ["Input.Email"] = "tester@acme.test", ["Input.Password"] = Password }, Ct);
+        Assert.Equal("/account/security", other.Headers.Location!.ToString());
+        await browser.GetAsync("/account/security", Ct);
+        Assert.Contains("tester@acme.test", browser.Html);
+        Assert.DoesNotContain(Email, browser.Html);
+    }
+
+    [Fact]
     public async Task A_wrong_password_shows_the_error_in_the_language_of_the_pages()
     {
         await using var english = await PagesTestHost.StartAsync(Ct);

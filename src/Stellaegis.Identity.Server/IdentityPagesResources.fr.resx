@@ -322,6 +322,15 @@
   <data name="Login.Required" xml:space="preserve">
     <value>Saisir l'adresse e-mail et le mot de passe.</value>
   </data>
+  <data name="Login.Session.Continue" xml:space="preserve">
+    <value>Continuer</value>
+  </data>
+  <data name="Login.Session.Help" xml:space="preserve">
+    <value>Une session est déjà ouverte dans ce navigateur.</value>
+  </data>
+  <data name="Login.Session.Switch" xml:space="preserve">
+    <value>Changer de compte</value>
+  </data>
   <data name="Login.Submit" xml:space="preserve">
     <value>Se connecter</value>
   </data>

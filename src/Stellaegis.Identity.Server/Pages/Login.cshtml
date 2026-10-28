@@ -6,36 +6,65 @@
 }
 
 <h2 class="auth-h2">@T["Login.Heading"]</h2>
-<p class="auth-help">@T["Login.Help"]</p>
 
-@if (TempData["Notice"] is string notice)
+@if (Model.Session is { } session)
 {
-    <div class="auth-success" role="status">@T[notice]</div>
+    var initial = session.Name.Length > 0 ? session.Name[..1].ToUpperInvariant() : "?";
+    <p class="auth-help">@T["Login.Session.Help"]</p>
+    <div class="account-profile">
+        @if (session.Picture is { } picture)
+        {
+            <img class="account-avatar" src="@picture" alt="" width="48" height="48" />
+        }
+        else
+        {
+            <div class="account-avatar" aria-hidden="true">@initial</div>
+        }
+        <div>
+            <div class="account-display-name">@session.Name</div>
+            <div class="account-email">@session.Email</div>
+        </div>
+    </div>
+    <div class="auth-form">
+        <a href="@Model.ContinueUrl" class="auth-btn">@T["Login.Session.Continue"]</a>
+        <form method="post" asp-page-handler="Switch" asp-route-return_url="@Model.ReturnUrl">
+            <button class="auth-btn auth-btn-secondary" type="submit">@T["Login.Session.Switch"]</button>
+        </form>
+    </div>
 }
+else
+{
+    <p class="auth-help">@T["Login.Help"]</p>
 
-<form class="auth-form" method="post" autocomplete="on">
-    <div class="auth-field">
-        <label class="auth-label" for="Input_Email">@T["Field.Email"]</label>
-        <input class="auth-input" asp-for="Input.Email" type="email" autocomplete="username" autofocus />
-    </div>
-    <div class="auth-field">
-        <label class="auth-label" for="Input_Password">@T["Field.Password"]</label>
-        <input class="auth-input" asp-for="Input.Password" type="password" autocomplete="current-password" />
-    </div>
-    <div class="auth-row">
-        <label class="auth-check"><input asp-for="Input.RememberMe" type="checkbox" /> @T["Login.RememberMe"]</label>
-    </div>
-    <button class="auth-btn" type="submit">@T["Login.Submit"]</button>
-    <partial name="_Errors" />
-</form>
+    @if (TempData["Notice"] is string notice)
+    {
+        <div class="auth-success" role="status">@T[notice]</div>
+    }
 
-<div class="auth-links">
-    @if (Model.RegistrationOpen)
-    {
-        <a href="@Links.WithReturnUrl("/register", Model.ReturnUrl)" class="auth-btn auth-btn-secondary">@T["Login.Register"]</a>
-    }
-    @if (Model.PasswordResetEnabled)
-    {
-        <a href="/forgot-password" class="auth-link">@T["Login.Forgot"]</a>
-    }
-</div>
+    <form class="auth-form" method="post" autocomplete="on">
+        <div class="auth-field">
+            <label class="auth-label" for="Input_Email">@T["Field.Email"]</label>
+            <input class="auth-input" asp-for="Input.Email" type="email" autocomplete="username" autofocus />
+        </div>
+        <div class="auth-field">
+            <label class="auth-label" for="Input_Password">@T["Field.Password"]</label>
+            <input class="auth-input" asp-for="Input.Password" type="password" autocomplete="current-password" />
+        </div>
+        <div class="auth-row">
+            <label class="auth-check"><input asp-for="Input.RememberMe" type="checkbox" /> @T["Login.RememberMe"]</label>
+        </div>
+        <button class="auth-btn" type="submit">@T["Login.Submit"]</button>
+        <partial name="_Errors" />
+    </form>
+
+    <div class="auth-links">
+        @if (Model.RegistrationOpen)
+        {
+            <a href="@Links.WithReturnUrl("/register", Model.ReturnUrl)" class="auth-btn auth-btn-secondary">@T["Login.Register"]</a>
+        }
+        @if (Model.PasswordResetEnabled)
+        {
+            <a href="/forgot-password" class="auth-link">@T["Login.Forgot"]</a>
+        }
+    </div>
+}
