@@ -33,8 +33,12 @@ internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService prof
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
-        if (this.UserId() is not { } userId || (await profiles.GetAsync(userId, cancellationToken)).Value is not { } profile)
+        if (this.UserId() is not { } userId)
             return Forbid();
+        var found = await profiles.GetAsync(userId, cancellationToken);
+        if (found.IsFailure)
+            return await SignOutAsync();
+        var profile = found.Value;
         Show(profile);
         Input = new InputModel { DisplayName = profile.DisplayName, Locale = profile.Locale, TimeZone = profile.TimeZone };
         return Page();
@@ -42,8 +46,12 @@ internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService prof
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        if (this.UserId() is not { } userId || (await profiles.GetAsync(userId, cancellationToken)).Value is not { } current)
+        if (this.UserId() is not { } userId)
             return Forbid();
+        var found = await profiles.GetAsync(userId, cancellationToken);
+        if (found.IsFailure)
+            return await SignOutAsync();
+        var current = found.Value;
         Show(current);
         var displayName = (Input.DisplayName ?? "").Trim();
         if (displayName.Length is < 2 or > 100)
@@ -70,7 +78,10 @@ internal sealed class AccountIndexModel(CookieSignIn signIn, ProfileService prof
         AvatarVersion = profile.AvatarModifiedAt?.ToUnixTimeMilliseconds();
     }
 
-    public async Task<IActionResult> OnPostLogoutAsync()
+    public Task<IActionResult> OnPostLogoutAsync() => SignOutAsync();
+
+    // Also the way out of a session whose account is gone or disabled since its cookie was last read.
+    private async Task<IActionResult> SignOutAsync()
     {
         await signIn.SignOutAsync(HttpContext);
         return Redirect(IdentityCookie.LoginPath);

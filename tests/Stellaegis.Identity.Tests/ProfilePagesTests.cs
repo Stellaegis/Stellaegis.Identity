@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Stellaegis.Identity.AspNetCore;
+using Stellaegis.Primitives;
 
 namespace Stellaegis.Identity.Tests;
 
@@ -53,6 +54,39 @@ public sealed class ProfilePagesTests
         Assert.Contains("<html lang=\"fr\"", browser.Html);
         Assert.Contains("Profil enregistr", browser.Html);   // Razor encodes the accent
         Assert.Contains("<option value=\"fr\" lang=\"fr\" selected=\"selected\">", browser.Html);
+    }
+
+    [Fact]
+    public async Task The_account_page_signs_out_a_session_whose_account_is_disabled_rather_than_failing()
+    {
+        // Within the validation interval the cookie is not read again: the page meets the disabled account itself.
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        var id = await app.CreateAccountAsync(Email, Password, Ct);
+
+        async Task<HttpResponseMessage> DisabledThenAsync(Func<Browser, Task<HttpResponseMessage>> request)
+        {
+            var browser = await SignedInAsync(app);
+            await browser.GetAsync("/account", Ct);
+            var administration = app.Administration(out var scope);
+            using (scope)
+            {
+                Assert.True((await administration.BlockAsync(id, Actor.Parse("admin"), Ct)).IsSuccess);
+                var response = await request(browser);
+                Assert.False(browser.HasCookie(IdentityCookie.CookieName));
+                Assert.True((await administration.UnblockAsync(id, Actor.Parse("admin"), Ct)).IsSuccess);
+                return response;
+            }
+        }
+
+        var read = await DisabledThenAsync(browser => browser.GetAsync("/account", Ct));
+        Assert.Equal(HttpStatusCode.Redirect, read.StatusCode);
+        Assert.Equal(IdentityCookie.LoginPath, read.Headers.Location!.ToString());
+
+        var posted = await DisabledThenAsync(browser =>
+            browser.PostReadFormAsync("/account", new Dictionary<string, string> { ["Input.DisplayName"] = "Jane Doe" }, Ct));
+        Assert.Equal(HttpStatusCode.Redirect, posted.StatusCode);
+        Assert.Equal(IdentityCookie.LoginPath, posted.Headers.Location!.ToString());
+        Assert.Equal("Jane", (await AccountAsync(app, id)).DisplayName);
     }
 
     [Fact]

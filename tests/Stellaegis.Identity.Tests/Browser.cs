@@ -94,10 +94,16 @@ internal sealed class Browser(WebApplication app)
     {
         var page = await GetAsync(path, ct);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        return await PostReadFormAsync(postPath ?? path, fields(Html), ct);
+    }
+
+    /// <summary>Posts <paramref name="fields"/> to <paramref name="path"/> with the antiforgery token of the page last read — when something changes between reading the page and posting it.</summary>
+    public async Task<HttpResponseMessage> PostReadFormAsync(string path, IDictionary<string, string> fields, CancellationToken ct)
+    {
         var token = TokenPattern.Match(Html).Groups[1].Value;
         Assert.False(string.IsNullOrEmpty(token), "The page carries no antiforgery token.");
-        var form = new Dictionary<string, string>(fields(Html)) { ["__RequestVerificationToken"] = token };
-        using var request = new HttpRequestMessage(HttpMethod.Post, postPath ?? path) { Content = new FormUrlEncodedContent(form) };
+        var form = new Dictionary<string, string>(fields) { ["__RequestVerificationToken"] = token };
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = new FormUrlEncodedContent(form) };
         return await SendAsync(request, ct);
     }
 
