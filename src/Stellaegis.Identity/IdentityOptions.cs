@@ -52,6 +52,9 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>How long what identifies a person is kept once it no longer serves (<see cref="IdentityRetentionService"/>).</summary>
     public RetentionOptions Retention { get; set; } = new();
 
+    /// <summary>How a signed-in session is held against its account.</summary>
+    public SessionPolicyOptions Session { get; set; } = new();
+
     /// <summary>
     /// The address the avatar of the signed-in person is served at, absolute — the account page's,
     /// <c>https://id.acme.test/account/avatar</c> —, which the session carries in its <c>picture</c> claim, versioned
@@ -72,6 +75,7 @@ public sealed class IdentityOptions : IValidatableOptions
         ?? Prefix(nameof(Activation), Activation.FindError())
         ?? Prefix(nameof(Links), Links.FindError())
         ?? Prefix(nameof(Retention), Retention.FindError())
+        ?? Prefix(nameof(Session), Session.FindError())
         ?? (AvatarUrl is null || Uri.TryCreate(AvatarUrl, UriKind.Absolute, out var avatar) && (avatar.Scheme == Uri.UriSchemeHttps || avatar.Scheme == Uri.UriSchemeHttp) && avatar.Query.Length == 0
             ? null
             : $"{nameof(AvatarUrl)} must be an absolute http(s) URL without a query, or absent.");
@@ -259,6 +263,21 @@ public sealed class LinkOptions : IValidatableOptions
             ? null
             : $"{nameof(PublicBaseUrl)} must be an absolute http or https address.";
     }
+}
+
+/// <summary>How a signed-in session — the cookie of the pages — is held against its account.</summary>
+public sealed class SessionPolicyOptions : IValidatableOptions
+{
+    /// <summary>
+    /// How long a session goes without its account being read again. Once elapsed, the next request reads it: a session
+    /// whose account is gone, deleted or blocked is closed, and the others carry the account as it is now. A session
+    /// older than the interval is read again on its first request. Five minutes unless set; <see cref="TimeSpan.Zero"/>
+    /// reads the account on every request.
+    /// </summary>
+    public TimeSpan ValidationInterval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <inheritdoc/>
+    public string? FindError() => ValidationInterval < TimeSpan.Zero ? $"{nameof(ValidationInterval)} is zero or positive." : null;
 }
 
 /// <summary>

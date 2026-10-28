@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Stellaegis.Primitives;
 
 namespace Stellaegis.Identity.AspNetCore;
@@ -39,6 +41,12 @@ public static class CookieServiceCollectionExtensions
     /// <see cref="CookieSignIn"/>, which the login page signs in and out with. <paramref name="configure"/> changes
     /// what the cookie does by default — its lifetime, its path, its domain. A host that authenticates its API
     /// otherwise — a bearer token — registers that scheme too, and chooses the default after this call.
+    /// <para>
+    /// The cookie is held against its account (<see cref="SessionPolicyOptions"/>): read again once its validation
+    /// interval elapsed, it is closed when its account is gone, deleted or blocked. An <c>OnValidatePrincipal</c> the
+    /// host sets in <paramref name="configure"/> runs after that reading, on the account as it is now; an
+    /// <c>EventsType</c> replaces these events, the validation with them.
+    /// </para>
     /// <code>
     /// builder.Services.AddStellaegisIdentityInMemory(builder.Configuration);
     /// builder.Services.AddStellaegisIdentityCookie();
@@ -58,7 +66,53 @@ public static class CookieServiceCollectionExtensions
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                 configure?.Invoke(options);
+                var host = options.Events.OnValidatePrincipal;
+                options.Events.OnValidatePrincipal = async context =>
+                {
+                    await SessionValidation.ValidateAsync(context);
+                    if (context.Principal is not null)
+                        await host(context);
+                };
             });
+    }
+}
+
+/// <summary>
+/// Holds a session against its account, the mechanism of the security stamp validator of ASP.NET Core Identity: once
+/// <see cref="SessionPolicyOptions.ValidationInterval"/> elapsed since its last reading, the account is read again.
+/// A session whose account is gone — a database installed again under the same keys —, deleted or blocked is closed;
+/// the others carry the account as it is now, with how the person proved who they are, and the cookie is issued again
+/// with the time of the reading. A cookie without that time is dated by its issue.
+/// </summary>
+internal static class SessionValidation
+{
+    private const string ValidatedAtItem = ".stellaegis.validated";
+
+    public static async Task ValidateAsync(CookieValidatePrincipalContext context)
+    {
+        var services = context.HttpContext.RequestServices;
+        var interval = services.GetRequiredService<IOptions<IdentityOptions>>().Value.Session.ValidationInterval;
+        var now = (context.Options.TimeProvider ?? TimeProvider.System).GetUtcNow();
+        var validatedAt = DateTimeOffset.TryParse(context.Properties.GetString(ValidatedAtItem), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var at)
+            ? at
+            : context.Properties.IssuedUtc;
+        if (interval > TimeSpan.Zero && validatedAt is { } last && now - last < interval)
+            return;
+
+        var current = context.Principal;
+        var methods = current?.FindAll(AuthenticationMethods.ClaimType).Select(claim => claim.Value).ToList() ?? [];
+        var principal = methods.Count > 0 && Guid.TryParse(current!.FindFirst("sub")?.Value, out var userUniqueId)
+            ? await services.GetRequiredService<LoginService>().CreatePrincipalAsync(userUniqueId, methods, IdentityCookie.Scheme, context.HttpContext.RequestAborted)
+            : null;
+        if (principal is null)
+        {
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(context.Scheme.Name);
+            return;
+        }
+        context.ReplacePrincipal(principal);
+        context.Properties.SetString(ValidatedAtItem, now.ToString("O", CultureInfo.InvariantCulture));
+        context.ShouldRenew = true;
     }
 }
 
