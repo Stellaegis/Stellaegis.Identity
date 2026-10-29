@@ -153,10 +153,17 @@ public sealed class RecoveryCodeService(IRecoveryCodeStore store, PasswordHasher
         return codes;
     }
 
+    /// <summary>
+    /// Whether <paramref name="code"/> has the shape of a recovery code — ten letters or digits, in any case, with or
+    /// without its dash —, which no one-time code has: what tells the two apart on one field, before any hash is
+    /// derived.
+    /// </summary>
+    public static bool LooksLikeCode(string? code) => Normalize(code).Length == CodeLength;
+
     /// <summary>Whether <paramref name="code"/> is one of the account's unused codes, in any case and with or without its dash; a match spends it.</summary>
     public async Task<bool> TryConsumeAsync(Guid userUniqueId, string? code, CancellationToken cancellationToken = default)
     {
-        var normalized = new string((code ?? "").Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
+        var normalized = Normalize(code);
         if (normalized.Length == 0)
             return false;
         foreach (var hash in await store.GetUnusedHashesAsync(userUniqueId, cancellationToken))
@@ -170,6 +177,9 @@ public sealed class RecoveryCodeService(IRecoveryCodeStore store, PasswordHasher
     /// <summary>How many codes the account has left.</summary>
     public Task<int> CountRemainingAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
         => store.CountUnusedAsync(userUniqueId, cancellationToken);
+
+    private static string Normalize(string? code)
+        => new((code ?? "").Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
     private static string GenerateRaw()
     {

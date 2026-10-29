@@ -106,6 +106,108 @@ public sealed class LoginTests
     }
 
     [Fact]
+    public async Task A_wrong_second_factor_counts_as_a_failed_login_and_locks_the_account_like_a_wrong_password()
+    {
+        using var host = new TestHost(o => { o.LoginPolicy.MaxFailedAttempts = 3; o.LoginPolicy.LockoutDuration = TimeSpan.FromMinutes(15); });
+        var id = await host.CreateUserAsync();
+        var secret = await EnrollAuthenticatorAsync(host, id);
+        var login = host.Get<LoginService>();
+        Assert.Equal(LoginStep.RequiresMfa, (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
+        host.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        var first = await login.CompleteWithSecondFactorAsync(id, "000000", ipAddress: "10.0.0.1");
+        Assert.Equal(LoginStep.Failed, first.Step);
+        Assert.Equal(IdentityErrors.InvalidMfaCode, first.Error);
+        Assert.Equal(1, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
+        var failure = (await host.Get<ILoginEventStore>().GetRecentAsync(id)).First();
+        Assert.Equal(LoginFailureReasons.InvalidSecondFactor, failure.FailReason);
+        Assert.Equal("10.0.0.1", failure.IpAddress);
+
+        Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, "000000")).Step);
+        var locked = await login.CompleteWithSecondFactorAsync(id, "000000");
+        Assert.Equal(LoginStep.LockedOut, locked.Step);
+        Assert.Equal(IdentityErrors.LockedOut, locked.Error);
+
+        // The right code is refused while the lockout holds, and the account answers as a locked one.
+        host.Clock.Advance(TimeSpan.FromMinutes(1));
+        var refused = await login.CompleteWithSecondFactorAsync(id, CodeOf(secret, host));
+        Assert.Equal(LoginStep.LockedOut, refused.Step);
+        Assert.Equal(LoginFailureReasons.LockedOut, (await host.Get<ILoginEventStore>().GetRecentAsync(id)).First().FailReason);
+
+        host.Clock.Advance(TimeSpan.FromMinutes(15));
+        var completed = await login.CompleteWithSecondFactorAsync(id, CodeOf(secret, host));
+        Assert.True(completed.Succeeded);
+        Assert.Equal(["pwd", "otp", "mfa"], completed.Principal!.FindAll("amr").Select(c => c.Value));
+        Assert.Equal(host.Clock.Now.ToUnixTimeSeconds().ToString(), completed.Principal.FindFirst(AuthenticationTime.ClaimType)!.Value);
+        Assert.Equal(0, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
+    }
+
+    [Fact]
+    public async Task Once_locked_out_a_second_factor_is_refused_before_it_is_read_and_counts_nothing_more()
+    {
+        using var host = new TestHost(o => o.LoginPolicy.MaxFailedAttempts = 5);
+        var id = await host.CreateUserAsync();
+        var secret = await EnrollAuthenticatorAsync(host, id);
+        var login = host.Get<LoginService>();
+
+        var results = new List<LoginResult>();
+        for (var i = 0; i < 8; i++)
+            results.Add(await login.CompleteWithSecondFactorAsync(id, "000000"));
+        var right = await login.CompleteWithSecondFactorAsync(id, CodeOf(secret, host));
+
+        Assert.Equal([LoginStep.Failed, LoginStep.Failed, LoginStep.Failed, LoginStep.Failed, LoginStep.LockedOut, LoginStep.LockedOut, LoginStep.LockedOut, LoginStep.LockedOut], results.Select(r => r.Step));
+        Assert.Equal(LoginStep.LockedOut, right.Step);
+        Assert.Equal(5, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
+        // The right code was refused unread: it still works once the lockout ends.
+        host.Clock.Advance(TimeSpan.FromMinutes(16));
+        Assert.True((await login.CompleteWithSecondFactorAsync(id, CodeOf(secret, host))).Succeeded);
+    }
+
+    [Fact]
+    public async Task A_recovery_code_an_email_code_and_a_blocked_account_complete_the_login_or_not()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        await EnrollAuthenticatorAsync(host, id);
+        var login = host.Get<LoginService>();
+        var codes = await host.Get<RecoveryCodeService>().GenerateAsync(id);
+
+        Assert.True(RecoveryCodeService.LooksLikeCode(codes[0]));
+        Assert.False(RecoveryCodeService.LooksLikeCode("123456"));
+        var recovered = await login.CompleteWithSecondFactorAsync(id, codes[0].ToLowerInvariant());
+        Assert.True(recovered.Succeeded);
+        Assert.Equal(["pwd", "mfa"], recovered.Principal!.FindAll("amr").Select(c => c.Value));
+        Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, codes[0])).Step);   // spent
+        Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, "ABCDE-FGHJK")).Step);
+        Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, "  ")).Step);
+        Assert.Equal(3, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
+
+        await host.Get<MfaService>().EnableEmailAsync(id);
+        var sent = host.Get<LoginOtpService>().Generate(id);
+        Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, "000000")).Step);
+        var byEmail = await login.CompleteWithSecondFactorAsync(id, sent);
+        Assert.True(byEmail.Succeeded);
+        Assert.Equal(["pwd", "otp", "mfa"], byEmail.Principal!.FindAll("amr").Select(c => c.Value));
+        Assert.Equal(0, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
+
+        await host.Get<AccountAdministrationService>().BlockAsync(id, Actor.Parse("admin"));
+        var blocked = await login.CompleteWithSecondFactorAsync(id, host.Get<LoginOtpService>().Generate(id));
+        Assert.Equal(LoginStep.Failed, blocked.Step);
+        Assert.Equal(IdentityErrors.AccountBlocked, blocked.Error);
+    }
+
+    private static async Task<string> EnrollAuthenticatorAsync(TestHost host, Guid id)
+    {
+        var mfa = host.Get<MfaService>();
+        var secret = await mfa.BeginSetupAsync(id);
+        Assert.True((await mfa.ConfirmSetupAsync(id, CodeOf(secret, host))).IsSuccess);
+        host.Clock.Advance(TimeSpan.FromSeconds(30));   // the code that confirmed is spent
+        return secret;
+    }
+
+    private static string CodeOf(string secret, TestHost host) => new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp(host.Clock.Now.UtcDateTime);
+
+    [Fact]
     public async Task A_blocked_account_gets_no_principal_after_its_second_factor()
     {
         using var host = new TestHost();

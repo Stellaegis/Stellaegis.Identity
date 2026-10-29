@@ -9,12 +9,15 @@ namespace Stellaegis.Identity;
 /// <summary>
 /// Verifies a person's credentials, enforces the lockout, keeps the attempt from telling whether the account
 /// exists, and builds the principal the host signs in. Everything sensitive to a login is here, so that a page or
-/// a controller only calls <see cref="AuthenticateAsync"/>.
+/// a controller only calls <see cref="AuthenticateAsync"/>, then <see cref="CompleteWithSecondFactorAsync"/> when a
+/// second factor is due.
 /// </summary>
 public sealed class LoginService(
     IAuthUserStore users,
     ILoginEventStore loginEvents,
     MfaService mfa,
+    LoginOtpService loginCodes,
+    RecoveryCodeService recoveryCodes,
     PasswordHasher hasher,
     IOptions<IdentityOptions> options,
     TimeProvider clock,
@@ -80,11 +83,7 @@ public sealed class LoginService(
 
             if (!verified)
             {
-                user.FailedLoginCount++;
-                user.FailedLoginLast = now;
-                if (user.FailedLoginCount >= policy.MaxFailedAttempts)
-                    user.BlockedUntil = now.Add(policy.LockoutDuration);
-                await users.UpdateAsync(user, cancellationToken);
+                await users.RecordFailedLoginAsync(user.UserUniqueId, now, policy.MaxFailedAttempts, policy.LockoutDuration, cancellationToken);
                 await RecordAsync(user.UserUniqueId, normalized, false, LoginFailureReasons.InvalidCredentials, ipAddress, userAgent, now, cancellationToken);
                 return LoginResult.Failure(IdentityErrors.InvalidCredentials);
             }
@@ -112,10 +111,93 @@ public sealed class LoginService(
         }
         finally
         {
-            var elapsed = started.Elapsed;
-            if (elapsed < policy.MinResponseTime)
-                await Task.Delay(policy.MinResponseTime - elapsed, clock, cancellationToken);
+            await PadAsync(started, policy, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Completes a login whose password held and awaits its second factor (<see cref="LoginStep.RequiresMfa"/>) by
+    /// <paramref name="code"/>: the one-time code of the account's method — authenticator or e-mail —, or a recovery
+    /// code, told apart by its shape. A wrong code counts as a failed login and locks the account out like a wrong
+    /// password does; a locked account is refused before the code is read. Succeeds with the principal to sign in,
+    /// saying how the person proved who they are.
+    /// </summary>
+    /// <param name="userUniqueId">The account whose password held.</param>
+    /// <param name="code">The code typed, one-time or recovery.</param>
+    /// <param name="authenticationType">The authentication type of the principal; <see cref="DefaultAuthenticationType"/> unless set.</param>
+    /// <param name="ipAddress">The address of the attempt, kept in its <see cref="LoginEvent"/> when it fails.</param>
+    /// <param name="userAgent">The user agent of the attempt, kept in its <see cref="LoginEvent"/> when it fails.</param>
+    /// <param name="cancellationToken">Cancels the attempt.</param>
+    public async Task<LoginResult> CompleteWithSecondFactorAsync(
+        Guid userUniqueId,
+        string? code,
+        string authenticationType = DefaultAuthenticationType,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default)
+    {
+        var started = Stopwatch.StartNew();
+        var policy = options.Value.LoginPolicy;
+        try
+        {
+            var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+            if (user is null || user.IsBlockedAtDoor)
+                return LoginResult.Failure(IdentityErrors.AccountBlocked);
+            var now = clock.GetUtcNow();
+            if (user.BlockedUntil is { } until && until > now)
+            {
+                await RecordAsync(user.UserUniqueId, user.Email, false, LoginFailureReasons.LockedOut, ipAddress, userAgent, now, cancellationToken);
+                return LoginResult.Failure(IdentityErrors.LockedOut, LoginStep.LockedOut);
+            }
+
+            var methods = await VerifySecondFactorAsync(user.UserUniqueId, code, cancellationToken);
+            if (methods is null)
+            {
+                var failed = await users.RecordFailedLoginAsync(user.UserUniqueId, now, policy.MaxFailedAttempts, policy.LockoutDuration, cancellationToken);
+                await RecordAsync(user.UserUniqueId, user.Email, false, LoginFailureReasons.InvalidSecondFactor, ipAddress, userAgent, now, cancellationToken);
+                if (failed?.IsLockedOutAt(now) == true)
+                {
+                    logger.LogWarning("Login of {UserUniqueId} locked after too many wrong second factors", user.UserUniqueId);
+                    return LoginResult.Failure(IdentityErrors.LockedOut, LoginStep.LockedOut);
+                }
+                return LoginResult.Failure(IdentityErrors.InvalidMfaCode);
+            }
+
+            // The wrong codes of this login are forgotten with its success, as the wrong passwords were with the password's.
+            if (user.FailedLoginCount > 0)
+            {
+                user.FailedLoginCount = 0;
+                user.FailedLoginLast = null;
+                await users.UpdateAsync(user, cancellationToken);
+            }
+            logger.LogInformation("Login of {Email} completed by its second factor", user.Email);
+            return LoginResult.Success(await BuildPrincipalAsync(user, methods, now, authenticationType, cancellationToken));
+        }
+        finally
+        {
+            await PadAsync(started, policy, cancellationToken);
+        }
+    }
+
+    // A recovery code is recognized by its shape and tried alone: each try costs a hash per code left, which a
+    // one-time code must not pay — nor let an attacker make the server pay.
+    private async Task<IReadOnlyCollection<string>?> VerifySecondFactorAsync(Guid userUniqueId, string? code, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return null;
+        if (RecoveryCodeService.LooksLikeCode(code))
+            return await recoveryCodes.TryConsumeAsync(userUniqueId, code, cancellationToken) ? AuthenticationMethods.PasswordAndRecoveryCode : null;
+        var held = await mfa.GetMethodAsync(userUniqueId, cancellationToken) == MfaMethod.Email
+            ? loginCodes.Validate(userUniqueId, code)
+            : await mfa.ValidateCodeAsync(userUniqueId, code, cancellationToken);
+        return held ? AuthenticationMethods.PasswordAndCode : null;
+    }
+
+    private async Task PadAsync(Stopwatch started, LoginPolicyOptions policy, CancellationToken cancellationToken)
+    {
+        var elapsed = started.Elapsed;
+        if (elapsed < policy.MinResponseTime)
+            await Task.Delay(policy.MinResponseTime - elapsed, clock, cancellationToken);
     }
 
     /// <summary>

@@ -7,12 +7,11 @@ namespace Stellaegis.Identity.Server.Pages;
 
 /// <summary>
 /// The second factor of a login whose password held: the code of the authenticator or of the e-mail, or a
-/// recovery code when the authenticator is gone. The pending login lives in a protected cookie for ten minutes.
+/// recovery code when the authenticator is gone, checked by <see cref="LoginService"/> — which counts a wrong one
+/// as a failed login. The pending login lives in a protected cookie for ten minutes, and leaves with a lockout.
 /// </summary>
 internal sealed class LoginMfaModel(
-    MfaService mfa,
-    LoginOtpService loginCodes,
-    RecoveryCodeService recoveryCodes,
+    LoginService login,
     CookieSignIn signIn,
     PendingStates pending,
     IdentityTexts texts,
@@ -42,24 +41,26 @@ internal sealed class LoginMfaModel(
             return Page();
         }
 
-        var methods = (ByEmail
-                ? loginCodes.Validate(state.UserUniqueId, Code)
-                : await mfa.ValidateCodeAsync(state.UserUniqueId, Code!, cancellationToken))
-            ? AuthenticationMethods.PasswordAndCode
-            : await recoveryCodes.TryConsumeAsync(state.UserUniqueId, Code, cancellationToken)
-                ? AuthenticationMethods.PasswordAndRecoveryCode
-                : null;
-        if (methods is null)
+        var result = await login.CompleteWithSecondFactorAsync(state.UserUniqueId, Code, IdentityCookie.Scheme, this.ClientAddress(), this.ClientAgent(), cancellationToken);
+        switch (result.Step)
         {
-            ModelState.AddModelError(nameof(Code), texts["Mfa.CodeInvalid"]);
-            return Page();
+            case LoginStep.Succeeded:
+                pending.Clear(HttpContext, PendingStates.Mfa);
+                await signIn.SignInAsync(HttpContext, result.Principal!);
+                return LocalRedirect(state.ReturnUrl.Length > 0 ? state.ReturnUrl : pages.Value.DefaultReturnUrl);
+            case LoginStep.LockedOut:
+                pending.Clear(HttpContext, PendingStates.Mfa);
+                ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));
+                return Page();
+            default:
+                if (result.Error == IdentityErrors.AccountBlocked)
+                {
+                    pending.Clear(HttpContext, PendingStates.Mfa);
+                    return Redirect(IdentityCookie.LoginPath);
+                }
+                ModelState.AddModelError(nameof(Code), texts["Mfa.CodeInvalid"]);
+                return Page();
         }
-
-        pending.Clear(HttpContext, PendingStates.Mfa);
-        var signedIn = await signIn.SignInAsync(HttpContext, state.UserUniqueId, methods, cancellationToken: cancellationToken);
-        if (signedIn.IsFailure)
-            return Redirect(IdentityCookie.LoginPath);
-        return LocalRedirect(state.ReturnUrl.Length > 0 ? state.ReturnUrl : pages.Value.DefaultReturnUrl);
     }
 
     private (Guid UserUniqueId, string ReturnUrl, string Method)? ReadPending()
