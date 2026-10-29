@@ -93,6 +93,9 @@ public sealed class LoginService(
             user.FailedLoginLast = null;
             user.BlockedUntil = null;
             user.LastLogin = now;
+            // The one moment the password is held in clear and known good: a hash made with a former iteration count is remade.
+            if (hasher.NeedsRehash(user.PasswordHash))
+                user.PasswordHash = hasher.Hash(password);
             await users.UpdateAsync(user, cancellationToken);
             await RecordAsync(user.UserUniqueId, normalized, true, null, ipAddress, userAgent, now, cancellationToken);
 

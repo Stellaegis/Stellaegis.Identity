@@ -11,13 +11,13 @@ namespace Stellaegis.Identity;
 /// </summary>
 public sealed class PasswordHasher
 {
-    // A hash to verify against when the account does not exist, so that the attempt costs the same time.
-    // Not a secret: its only purpose is the work it takes.
-    private const string DummyStoredHash =
-        "pbkdf2_sha256$310000$2g9y9xq2xW2mRjKf8fQZ0Q==$uG2H8m8l7TtG5eZV4fM8l2oR7x8p1gQmQG8p3Qb8v1k=";
-
     private readonly string _pepper;
     private readonly int _iterations;
+
+    // A hash to verify against when the account does not exist, so that the attempt costs the same time: made with
+    // the configured iterations, since a fixed count would cost a different time from the accounts' and tell them
+    // apart. Not a secret: its only purpose is the work it takes.
+    private readonly string _dummyStoredHash;
 
     /// <summary>Creates the hasher from the options of the module, whose pepper is required.</summary>
     public PasswordHasher(IOptions<IdentityOptions> options)
@@ -25,6 +25,7 @@ public sealed class PasswordHasher
         var hasher = Guard.NotNull(options).Value.PasswordHasher;
         _pepper = Guard.NotWhiteSpace(hasher.Pepper);
         _iterations = hasher.Iterations;
+        _dummyStoredHash = Hash(Guid.NewGuid().ToString("N"));
     }
 
     /// <summary>Hashes <paramref name="password"/> with a fresh 16-byte salt.</summary>
@@ -63,7 +64,19 @@ public sealed class PasswordHasher
     /// <see cref="Verify"/>, against a stand-in hash when <paramref name="storedOrNull"/> is <see langword="null"/>:
     /// the attempt costs the same time whether the account exists or not, so that its duration tells nothing.
     /// </summary>
-    public bool VerifyOrDummy(string password, string? storedOrNull) => Verify(password, storedOrNull ?? DummyStoredHash);
+    public bool VerifyOrDummy(string password, string? storedOrNull) => Verify(password, storedOrNull ?? _dummyStoredHash);
+
+    /// <summary>
+    /// Whether <paramref name="stored"/> was made with another iteration count than the configured one — raised since —,
+    /// so that the caller hashes the password again while it holds it in clear: at the login that verified it.
+    /// </summary>
+    public bool NeedsRehash(string? stored)
+    {
+        if (string.IsNullOrWhiteSpace(stored))
+            return false;
+        var parts = stored.Split('$');
+        return parts.Length != 4 || !int.TryParse(parts[1], out var iterations) || iterations != _iterations;
+    }
 
     private byte[] DeriveKey(string password, byte[] salt, int iterations)
         => Rfc2898DeriveBytes.Pbkdf2(password + _pepper, salt, iterations, HashAlgorithmName.SHA256, 32);

@@ -30,6 +30,27 @@ public sealed class LoginTests
     }
 
     [Fact]
+    public async Task A_hash_made_with_a_former_iteration_count_is_remade_at_the_login_that_verified_it()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var users = host.Get<IAuthUserStore>();
+        var user = (await users.GetByUniqueIdAsync(id))!;
+        var former = new PasswordHasher(Microsoft.Extensions.Options.Options.Create(new IdentityOptions { PasswordHasher = { Pepper = TestHost.Pepper, Iterations = 1500 } }));
+        user.PasswordHash = former.Hash("Correct-Horse-9");
+        await users.UpdateAsync(user);
+        Assert.StartsWith("pbkdf2_sha256$1500$", user.PasswordHash);
+        Assert.True(host.Get<PasswordHasher>().NeedsRehash(user.PasswordHash));
+
+        Assert.True((await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Succeeded);
+
+        var remade = (await users.GetByUniqueIdAsync(id))!.PasswordHash!;
+        Assert.StartsWith("pbkdf2_sha256$1000$", remade);
+        Assert.False(host.Get<PasswordHasher>().NeedsRehash(remade));
+        Assert.True(host.Get<PasswordHasher>().Verify("Correct-Horse-9", remade));
+    }
+
+    [Fact]
     public async Task A_wrong_password_an_unknown_email_and_a_disabled_account_get_the_same_answer()
     {
         using var host = new TestHost();
