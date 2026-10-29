@@ -48,7 +48,7 @@ internal sealed class VerifyEmailModel(
             ModelState.AddModelError(string.Empty, texts.Describe(verified.Error!));
             return Page();
         }
-        var created = await registration.CreateAccountAsync(state.Email, state.DisplayName, state.Password, cancellationToken: cancellationToken);
+        var created = await registration.CreateAccountFromHashAsync(state.Email, state.DisplayName, state.PasswordHash, cancellationToken);
         if (created.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(created.Error!));
@@ -89,7 +89,7 @@ internal sealed class VerifyEmailModel(
         return Redirect("/verify-email");
     }
 
-    private (string Email, string DisplayName, string Password, string? ReturnUrl, string? TimeZone)? ReadPending()
+    private (string Email, string DisplayName, string PasswordHash, string? ReturnUrl, string? TimeZone)? ReadPending()
     {
         if (pending.Read(HttpContext, PendingStates.Registration) is not { Length: 5 } parts || parts[0].Length == 0)
             return null;

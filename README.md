@@ -103,7 +103,9 @@ never reused; its e-mail, normalized and unique among the accounts, and whether 
 display name; the language and the time zone its person chose, absent while they chose none; the hash of its
 password, absent while the account waits for its activation; whether it is enabled; its failed logins and its
 lockout; who created, modified and deleted it, as `Actor`s, never a default. A deleted account stays, marked, so
-that its identity is never given to someone else. Its avatar is kept apart, and goes with it.
+that its identity is never given to someone else; its e-mail is replaced by `deleted:{id}`, so that the address is
+free again — a person who returns, or the next holder of the address, is a new account, with nothing of the old one.
+Its avatar is kept apart, and goes with it.
 
 The services do what a person or an administrator does to accounts, and answer a `Result` whose `Error` carries
 a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Account.Blocked`, `Email.Taken`,
@@ -399,8 +401,9 @@ circle.
 
 A login whose password held and awaits its second factor, a registration that awaits its code, a change of
 e-mail that awaits its code: each waits in a cookie of its own, protected by the data protection of the host, out
-of scripts, for ten to fifteen minutes. The registration keeps the password there until the code proves the e-mail,
-and the time zone of the browser, written into the account at its creation. A wrong code on `/login/mfa` is a
+of scripts, for ten to fifteen minutes. The registration keeps the hash of the password there until the code proves
+the e-mail — hashed when typed, never in clear in the cookie —, and the time zone of the browser, written into the
+account at its creation. A wrong code on `/login/mfa` is a
 failed login: it counts toward the lockout of the account, and the lockout ends the pending login.
 
 ## Tests

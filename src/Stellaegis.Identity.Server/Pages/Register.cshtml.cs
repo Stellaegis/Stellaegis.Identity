@@ -14,6 +14,7 @@ namespace Stellaegis.Identity.Server.Pages;
 internal sealed class RegisterModel(
     IAuthUserStore users,
     EmailVerificationService verification,
+    PasswordHasher hasher,
     PasswordRules passwords,
     PendingStates pending,
     IdentityTexts texts,
@@ -105,7 +106,8 @@ internal sealed class RegisterModel(
 
         // The browser's time zone, kept with the registration when it is one the system knows; nothing otherwise.
         var timeZone = ProfileService.IsTimeZone(Input.TimeZone) ? Input.TimeZone : "";
-        pending.Write(HttpContext, PendingStates.Registration, email, displayName, Input.Password ?? "", ReturnUrl ?? "", timeZone!);
+        // The password waits for the code as its hash: the cookie is protected, and still travels with every request.
+        pending.Write(HttpContext, PendingStates.Registration, email, displayName, hasher.Hash(Input.Password!), ReturnUrl ?? "", timeZone!);
         return Redirect("/verify-email");
     }
 }

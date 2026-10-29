@@ -22,6 +22,11 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
   address, and the sixth answer said whether it had an account. The lockout stays in `LoginStep.LockedOut`, for the
   host; the person is told by e-mail when it starts, `IIdentityMailer.SendAccountLockedAsync`, once per lockout. After a
   password that held, or from a session, `Account.LockedOut` is still said: there is nothing left to hide.
+- **The e-mail of a deleted account is replaced by `deleted:{id}`** at the deletion, by the store: the address is free
+  for a new account, under a new identity. It stayed, unique, and a registration or `POST identity/users` on it hit the
+  constraint — a failure that said an account had existed there.
+- **The registration keeps the hash of the password, not the password**, in its protected cookie, between the form and
+  the code: `RegistrationService.CreateAccountFromHashAsync` takes it, `CreateAccountAsync` still takes a password.
 - **A hash made with a former iteration count is remade at the login that verified it**, `PasswordHasher.NeedsRehash`:
   raising `PasswordHasher:Iterations` now reaches the accounts, one login each. And the stand-in hash of an unknown
   account is made with the configured count: a fixed one cost a different time, and told an unknown account from a

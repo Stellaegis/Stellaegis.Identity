@@ -26,6 +26,20 @@ public sealed class RegistrationService(
     /// </summary>
     public async Task<Result<Guid>> CreateAccountAsync(string email, string displayName, string password, CancellationToken cancellationToken = default)
     {
+        var violations = passwords.Violations(password);
+        if (violations.Count > 0)
+            return Result.Failure<Guid>(IdentityErrors.PasswordRejected(violations));
+        return await CreateAccountFromHashAsync(email, displayName, hasher.Hash(password), cancellationToken);
+    }
+
+    /// <summary>
+    /// <see cref="CreateAccountAsync"/>, from the hash of a password checked against the policy and hashed when it was
+    /// typed: what a page does at its first step, so that the password waits for the code of the e-mail as a hash and
+    /// never in clear.
+    /// </summary>
+    public async Task<Result<Guid>> CreateAccountFromHashAsync(string email, string displayName, string passwordHash, CancellationToken cancellationToken = default)
+    {
+        Guard.NotWhiteSpace(passwordHash);
         if (options.Value.SelfRegistration != SelfRegistration.Open)
             return Result.Failure<Guid>(IdentityErrors.RegistrationClosed);
 
@@ -34,9 +48,6 @@ public sealed class RegistrationService(
             return Result.Failure<Guid>(IdentityErrors.EmailNotVerified);
         if (await users.GetByEmailAsync(normalized, cancellationToken) is not null)
             return Result.Failure<Guid>(IdentityErrors.EmailTaken);
-        var violations = passwords.Violations(password);
-        if (violations.Count > 0)
-            return Result.Failure<Guid>(IdentityErrors.PasswordRejected(violations));
 
         var id = Guid.NewGuid();
         var self = Actor.Parse(id.ToString("N"));
@@ -46,7 +57,7 @@ public sealed class RegistrationService(
             UserUniqueId = id,
             Email = normalized,
             DisplayName = Guard.NotWhiteSpace(displayName).Trim(),
-            PasswordHash = hasher.Hash(password),
+            PasswordHash = passwordHash,
             IsEnabled = true,
             EmailVerified = true,
             CreatedAt = now,

@@ -19,7 +19,7 @@ internal sealed class PendingStates(IDataProtectionProvider protection, TimeProv
     /// <summary>The login that awaits a second factor to be set up: the account, the way back, the e-mail.</summary>
     public static readonly PendingState MfaSetup = new("stellaegis_identity.mfa_setup", TimeSpan.FromMinutes(15));
 
-    /// <summary>The registration that awaits its code: the e-mail, the display name, the password, the way back.</summary>
+    /// <summary>The registration that awaits its code: the e-mail, the display name, the hash of the password, the way back, the time zone.</summary>
     public static readonly PendingState Registration = new("stellaegis_identity.registration", TimeSpan.FromMinutes(15));
 
     /// <summary>The change of e-mail that awaits its code: the new e-mail.</summary>
