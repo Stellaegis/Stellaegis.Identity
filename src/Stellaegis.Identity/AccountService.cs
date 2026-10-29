@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Stellaegis.Primitives;
@@ -6,13 +7,16 @@ namespace Stellaegis.Identity;
 
 /// <summary>
 /// What a person does to their own account: changing the password or the e-mail, deleting it; and undoing a change of
-/// e-mail from the link the previous address received.
+/// e-mail from the link the previous address received. A password typed from a session to confirm one of these is a
+/// login attempt, and counts as one: it is refused while the account is locked out, a wrong one counts toward the
+/// lockout and is traced, and the answer takes <see cref="LoginPolicyOptions.MinResponseTime"/> at least.
 /// </summary>
 public sealed class AccountService(
     IAuthUserStore users,
     IAccountTokenStore tokens,
     IMfaStore mfa,
     IRecoveryCodeStore recoveryCodes,
+    ILoginEventStore loginEvents,
     EmailVerificationService emailVerification,
     PasswordHasher hasher,
     PasswordStrengthEvaluator passwords,
@@ -21,20 +25,20 @@ public sealed class AccountService(
     TimeProvider clock,
     ILogger<AccountService> logger)
 {
-    /// <summary>Changes the password, once the current one is confirmed; a lockout in progress ends with it.</summary>
-    public async Task<Result> ChangePasswordAsync(Guid userUniqueId, string currentPassword, string newPassword, CancellationToken cancellationToken = default)
+    /// <summary>Changes the password, once the current one is confirmed; the failed logins are forgotten with it.</summary>
+    public async Task<Result> ChangePasswordAsync(Guid userUniqueId, string currentPassword, string newPassword, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
-        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        if (user is null || !user.IsEnabled)
-            return Result.Failure(IdentityErrors.AccountNotFound);
-        if (!hasher.Verify(currentPassword, user.PasswordHash))
-            return Result.Failure(IdentityErrors.InvalidCurrentPassword);
+        var confirmed = await ConfirmPasswordAsync(userUniqueId, currentPassword, ipAddress, cancellationToken);
+        if (confirmed.IsFailure)
+            return Result.Failure(confirmed.Error!);
         var violations = passwords.Violations(newPassword);
         if (violations.Count > 0)
             return Result.Failure(IdentityErrors.PasswordRejected(violations));
 
+        var user = confirmed.Value;
         user.PasswordHash = hasher.Hash(newPassword);
         user.FailedLoginCount = 0;
+        user.FailedLoginLast = null;
         user.BlockedUntil = null;
         user.ModifiedAt = clock.GetUtcNow();
         user.ModifiedBy = user.AsActor();
@@ -154,6 +158,50 @@ public sealed class AccountService(
         return Result.Success(new EmailReverted(user.Email, reset));
     }
 
+    // A password typed from a session is as much a guess as one typed at the login: same lockout, same count, same
+    // trace, same time to answer. The account, when it holds, for the operation to go on with.
+    private async Task<Result<AuthUser>> ConfirmPasswordAsync(Guid userUniqueId, string? password, string? ipAddress, CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.StartNew();
+        var policy = options.Value.LoginPolicy;
+        try
+        {
+            var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+            if (user is null || !user.IsEnabled)
+                return Result.Failure<AuthUser>(IdentityErrors.AccountNotFound);
+            var now = clock.GetUtcNow();
+            if (user.BlockedUntil is { } until && until > now)
+            {
+                await TraceAsync(user, LoginFailureReasons.LockedOut, ipAddress, now, cancellationToken);
+                return Result.Failure<AuthUser>(IdentityErrors.LockedOut);
+            }
+            if (string.IsNullOrEmpty(password) || !hasher.Verify(password, user.PasswordHash))
+            {
+                var failed = await users.RecordFailedLoginAsync(user.UserUniqueId, now, policy.MaxFailedAttempts, policy.LockoutDuration, cancellationToken);
+                await TraceAsync(user, LoginFailureReasons.InvalidCurrentPassword, ipAddress, now, cancellationToken);
+                return Result.Failure<AuthUser>(failed?.IsLockedOutAt(now) == true ? IdentityErrors.LockedOut : IdentityErrors.InvalidCurrentPassword);
+            }
+            return Result.Success(user);
+        }
+        finally
+        {
+            var elapsed = started.Elapsed;
+            if (elapsed < policy.MinResponseTime)
+                await Task.Delay(policy.MinResponseTime - elapsed, clock, cancellationToken);
+        }
+    }
+
+    private Task TraceAsync(AuthUser user, string reason, string? ipAddress, DateTimeOffset now, CancellationToken cancellationToken)
+        => loginEvents.AddAsync(new LoginEvent
+        {
+            UserUniqueId = user.UserUniqueId,
+            Email = user.Email,
+            Success = false,
+            FailReason = reason,
+            IpAddress = ipAddress,
+            CreatedAt = now,
+        }, cancellationToken);
+
     private async Task<AccountToken?> FindRevertAsync(string token, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -194,21 +242,24 @@ public sealed class AccountService(
         return Result.Success();
     }
 
-    /// <summary>Whether <paramref name="password"/> is the account's, to confirm an operation that changes nothing by itself.</summary>
-    public async Task<bool> VerifyCurrentPasswordAsync(Guid userUniqueId, string password, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Confirms that <paramref name="password"/> is the account's, for an operation that changes nothing by itself:
+    /// <see cref="IdentityErrors.InvalidCurrentPassword"/> when it is not, <see cref="IdentityErrors.LockedOut"/> while
+    /// the account is locked out — a wrong one counted like a wrong password at the login.
+    /// </summary>
+    public async Task<Result> VerifyCurrentPasswordAsync(Guid userUniqueId, string? password, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
-        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        return user is { IsEnabled: true } && hasher.Verify(password, user.PasswordHash);
+        var confirmed = await ConfirmPasswordAsync(userUniqueId, password, ipAddress, cancellationToken);
+        return confirmed.IsFailure ? Result.Failure(confirmed.Error!) : Result.Success();
     }
 
     /// <summary>Deletes the account, once the password is confirmed. The host ends the session; an issuer revokes the tokens on the event.</summary>
-    public async Task<Result> DeleteAccountAsync(Guid userUniqueId, string currentPassword, CancellationToken cancellationToken = default)
+    public async Task<Result> DeleteAccountAsync(Guid userUniqueId, string currentPassword, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
-        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        if (user is null || !user.IsEnabled)
-            return Result.Failure(IdentityErrors.AccountNotFound);
-        if (!hasher.Verify(currentPassword, user.PasswordHash))
-            return Result.Failure(IdentityErrors.InvalidCurrentPassword);
+        var confirmed = await ConfirmPasswordAsync(userUniqueId, currentPassword, ipAddress, cancellationToken);
+        if (confirmed.IsFailure)
+            return Result.Failure(confirmed.Error!);
+        var user = confirmed.Value;
         if (!await users.SoftDeleteAsync(userUniqueId, user.AsActor(), cancellationToken))
             return Result.Failure(IdentityErrors.AccountNotFound);
         await events.PublishAsync(new UserBlockedEvent { OccurredAt = clock.GetUtcNow(), UserUniqueId = userUniqueId, Reason = AccountAdministrationService.DeletedReason }, cancellationToken);

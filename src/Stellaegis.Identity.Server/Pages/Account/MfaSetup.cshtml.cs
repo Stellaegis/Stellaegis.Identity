@@ -43,8 +43,8 @@ internal sealed class AccountMfaSetupModel(MfaService mfa, AccountService accoun
 
         if (string.IsNullOrEmpty(Password))
             ModelState.AddModelError(nameof(Password), texts["Field.CurrentPassword.Required"]);
-        else if (!await account.VerifyCurrentPasswordAsync(userId, Password, cancellationToken))
-            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
+        else if (await account.VerifyCurrentPasswordAsync(userId, Password, this.ClientAddress(), cancellationToken) is { IsFailure: true } refused)
+            ModelState.AddModelError(nameof(Password), texts.Describe(refused.Error!));
         var confirmed = !ModelState.IsValid
             ? Result.Failure(IdentityErrors.InvalidCurrentPassword)
             : string.IsNullOrWhiteSpace(Code)

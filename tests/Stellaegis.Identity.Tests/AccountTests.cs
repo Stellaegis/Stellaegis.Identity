@@ -7,24 +7,53 @@ namespace Stellaegis.Identity.Tests;
 public sealed class AccountTests
 {
     [Fact]
-    public async Task Changing_the_password_needs_the_current_one_and_a_good_new_one_and_ends_a_lockout()
+    public async Task Changing_the_password_needs_the_current_one_and_a_good_new_one_and_forgets_the_failed_logins()
     {
         using var host = new TestHost();
         var id = await host.CreateUserAsync();
         var account = host.Get<AccountService>();
         var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!;
         user.FailedLoginCount = 3;
-        user.BlockedUntil = host.Clock.Now.AddMinutes(10);
 
         Assert.Equal(IdentityErrors.InvalidCurrentPassword, (await account.ChangePasswordAsync(id, "nope", "New-Horse-10")).Error);
         Assert.Equal(IdentityErrors.PasswordRejectedCode, (await account.ChangePasswordAsync(id, "Correct-Horse-9", "weak")).Error!.Code);
         Assert.True((await account.ChangePasswordAsync(id, "Correct-Horse-9", "New-Horse-10")).IsSuccess);
 
-        Assert.True(await account.VerifyCurrentPasswordAsync(id, "New-Horse-10"));
-        Assert.False(await account.VerifyCurrentPasswordAsync(id, "Correct-Horse-9"));
-        Assert.Equal(0, user.FailedLoginCount);
+        Assert.True((await account.VerifyCurrentPasswordAsync(id, "New-Horse-10")).IsSuccess);
+        Assert.Equal(IdentityErrors.InvalidCurrentPassword, (await account.VerifyCurrentPasswordAsync(id, "Correct-Horse-9")).Error);
+        Assert.Equal(1, user.FailedLoginCount);   // the wrong one just typed; the three before went with the change
         Assert.Null(user.BlockedUntil);
         Assert.Equal(user.AsActor(), user.ModifiedBy);
+    }
+
+    [Fact]
+    public async Task A_password_typed_to_confirm_an_operation_is_a_login_attempt_counted_locked_out_and_traced()
+    {
+        using var host = new TestHost(o => { o.LoginPolicy.MaxFailedAttempts = 3; o.LoginPolicy.LockoutDuration = TimeSpan.FromMinutes(15); });
+        var id = await host.CreateUserAsync();
+        var account = host.Get<AccountService>();
+        var users = host.Get<IAuthUserStore>();
+
+        Assert.Equal(IdentityErrors.InvalidCurrentPassword, (await account.ChangePasswordAsync(id, "nope", "New-Horse-10", ipAddress: "10.0.0.7")).Error);
+        var traced = (await host.Get<ILoginEventStore>().GetRecentAsync(id)).First();
+        Assert.Equal(LoginFailureReasons.InvalidCurrentPassword, traced.FailReason);
+        Assert.Equal("10.0.0.7", traced.IpAddress);
+        Assert.Equal(IdentityErrors.InvalidCurrentPassword, (await account.VerifyCurrentPasswordAsync(id, "nope")).Error);
+        Assert.Equal(IdentityErrors.LockedOut, (await account.DeleteAccountAsync(id, "nope")).Error);   // the third locks
+        Assert.Equal(3, (await users.GetByUniqueIdAsync(id))!.FailedLoginCount);
+
+        // Locked out, the right password opens nothing — neither here nor at the login —, and counts nothing more.
+        Assert.Equal(IdentityErrors.LockedOut, (await account.ChangePasswordAsync(id, "Correct-Horse-9", "New-Horse-10")).Error);
+        Assert.Equal(IdentityErrors.LockedOut, (await account.VerifyCurrentPasswordAsync(id, "Correct-Horse-9")).Error);
+        Assert.Equal(IdentityErrors.LockedOut, (await account.DeleteAccountAsync(id, "Correct-Horse-9")).Error);
+        Assert.Equal(LoginStep.LockedOut, (await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
+        Assert.Equal(3, (await users.GetByUniqueIdAsync(id))!.FailedLoginCount);
+        Assert.NotNull(await users.GetByUniqueIdAsync(id));
+
+        host.Clock.Advance(TimeSpan.FromMinutes(16));
+        Assert.True((await account.ChangePasswordAsync(id, "Correct-Horse-9", "New-Horse-10")).IsSuccess);
+        Assert.Equal(0, (await users.GetByUniqueIdAsync(id))!.FailedLoginCount);
+        Assert.True((await account.DeleteAccountAsync(id, "New-Horse-10")).IsSuccess);
     }
 
     [Fact]
@@ -142,7 +171,7 @@ public sealed class PasswordResetTests
         Assert.Equal(IdentityErrors.PasswordRejectedCode, (await reset.ResetPasswordAsync(token, "weak")).Error!.Code);
         Assert.True(await reset.ValidateTokenAsync(token));   // a rejected password spends nothing
         Assert.True((await reset.ResetPasswordAsync(token, "New-Horse-10")).IsSuccess);
-        Assert.True(await host.Get<AccountService>().VerifyCurrentPasswordAsync(id, "New-Horse-10"));
+        Assert.True((await host.Get<AccountService>().VerifyCurrentPasswordAsync(id, "New-Horse-10")).IsSuccess);
         Assert.False(await reset.ValidateTokenAsync(token));
         Assert.Equal(IdentityErrors.InvalidResetToken, (await reset.ResetPasswordAsync(token, "New-Horse-11")).Error);
     }

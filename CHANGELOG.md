@@ -18,6 +18,12 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 - **Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password**, as
   disabling the second factor and deleting the account did. A wrong or missing password shows the form again.
+- **A password typed from a session to confirm an operation is a login attempt**: `AccountService` refuses it while the
+  account is locked out, counts a wrong one toward the lockout, traces it as `LoginFailureReasons.InvalidCurrentPassword`,
+  and answers in `LoginPolicy:MinResponseTime` at least. Six places let a taken session guess the password without limit.
+  `VerifyCurrentPasswordAsync` answers a `Result` — `Password.InvalidCurrent` or `Account.LockedOut` — and takes the
+  address of the request, as `ChangePasswordAsync` and `DeleteAccountAsync` do; a change of password no longer ends a
+  lockout, it is refused during one.
 - **The previous address is told of a change of e-mail**, `IIdentityMailer.SendEmailChangedAsync`, once the new one
   is confirmed, with the link that undoes it — good for `EmailChange:RevertLifetime`, seven days unless set. The link,
   `/revert-email`, restores the address, removes the password, revokes the reset links and a second factor enrolled

@@ -41,6 +41,9 @@ public static class LoginFailureReasons
 
     /// <summary>The password held, and the code of the second factor — one-time or recovery — is wrong.</summary>
     public const string InvalidSecondFactor = "INVALID_SECOND_FACTOR";
+
+    /// <summary>The password typed from a session, to confirm an operation on the account, is wrong.</summary>
+    public const string InvalidCurrentPassword = "INVALID_CURRENT_PASSWORD";
 }
 
 /// <summary>

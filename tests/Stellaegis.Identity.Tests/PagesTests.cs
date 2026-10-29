@@ -413,7 +413,7 @@ public sealed class PagesTests
         Assert.Contains("Enter your current password.", browser.Html);
         var wrong = await browser.PostFormAsync("/account/mfa/setup", html => new Dictionary<string, string> { ["Code"] = "000000", ["Password"] = "nope" }, Ct);
         Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
-        Assert.Contains("Wrong password.", browser.Html);
+        Assert.Contains("The current password is wrong.", browser.Html);
         Assert.DoesNotContain("Wrong code.", browser.Html);
 
         // Each reading of the page keeps the secret it showed: the code is computed from the page the form is posted from.
@@ -443,7 +443,7 @@ public sealed class PagesTests
         Assert.Contains("Enter your current password.", browser.Html);
         var wrong = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["NewEmail"] = "jane.doe@acme.test", ["Password"] = "nope" }, Ct);
         Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
-        Assert.Contains("Wrong password.", browser.Html);
+        Assert.Contains("The current password is wrong.", browser.Html);
         Assert.Null(app.Mailer().LastTo("jane.doe@acme.test"));
 
         var asked = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["NewEmail"] = "jane.doe@acme.test", ["Password"] = Password }, Ct);

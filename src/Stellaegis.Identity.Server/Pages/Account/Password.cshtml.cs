@@ -39,7 +39,7 @@ internal sealed class AccountPasswordModel(AccountService account, PasswordRules
         if (!ModelState.IsValid)
             return Page();
 
-        var result = await account.ChangePasswordAsync(userId, Input.CurrentPassword!, Input.NewPassword ?? "", cancellationToken);
+        var result = await account.ChangePasswordAsync(userId, Input.CurrentPassword!, Input.NewPassword ?? "", this.ClientAddress(), cancellationToken);
         if (result.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));

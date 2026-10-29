@@ -114,7 +114,7 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 | `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due and completes the login by it — a one-time code or a recovery code, a wrong one counting as a failed login —, and builds the principal — `sub`, `email`, `name`, and `locale`, `zoneinfo`, `picture` when the person chose them — a host signs in |
 | `RegistrationService` | Creates an account when the self-registration is open, after the e-mail was proved by a code |
 | `ActivationService` | Lets the person of an account an administrator created choose its first password, by the link of its activation |
-| `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, verifies a password |
+| `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, confirms a password, undoes a change of e-mail from the link the previous address received. A password typed from a session to confirm one of these is a login attempt: refused while the account is locked out, counted toward the lockout when wrong, traced, and answered in the same time |
 | `ProfileService` | Reads and changes what a person chose of their own profile: the name of the account, the language, the time zone, the avatar |
 | `PasswordResetService` | Issues a reset link sent by e-mail to a proven address, and spends its token once |
 | `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read |

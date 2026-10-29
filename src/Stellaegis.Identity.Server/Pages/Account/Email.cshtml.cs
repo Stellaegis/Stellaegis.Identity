@@ -95,8 +95,8 @@ internal sealed class AccountEmailModel(
             ModelState.AddModelError(nameof(NewEmail), texts["Field.Email.Invalid"]);
         if (string.IsNullOrEmpty(Password))
             ModelState.AddModelError(nameof(Password), texts["Field.CurrentPassword.Required"]);
-        else if (!await account.VerifyCurrentPasswordAsync(userId, Password, cancellationToken))
-            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
+        else if (await account.VerifyCurrentPasswordAsync(userId, Password, this.ClientAddress(), cancellationToken) is { IsFailure: true } refused)
+            ModelState.AddModelError(nameof(Password), texts.Describe(refused.Error!));
         if (!ModelState.IsValid)
         {
             CurrentVerified = await IsCurrentVerifiedAsync(cancellationToken);

@@ -25,7 +25,7 @@ internal sealed class AccountDeleteModel(AccountService account, CookieSignIn si
             ModelState.AddModelError(nameof(Password), texts["Field.CurrentPassword.Required"]);
             return Page();
         }
-        var result = await account.DeleteAccountAsync(userId, Password!, cancellationToken);
+        var result = await account.DeleteAccountAsync(userId, Password!, this.ClientAddress(), cancellationToken);
         if (result.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));
