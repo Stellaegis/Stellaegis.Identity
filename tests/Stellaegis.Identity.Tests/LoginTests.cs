@@ -66,7 +66,7 @@ public sealed class LoginTests
         host.Clock.Advance(TimeSpan.FromSeconds(1));
         var locked = await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9");
         Assert.Equal(LoginStep.LockedOut, locked.Step);
-        Assert.Equal(IdentityErrors.LockedOut, locked.Error);
+        Assert.Equal(IdentityErrors.InvalidCredentials, locked.Error);   // what anyone is told: the lockout would say the account exists
         Assert.Equal(LoginFailureReasons.LockedOut, (await host.Get<ILoginEventStore>().GetRecentAsync(id)).First().FailReason);
 
         host.Clock.Advance(TimeSpan.FromMinutes(16));

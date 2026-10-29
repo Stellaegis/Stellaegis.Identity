@@ -97,6 +97,24 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task A_locked_account_is_told_what_anyone_is_told_and_its_person_is_told_by_email_once()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        await app.CreateAccountAsync(Email, Password, Ct);
+        var browser = new Browser(app);
+        for (var i = 0; i < 5; i++)
+            await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = "wrong" }, Ct);
+        Assert.Equal(InMemoryIdentityMailer.AccountLocked, app.Mailer().LastTo(Email)!.Kind);
+
+        var locked = await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+        Assert.Equal(HttpStatusCode.OK, locked.StatusCode);
+        Assert.Contains("Wrong e-mail or password.", browser.Html);
+        Assert.DoesNotContain("locked", browser.Html);
+        Assert.False(browser.HasCookie(IdentityCookie.CookieName));
+        Assert.Single(app.Mailer().Sent, mail => mail.Kind == InMemoryIdentityMailer.AccountLocked);
+    }
+
+    [Fact]
     public async Task A_wrong_password_shows_the_error_in_the_language_of_the_pages()
     {
         await using var english = await PagesTestHost.StartAsync(Ct);

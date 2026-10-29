@@ -15,7 +15,7 @@ namespace Stellaegis.Identity;
 /// </summary>
 public sealed class LoginService(
     IAuthUserStore users,
-    ILoginEventStore loginEvents,
+    FailedLoginCounter failures,
     MfaService mfa,
     LoginOtpService loginCodes,
     RecoveryCodeService recoveryCodes,
@@ -31,7 +31,8 @@ public sealed class LoginService(
     /// <summary>
     /// Verifies <paramref name="password"/> for the account of <paramref name="email"/>, and says what the caller
     /// does next: sign the principal in, ask a one-time code, ask to set a second factor up, or show the error.
-    /// A wrong e-mail and a wrong password get the same answer, in the same time.
+    /// A wrong e-mail, a wrong password and a locked account get the same answer, in the same time: the lockout is in
+    /// the <see cref="LoginResult.Step"/>, for the host, and in the e-mail the person received when it started.
     /// </summary>
     /// <param name="email">The e-mail of the account, in any case.</param>
     /// <param name="password">The password, in clear.</param>
@@ -79,13 +80,12 @@ public sealed class LoginService(
             {
                 logger.LogWarning("Login refused for {Email}: locked until {Until}", user.Email, until);
                 await RecordAsync(user.UserUniqueId, normalized, false, LoginFailureReasons.LockedOut, ipAddress, userAgent, now, cancellationToken);
-                return LoginResult.Failure(IdentityErrors.LockedOut, LoginStep.LockedOut);
+                return LoginResult.Failure(IdentityErrors.InvalidCredentials, LoginStep.LockedOut);
             }
 
             if (!verified)
             {
-                await users.RecordFailedLoginAsync(user.UserUniqueId, now, policy.MaxFailedAttempts, policy.LockoutDuration, cancellationToken);
-                await RecordAsync(user.UserUniqueId, normalized, false, LoginFailureReasons.InvalidCredentials, ipAddress, userAgent, now, cancellationToken);
+                await failures.CountAsync(user, LoginFailureReasons.InvalidCredentials, ipAddress, userAgent, now, cancellationToken);
                 return LoginResult.Failure(IdentityErrors.InvalidCredentials);
             }
 
@@ -154,14 +154,10 @@ public sealed class LoginService(
             var methods = await VerifySecondFactorAsync(user.UserUniqueId, code, cancellationToken);
             if (methods is null)
             {
-                var failed = await users.RecordFailedLoginAsync(user.UserUniqueId, now, policy.MaxFailedAttempts, policy.LockoutDuration, cancellationToken);
-                await RecordAsync(user.UserUniqueId, user.Email, false, LoginFailureReasons.InvalidSecondFactor, ipAddress, userAgent, now, cancellationToken);
-                if (failed?.IsLockedOutAt(now) == true)
-                {
-                    logger.LogWarning("Login of {UserUniqueId} locked after too many wrong second factors", user.UserUniqueId);
-                    return LoginResult.Failure(IdentityErrors.LockedOut, LoginStep.LockedOut);
-                }
-                return LoginResult.Failure(IdentityErrors.InvalidMfaCode);
+                // The password held: the person is told the lockout, which tells nothing they did not prove.
+                return await failures.CountAsync(user, LoginFailureReasons.InvalidSecondFactor, ipAddress, userAgent, now, cancellationToken)
+                    ? LoginResult.Failure(IdentityErrors.LockedOut, LoginStep.LockedOut)
+                    : LoginResult.Failure(IdentityErrors.InvalidMfaCode);
             }
 
             // The wrong codes of this login are forgotten with its success, as the wrong passwords were with the password's.
@@ -263,16 +259,7 @@ public sealed class LoginService(
     }
 
     private Task RecordAsync(Guid userUniqueId, string email, bool success, string? failReason, string? ipAddress, string? userAgent, DateTimeOffset now, CancellationToken cancellationToken)
-        => loginEvents.AddAsync(new LoginEvent
-        {
-            UserUniqueId = userUniqueId,
-            Email = email,
-            Success = success,
-            FailReason = failReason,
-            IpAddress = ipAddress,
-            UserAgent = userAgent,
-            CreatedAt = now,
-        }, cancellationToken);
+        => failures.TraceAsync(userUniqueId, email, success, failReason, ipAddress, userAgent, now, cancellationToken);
 }
 
 /// <summary>How the module writes an e-mail before comparing or storing it: trimmed, lowercase.</summary>

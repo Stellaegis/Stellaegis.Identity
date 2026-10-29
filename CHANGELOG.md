@@ -18,6 +18,10 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 - **Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password**, as
   disabling the second factor and deleting the account did. A wrong or missing password shows the form again.
+- **A locked account is told what anyone is told at the login**, `Credentials.Invalid`: five wrong passwords on an
+  address, and the sixth answer said whether it had an account. The lockout stays in `LoginStep.LockedOut`, for the
+  host; the person is told by e-mail when it starts, `IIdentityMailer.SendAccountLockedAsync`, once per lockout. After a
+  password that held, or from a session, `Account.LockedOut` is still said: there is nothing left to hide.
 - **A password typed from a session to confirm an operation is a login attempt**: `AccountService` refuses it while the
   account is locked out, counts a wrong one toward the lockout, traces it as `LoginFailureReasons.InvalidCurrentPassword`,
   and answers in `LoginPolicy:MinResponseTime` at least. Six places let a taken session guess the password without limit.
@@ -52,7 +56,8 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 1. **The schema `ident` is installed again**: `0001` is corrected in place — `ck_account_tokens_purpose` takes
    `email_revert` —, so the installation and the verification refuse the schema of a 6.x. Drop it, then `install`.
 2. **A store written outside the package implements `RecordFailedLoginAsync`**; the three of the package do.
-   **An `IIdentityMailer` implements `SendEmailChangedAsync`**, the notice to the previous address with its link.
+   **An `IIdentityMailer` implements `SendEmailChangedAsync`**, the notice to the previous address with its link, and
+   **`SendAccountLockedAsync`**, the notice that the account is locked out.
    **A caller of `AccountService.ConfirmEmailChangeAsync`** reads a `Result<EmailChanged>`, and sends the notice.
 3. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.

@@ -101,6 +101,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<PasswordStrengthEvaluator>();
         services.TryAddSingleton<PasswordGenerator>();
         services.TryAddSingleton<LoginOtpService>();
+        services.TryAddScoped<FailedLoginCounter>();
         services.TryAddScoped<LoginService>();
         services.TryAddScoped<RegistrationService>();
         services.TryAddScoped<AccountService>();

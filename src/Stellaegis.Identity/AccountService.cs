@@ -16,7 +16,7 @@ public sealed class AccountService(
     IAccountTokenStore tokens,
     IMfaStore mfa,
     IRecoveryCodeStore recoveryCodes,
-    ILoginEventStore loginEvents,
+    FailedLoginCounter failures,
     EmailVerificationService emailVerification,
     PasswordHasher hasher,
     PasswordStrengthEvaluator passwords,
@@ -175,14 +175,14 @@ public sealed class AccountService(
             var now = clock.GetUtcNow();
             if (user.BlockedUntil is { } until && until > now)
             {
-                await TraceAsync(user, LoginFailureReasons.LockedOut, ipAddress, now, cancellationToken);
+                await failures.TraceAsync(user.UserUniqueId, user.Email, false, LoginFailureReasons.LockedOut, ipAddress, null, now, cancellationToken);
                 return Result.Failure<AuthUser>(IdentityErrors.LockedOut);
             }
             if (string.IsNullOrEmpty(password) || !hasher.Verify(password, user.PasswordHash))
             {
-                var failed = await users.RecordFailedLoginAsync(user.UserUniqueId, now, policy.MaxFailedAttempts, policy.LockoutDuration, cancellationToken);
-                await TraceAsync(user, LoginFailureReasons.InvalidCurrentPassword, ipAddress, now, cancellationToken);
-                return Result.Failure<AuthUser>(failed?.IsLockedOutAt(now) == true ? IdentityErrors.LockedOut : IdentityErrors.InvalidCurrentPassword);
+                return Result.Failure<AuthUser>(await failures.CountAsync(user, LoginFailureReasons.InvalidCurrentPassword, ipAddress, null, now, cancellationToken)
+                    ? IdentityErrors.LockedOut
+                    : IdentityErrors.InvalidCurrentPassword);
             }
             return Result.Success(user);
         }
@@ -193,17 +193,6 @@ public sealed class AccountService(
                 await Task.Delay(policy.MinResponseTime - elapsed, clock, cancellationToken);
         }
     }
-
-    private Task TraceAsync(AuthUser user, string reason, string? ipAddress, DateTimeOffset now, CancellationToken cancellationToken)
-        => loginEvents.AddAsync(new LoginEvent
-        {
-            UserUniqueId = user.UserUniqueId,
-            Email = user.Email,
-            Success = false,
-            FailReason = reason,
-            IpAddress = ipAddress,
-            CreatedAt = now,
-        }, cancellationToken);
 
     private async Task<AccountToken?> FindRevertAsync(string token, CancellationToken cancellationToken)
     {

@@ -111,7 +111,7 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 
 | Service | What it does |
 | --- | --- |
-| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due and completes the login by it — a one-time code or a recovery code, a wrong one counting as a failed login —, and builds the principal — `sub`, `email`, `name`, and `locale`, `zoneinfo`, `picture` when the person chose them — a host signs in |
+| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many — the person told by e-mail when the lockout starts, the attempt told what anyone is told —, answers in the same time whether the account exists or not, says whether a second factor is due and completes the login by it — a one-time code or a recovery code, a wrong one counting as a failed login —, and builds the principal — `sub`, `email`, `name`, and `locale`, `zoneinfo`, `picture` when the person chose them — a host signs in |
 | `RegistrationService` | Creates an account when the self-registration is open, after the e-mail was proved by a code |
 | `ActivationService` | Lets the person of an account an administrator created choose its first password, by the link of its activation |
 | `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, confirms a password, undoes a change of e-mail from the link the previous address received. A password typed from a session to confirm one of these is a login attempt: refused while the account is locked out, counted toward the lockout when wrong, traced, and answered in the same time |
@@ -193,7 +193,7 @@ when the host starts:
 Stellaegis:Identity:PasswordHasher:Pepper          required; a secret of the deployment, never in the repository
 Stellaegis:Identity:PasswordHasher:Iterations      310000
 Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a password must mix
-Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes
+Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes, told to the person by e-mail
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
 Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and Keys:<slot>, secrets of the deployment
@@ -330,11 +330,12 @@ environment. A host on `UseStaticFiles()` serves them too, but only in `Developm
 
 ### What the pages send
 
-Six messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
+Seven messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
 verification code, a login code, a password reset link, an activation link, the notice that an e-mail has an
-account already, and the notice to the previous address that the e-mail of the account changed, with the link that
-undoes it. Without an implementation, a host whose self-registration is open or whose password reset is enabled
-refuses to start.
+account already, the notice to the previous address that the e-mail of the account changed, with the link that
+undoes it, and the notice that the account is locked out after too many failed attempts — sent once, when the lockout
+starts, since the login page tells the attempt nothing of it. Without an implementation, a host whose
+self-registration is open or whose password reset is enabled refuses to start.
 
 Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password first, as
 disabling the second factor and deleting the account do: a session taken from its person opens none of them. And a

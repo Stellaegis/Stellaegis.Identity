@@ -18,7 +18,12 @@ public enum LoginStep
     /// <summary>The login failed: wrong credentials, unknown or disabled account.</summary>
     Failed,
 
-    /// <summary>The account is locked after too many failed logins.</summary>
+    /// <summary>
+    /// The account is locked after too many failed logins. At the login, the person is told what anyone is told,
+    /// <see cref="IdentityErrors.InvalidCredentials"/> — the lockout would otherwise say the account exists —: the step
+    /// is for the host, and the person was told by e-mail when the lockout started. After a password that held, or from
+    /// a session, the error is <see cref="IdentityErrors.LockedOut"/>: there is nothing left to hide.
+    /// </summary>
     LockedOut,
 }
 
