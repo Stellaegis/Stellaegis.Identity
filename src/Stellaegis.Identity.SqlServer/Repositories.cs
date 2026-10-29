@@ -378,7 +378,7 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
     }
 }
 
-/// <summary>The rows of <c>ident.email_verifications</c>, one per e-mail.</summary>
+/// <summary>The rows of <c>ident.email_verifications</c>, one per e-mail and purpose.</summary>
 internal sealed class EmailVerificationRepository(DbConnection connection, Func<DbTransaction?> transaction)
 {
     static EmailVerificationRepository() => SnakeCaseTypeMap<VerificationRow>.Register();
@@ -395,44 +395,46 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
         => connection.ExecuteAsync(new CommandDefinition(
             """
             begin try
-                update ident.email_verifications set code = @Code, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email;
+                update ident.email_verifications set requested_by = @RequestedBy, code = @Code, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email and purpose = @Purpose;
                 if @@rowcount = 0
-                    insert into ident.email_verifications (email, code, created_at, expires_at, attempts, is_verified, ip_address) values (@Email, @Code, @CreatedAt, @ExpiresAt, @Attempts, @IsVerified, @IpAddress);
+                    insert into ident.email_verifications (email, purpose, requested_by, code, created_at, expires_at, attempts, is_verified, ip_address) values (@Email, @Purpose, @RequestedBy, @Code, @CreatedAt, @ExpiresAt, @Attempts, @IsVerified, @IpAddress);
             end try
             begin catch
                 if error_number() not in (2601, 2627) throw;
-                update ident.email_verifications set code = @Code, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email;
+                update ident.email_verifications set requested_by = @RequestedBy, code = @Code, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email and purpose = @Purpose;
             end catch
             """,
-            new { verification.Email, verification.Code, verification.CreatedAt, verification.ExpiresAt, verification.Attempts, verification.IsVerified, verification.IpAddress },
+            new { verification.Email, Purpose = VerificationRow.PurposeOf(verification.Purpose), verification.RequestedBy, verification.Code, verification.CreatedAt, verification.ExpiresAt, verification.Attempts, verification.IsVerified, verification.IpAddress },
             transaction(), cancellationToken: cancellationToken));
 
-    public async Task<EmailVerification?> FindAsync(string email, CancellationToken cancellationToken)
+    public async Task<EmailVerification?> FindAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         var row = await connection.QuerySingleOrDefaultAsync<VerificationRow>(new CommandDefinition(
-            "select email, code, created_at, expires_at, attempts, is_verified, ip_address from ident.email_verifications where email = @email",
-            new { email }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+            "select email, purpose, requested_by, code, created_at, expires_at, attempts, is_verified, ip_address from ident.email_verifications where email = @email and purpose = @purpose",
+            new { email, purpose = VerificationRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return row?.ToVerification();
     }
 
-    public Task IncrementAttemptsAsync(string email, CancellationToken cancellationToken)
+    public Task IncrementAttemptsAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
-            "update ident.email_verifications set attempts = attempts + 1 where email = @email",
-            new { email }, transaction(), cancellationToken: cancellationToken));
+            "update ident.email_verifications set attempts = attempts + 1 where email = @email and purpose = @purpose",
+            new { email, purpose = VerificationRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken));
 
-    public Task MarkVerifiedAsync(string email, CancellationToken cancellationToken)
+    public Task MarkVerifiedAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
-            "update ident.email_verifications set is_verified = 1 where email = @email",
-            new { email }, transaction(), cancellationToken: cancellationToken));
+            "update ident.email_verifications set is_verified = 1 where email = @email and purpose = @purpose",
+            new { email, purpose = VerificationRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken));
 
-    public Task DeleteAsync(string email, CancellationToken cancellationToken)
+    public Task DeleteAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
-            "delete from ident.email_verifications where email = @email",
-            new { email }, transaction(), cancellationToken: cancellationToken));
+            "delete from ident.email_verifications where email = @email and purpose = @purpose",
+            new { email, purpose = VerificationRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken));
 
     private sealed class VerificationRow
     {
         public string Email { get; set; } = "";
+        public string Purpose { get; set; } = "";
+        public Guid? RequestedBy { get; set; }
         public string Code { get; set; } = "";
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
@@ -440,9 +442,26 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
         public bool IsVerified { get; set; }
         public string? IpAddress { get; set; }
 
+        public static string PurposeOf(EmailVerificationPurpose purpose) => purpose switch
+        {
+            EmailVerificationPurpose.Registration => "registration",
+            EmailVerificationPurpose.EmailChange => "email_change",
+            EmailVerificationPurpose.CurrentEmail => "current_email",
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null),
+        };
+
+        private static EmailVerificationPurpose PurposeOf(string purpose) => purpose switch
+        {
+            "email_change" => EmailVerificationPurpose.EmailChange,
+            "current_email" => EmailVerificationPurpose.CurrentEmail,
+            _ => EmailVerificationPurpose.Registration,
+        };
+
         public EmailVerification ToVerification() => new()
         {
             Email = Email,
+            Purpose = PurposeOf(Purpose),
+            RequestedBy = RequestedBy,
             Code = Code,
             CreatedAt = CreatedAt,
             ExpiresAt = ExpiresAt,

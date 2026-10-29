@@ -42,7 +42,7 @@ internal sealed class VerifyEmailModel(
             return Page();
         }
 
-        var verified = await verification.VerifyCodeAsync(state.Email, Code, cancellationToken);
+        var verified = await verification.VerifyCodeAsync(state.Email, EmailVerificationPurpose.Registration, null, Code, cancellationToken);
         if (verified.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(verified.Error!));
@@ -70,7 +70,7 @@ internal sealed class VerifyEmailModel(
         if (mailer is null)
             throw new InvalidOperationException($"The registration is open and no {nameof(IIdentityMailer)} is registered.");
 
-        var issued = await verification.RequestVerificationAsync(state.Email, this.ClientAddress(), cancellationToken);
+        var issued = await verification.RequestVerificationAsync(state.Email, EmailVerificationPurpose.Registration, null, this.ClientAddress(), cancellationToken);
         if (issued.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(issued.Error!));

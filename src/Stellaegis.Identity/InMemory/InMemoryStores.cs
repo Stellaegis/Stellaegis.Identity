@@ -7,7 +7,7 @@ namespace Stellaegis.Identity.InMemory;
 public sealed class InMemoryIdentityData
 {
     internal ConcurrentDictionary<Guid, AuthUser> Users { get; } = new();
-    internal ConcurrentDictionary<string, EmailVerification> EmailVerifications { get; } = new(StringComparer.Ordinal);
+    internal ConcurrentDictionary<(string Email, EmailVerificationPurpose Purpose), EmailVerification> EmailVerifications { get; } = new();
     internal ConcurrentDictionary<string, AccountToken> AccountTokens { get; } = new(StringComparer.Ordinal);
     internal ConcurrentDictionary<Guid, ConcurrentQueue<LoginEvent>> LoginEvents { get; } = new();
     internal ConcurrentDictionary<Guid, MfaRecord> Mfa { get; } = new();
@@ -168,41 +168,41 @@ internal sealed class InMemoryEmailVerificationStore(InMemoryIdentityData data) 
 {
     public Task UpsertAsync(EmailVerification verification, CancellationToken cancellationToken = default)
     {
-        data.EmailVerifications[verification.Email] = verification;
+        data.EmailVerifications[(verification.Email, verification.Purpose)] = verification;
         return Task.CompletedTask;
     }
 
     public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default)
     {
         var removed = 0;
-        foreach (var (email, verification) in data.EmailVerifications)
+        foreach (var (key, verification) in data.EmailVerifications)
         {
-            if (verification.ExpiresAt < before && data.EmailVerifications.TryRemove(email, out _))
+            if (verification.ExpiresAt < before && data.EmailVerifications.TryRemove(key, out _))
                 removed++;
         }
         return Task.FromResult(removed);
     }
 
-    public Task<EmailVerification?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-        => Task.FromResult(data.EmailVerifications.TryGetValue(email, out var found) ? found : null);
+    public Task<EmailVerification?> GetAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.EmailVerifications.TryGetValue((email, purpose), out var found) ? found : null);
 
-    public Task IncrementAttemptsAsync(string email, CancellationToken cancellationToken = default)
+    public Task IncrementAttemptsAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default)
     {
-        if (data.EmailVerifications.TryGetValue(email, out var found))
+        if (data.EmailVerifications.TryGetValue((email, purpose), out var found))
             found.Attempts++;
         return Task.CompletedTask;
     }
 
-    public Task MarkVerifiedAsync(string email, CancellationToken cancellationToken = default)
+    public Task MarkVerifiedAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default)
     {
-        if (data.EmailVerifications.TryGetValue(email, out var found))
+        if (data.EmailVerifications.TryGetValue((email, purpose), out var found))
             found.IsVerified = true;
         return Task.CompletedTask;
     }
 
-    public Task DeleteByEmailAsync(string email, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default)
     {
-        data.EmailVerifications.TryRemove(email, out _);
+        data.EmailVerifications.TryRemove((email, purpose), out _);
         return Task.CompletedTask;
     }
 }

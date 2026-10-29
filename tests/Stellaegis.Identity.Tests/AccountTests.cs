@@ -90,7 +90,7 @@ public sealed class AccountTests
         Assert.Equal(IdentityErrors.PasswordBlocked, (await host.Get<PasswordResetService>().ResetPasswordAsync(reset!, "Common-Horse-1")).Error);
         var created = await host.Get<AccountAdministrationService>().CreateAsync("john@acme.test", "John", TokenDelivery.Email, Actor.Parse("admin"));
         Assert.Equal(IdentityErrors.PasswordBlocked, (await host.Get<ActivationService>().ActivateAsync(created.Value.ActivationToken, "Common-Horse-1")).Error);
-        await host.Get<EmailVerificationService>().RequestVerificationAsync("new@acme.test");
+        await host.Get<EmailVerificationService>().RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.Registration, null);
         Assert.Equal(IdentityErrors.PasswordBlocked, (await host.Get<RegistrationService>().CreateAccountAsync("new@acme.test", "New", "Common-Horse-1")).Error);
 
         using var without = new TestHost();
@@ -168,7 +168,7 @@ public sealed class AccountTests
         Assert.Equal("jane.doe@acme.test", changed.Value.NewEmail);
         Assert.Equal("jane@acme.test", await account.ValidateRevertTokenAsync(changed.Value.RevertToken!));
         Assert.Equal("jane.doe@acme.test", (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.Email);
-        Assert.Null(await host.Get<IEmailVerificationStore>().GetByEmailAsync("jane.doe@acme.test"));
+        Assert.Null(await host.Get<IEmailVerificationStore>().GetAsync("jane.doe@acme.test", EmailVerificationPurpose.EmailChange));
     }
 
     [Fact]
@@ -338,29 +338,69 @@ public sealed class PasswordResetTests
 /// <summary>Proving that a person owns an e-mail.</summary>
 public sealed class EmailVerificationTests
 {
+    private const EmailVerificationPurpose Registration = EmailVerificationPurpose.Registration;
+
     [Fact]
     public async Task A_code_verifies_the_email_within_its_attempts_and_its_lifetime()
     {
         using var host = new TestHost(o => { o.EmailVerification.MaxAttempts = 2; o.EmailVerification.CodeLength = 8; });
         var verification = host.Get<EmailVerificationService>();
 
-        Assert.Equal(IdentityErrors.NoPendingVerification, (await verification.VerifyCodeAsync("jane@acme.test", "1")).Error);
-        var code = (await verification.RequestVerificationAsync("Jane@Acme.test", "10.0.0.1")).Value;
+        Assert.Equal(IdentityErrors.NoPendingVerification, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, "1")).Error);
+        var code = (await verification.RequestVerificationAsync("Jane@Acme.test", Registration, null, "10.0.0.1")).Value;
         Assert.Equal(8, code.Length);
-        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await verification.VerifyCodeAsync("jane@acme.test", "0")).Error);
-        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await verification.VerifyCodeAsync("jane@acme.test", "0")).Error);
-        Assert.Equal(IdentityErrors.TooManyVerificationAttempts, (await verification.VerifyCodeAsync("jane@acme.test", code)).Error);
+        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, "0")).Error);
+        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, "0")).Error);
+        Assert.Equal(IdentityErrors.TooManyVerificationAttempts, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, code)).Error);
 
-        code = (await verification.RequestVerificationAsync("jane@acme.test")).Value;
-        Assert.True((await verification.VerifyCodeAsync("jane@acme.test", $"{code} ")).IsSuccess);
-        Assert.True(await verification.IsEmailVerifiedAsync("JANE@acme.test"));
-        Assert.True((await verification.VerifyCodeAsync("jane@acme.test", "whatever")).IsSuccess);
-        Assert.Equal(IdentityErrors.EmailAlreadyVerified, (await verification.RequestVerificationAsync("jane@acme.test")).Error);
+        code = (await verification.RequestVerificationAsync("jane@acme.test", Registration, null)).Value;
+        Assert.True((await verification.VerifyCodeAsync("jane@acme.test", Registration, null, $"{code} ")).IsSuccess);
+        Assert.True(await verification.IsEmailVerifiedAsync("JANE@acme.test", Registration, null));
+        // Verified, the e-mail still answers to its code alone: what failed after the code is tried again with it, never without.
+        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, "whatever")).Error);
+        Assert.True((await verification.VerifyCodeAsync("jane@acme.test", Registration, null, code)).IsSuccess);
+        // A new request replaces a verified one: the person starts over.
+        Assert.True((await verification.RequestVerificationAsync("jane@acme.test", Registration, null)).IsSuccess);
+        Assert.False(await verification.IsEmailVerifiedAsync("jane@acme.test", Registration, null));
 
-        await verification.CleanupAsync("jane@acme.test");
-        code = (await verification.RequestVerificationAsync("jane@acme.test")).Value;
+        await verification.CleanupAsync("jane@acme.test", Registration);
+        Assert.Equal(IdentityErrors.NoPendingVerification, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, code)).Error);
+        code = (await verification.RequestVerificationAsync("jane@acme.test", Registration, null)).Value;
         host.Clock.Advance(host.Options.EmailVerification.Lifetime + TimeSpan.FromSeconds(1));
-        Assert.Equal(IdentityErrors.VerificationCodeExpired, (await verification.VerifyCodeAsync("jane@acme.test", code)).Error);
+        Assert.Equal(IdentityErrors.VerificationCodeExpired, (await verification.VerifyCodeAsync("jane@acme.test", Registration, null, code)).Error);
+    }
+
+    [Fact]
+    public async Task A_verification_answers_to_its_purpose_and_its_requester_only()
+    {
+        using var host = new TestHost();
+        var verification = host.Get<EmailVerificationService>();
+        var jane = Guid.NewGuid();
+        var john = Guid.NewGuid();
+
+        // A stranger registers on the address while Jane asks to change hers to it: two verifications, two codes.
+        var registering = (await verification.RequestVerificationAsync("new@acme.test", Registration, null)).Value;
+        var changing = (await verification.RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.EmailChange, jane)).Value;
+        while (changing == registering)
+            changing = (await verification.RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.EmailChange, jane)).Value;
+        Assert.NotNull(await host.Get<IEmailVerificationStore>().GetAsync("new@acme.test", Registration));
+
+        // A code proves the e-mail for its own purpose, to its own requester.
+        Assert.Equal(IdentityErrors.InvalidVerificationCode, (await verification.VerifyCodeAsync("new@acme.test", Registration, null, changing)).Error);
+        Assert.Equal(IdentityErrors.NoPendingVerification, (await verification.VerifyCodeAsync("new@acme.test", EmailVerificationPurpose.EmailChange, john, changing)).Error);
+        Assert.True((await verification.VerifyCodeAsync("new@acme.test", EmailVerificationPurpose.EmailChange, jane, changing)).IsSuccess);
+        Assert.False(await verification.IsEmailVerifiedAsync("new@acme.test", EmailVerificationPurpose.EmailChange, john));
+        Assert.False(await verification.IsEmailVerifiedAsync("new@acme.test", Registration, null));
+        Assert.True((await verification.VerifyCodeAsync("new@acme.test", Registration, null, registering)).IsSuccess);
+
+        // Jane's verification served and gone, the registration's is still there.
+        await verification.CleanupAsync("new@acme.test", EmailVerificationPurpose.EmailChange);
+        Assert.False(await verification.IsEmailVerifiedAsync("new@acme.test", EmailVerificationPurpose.EmailChange, jane));
+        Assert.True(await verification.IsEmailVerifiedAsync("new@acme.test", Registration, null));
+
+        // A purpose and its requester go together; a caller that gets it wrong is told so.
+        await Assert.ThrowsAsync<ArgumentException>(() => verification.RequestVerificationAsync("new@acme.test", Registration, jane));
+        await Assert.ThrowsAsync<ArgumentException>(() => verification.RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.CurrentEmail, null));
     }
 }
 
@@ -600,7 +640,7 @@ public sealed class RetentionTests
         var id = await host.CreateUserAsync();   // its activation token, spent
         var login = host.Get<LoginService>();
         await login.AuthenticateAsync("jane@acme.test", "wrong", ipAddress: "10.0.0.1");
-        await host.Get<EmailVerificationService>().RequestVerificationAsync("other@acme.test");
+        await host.Get<EmailVerificationService>().RequestVerificationAsync("other@acme.test", EmailVerificationPurpose.Registration, null);
         var purge = host.Get<IdentityRetentionService>();
 
         // Nothing is due yet.

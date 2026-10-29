@@ -109,20 +109,27 @@ create table ident.account_tokens (
 create index ix_account_tokens_user_purpose on ident.account_tokens (user_unique_id, purpose);
 
 -- ── E-mail verifications ─────────────────────────────────────────────────────
--- The code sent to an e-mail before an account is created with it, or before an account takes
--- it. One per e-mail: a new request replaces the previous code. The code has as many digits as
--- the module is configured for, between 4 and 10.
+-- The code sent to an e-mail before an account is created with it (registration), before an
+-- account takes it (email_change), or to prove the address an account already has (current_email).
+-- One per e-mail and purpose: a new request for the same replaces the previous code, and a
+-- registration pending on an address is not touched by an account asking for it. requested_by is
+-- the account that asked, null for a registration: a code proves the e-mail to its requester only.
+-- The code has as many digits as the module is configured for, between 4 and 10.
 
 create table ident.email_verifications (
-  email        varchar(320) not null,
-  code         varchar(10)  not null,
-  created_at   timestamptz  not null,
-  expires_at   timestamptz  not null,
-  attempts     integer      not null default 0,
-  is_verified  boolean      not null default false,
-  ip_address   varchar(45),
+  email         varchar(320) not null,
+  purpose       varchar(20)  not null,
+  requested_by  uuid,
+  code          varchar(10)  not null,
+  created_at    timestamptz  not null,
+  expires_at    timestamptz  not null,
+  attempts      integer      not null default 0,
+  is_verified   boolean      not null default false,
+  ip_address    varchar(45),
 
-  constraint pk_email_verifications primary key (email),
+  constraint pk_email_verifications primary key (email, purpose),
+  constraint ck_email_verifications_purpose check (purpose in ('registration', 'email_change', 'current_email')),
+  constraint ck_email_verifications_requested_by check ((purpose = 'registration') = (requested_by is null)),
   constraint ck_email_verifications_code check (code ~ '^[0-9]{4,10}$'),
   constraint ck_email_verifications_attempts check (attempts >= 0)
 );

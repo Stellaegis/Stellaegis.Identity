@@ -60,6 +60,14 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
   account without a password keeping none. A second change does not kill the link of the first.
   `AccountService.ConfirmEmailChangeAsync` answers the token with the change; `RevertEmailChangeAsync` and
   `ValidateRevertTokenAsync` carry the link; `AccountTokenPurpose.EmailRevert` is its purpose.
+- **A verification of an e-mail is one per e-mail and purpose, and answers to its requester only.**
+  `ident.email_verifications` had the address for its whole key, and the service answered success without the code on
+  a row already verified: a registration whose account failed after the code could be completed by anyone; and an
+  account asking for an address erased the verification a stranger had pending on it. The row carries its purpose,
+  `EmailVerificationPurpose` — `Registration`, `EmailChange`, `CurrentEmail` —, keyed with the address, and
+  `RequestedBy`, the account that asked, none for a registration; `EmailVerificationService` takes both on every
+  call, answers `Verification.NotPending` to another requester, and a verified e-mail still answers to its code and to
+  nothing else. `IEmailVerificationStore` reads, counts, marks and deletes by e-mail and purpose.
 
 ### Added
 
@@ -83,9 +91,11 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 ### Updating from 6.3.0
 
 1. **The schema `ident` is installed again**: `0001` is corrected in place — `ck_account_tokens_purpose` takes
-   `email_revert` and `email_change_approval` —, so the installation and the verification refuse the schema of a 6.x.
-   Drop it, then `install`.
-2. **A store written outside the package implements `RecordFailedLoginAsync`**; the three of the package do.
+   `email_revert` and `email_change_approval`, `email_verifications` is keyed by e-mail and purpose and carries
+   `requested_by` —, so the installation and the verification refuse the schema of a 6.x. Drop it, then `install`.
+2. **A store written outside the package implements `RecordFailedLoginAsync`**, and the e-mail verifications by
+   e-mail and purpose; the three of the package do. **A caller of `EmailVerificationService`** passes the purpose and
+   the requester.
    **An `IIdentityMailer` implements `SendEmailChangeApprovalAsync`**, the approval link to the previous address,
    **`SendEmailChangedAsync`**, the notice to the previous address with its link, and **`SendAccountLockedAsync`**,
    the notice that the account is locked out.

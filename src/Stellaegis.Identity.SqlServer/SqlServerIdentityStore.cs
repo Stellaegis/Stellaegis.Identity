@@ -212,32 +212,32 @@ internal sealed class SqlServerIdentityStore
         return await uow.Repo<EmailVerificationRepository>().DeleteExpiredBeforeAsync(before, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task<EmailVerification?> IEmailVerificationStore.GetByEmailAsync(string email, CancellationToken cancellationToken)
+    async Task<EmailVerification?> IEmailVerificationStore.GetAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         Guard.NotWhiteSpace(email);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await uow.Repo<EmailVerificationRepository>().FindAsync(email, cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<EmailVerificationRepository>().FindAsync(email, purpose, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task IEmailVerificationStore.IncrementAttemptsAsync(string email, CancellationToken cancellationToken)
+    async Task IEmailVerificationStore.IncrementAttemptsAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         Guard.NotWhiteSpace(email);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await uow.Repo<EmailVerificationRepository>().IncrementAttemptsAsync(email, cancellationToken).ConfigureAwait(false);
+        await uow.Repo<EmailVerificationRepository>().IncrementAttemptsAsync(email, purpose, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task IEmailVerificationStore.MarkVerifiedAsync(string email, CancellationToken cancellationToken)
+    async Task IEmailVerificationStore.MarkVerifiedAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         Guard.NotWhiteSpace(email);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await uow.Repo<EmailVerificationRepository>().MarkVerifiedAsync(email, cancellationToken).ConfigureAwait(false);
+        await uow.Repo<EmailVerificationRepository>().MarkVerifiedAsync(email, purpose, cancellationToken).ConfigureAwait(false);
     }
 
-    async Task IEmailVerificationStore.DeleteByEmailAsync(string email, CancellationToken cancellationToken)
+    async Task IEmailVerificationStore.DeleteAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         Guard.NotWhiteSpace(email);
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await uow.Repo<EmailVerificationRepository>().DeleteAsync(email, cancellationToken).ConfigureAwait(false);
+        await uow.Repo<EmailVerificationRepository>().DeleteAsync(email, purpose, cancellationToken).ConfigureAwait(false);
     }
 
     // ── Second factor ────────────────────────────────────────────────────────

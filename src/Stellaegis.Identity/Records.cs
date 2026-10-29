@@ -158,11 +158,34 @@ public sealed class AccountToken
     public bool IsValidAt(DateTimeOffset now) => ConsumedAt is null && RevokedAt is null && ExpiresAt > now;
 }
 
-/// <summary>A pending or completed verification of an e-mail: one per e-mail, keyed by it.</summary>
+/// <summary>What a verification of an e-mail is for. A code proves the e-mail for its purpose only.</summary>
+public enum EmailVerificationPurpose
+{
+    /// <summary>Creating an account with the e-mail: nobody asks for it, there is no account yet.</summary>
+    Registration,
+
+    /// <summary>Giving the e-mail to an account that has another, asked by that account.</summary>
+    EmailChange,
+
+    /// <summary>Proving the e-mail an account already has, never proven so far, asked by that account.</summary>
+    CurrentEmail,
+}
+
+/// <summary>
+/// A pending or completed verification of an e-mail: one per e-mail and purpose, keyed by both. A code proves
+/// the e-mail for its purpose and its requester only — a registration pending on an address is not touched by
+/// an account asking for the same address, and a code cannot serve another than who asked for it.
+/// </summary>
 public sealed class EmailVerification
 {
     /// <summary>The e-mail being verified, normalized.</summary>
     public string Email { get; set; } = "";
+
+    /// <summary>What the verification is for.</summary>
+    public EmailVerificationPurpose Purpose { get; set; }
+
+    /// <summary>The account that asked for it; <see langword="null"/> for a registration, which has none yet.</summary>
+    public Guid? RequestedBy { get; set; }
 
     /// <summary>The code sent to the e-mail.</summary>
     public string Code { get; set; } = "";

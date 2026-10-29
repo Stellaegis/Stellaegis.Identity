@@ -107,8 +107,8 @@ public sealed class RegistrationTests
 {
     private static async Task VerifyAsync(TestHost host, string email)
     {
-        var code = await host.Get<EmailVerificationService>().RequestVerificationAsync(email);
-        Assert.True((await host.Get<EmailVerificationService>().VerifyCodeAsync(email, code.Value)).IsSuccess);
+        var code = await host.Get<EmailVerificationService>().RequestVerificationAsync(email, EmailVerificationPurpose.Registration, null);
+        Assert.True((await host.Get<EmailVerificationService>().VerifyCodeAsync(email, EmailVerificationPurpose.Registration, null, code.Value)).IsSuccess);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class RegistrationTests
         Assert.True(user.IsEnabled);
         Assert.Equal(user.AsActor(), user.CreatedBy);
         Assert.Equal(host.Clock.Now, user.CreatedAt);
-        Assert.False(await host.Get<EmailVerificationService>().IsEmailVerifiedAsync("jane@acme.test"));
+        Assert.False(await host.Get<EmailVerificationService>().IsEmailVerifiedAsync("jane@acme.test", EmailVerificationPurpose.Registration, null));
         var registered = Assert.IsType<UserRegisteredEvent>(Assert.Single(host.Events.Events));
         Assert.Equal(created.Value, registered.UserUniqueId);
         Assert.Equal("jane@acme.test", registered.Email);

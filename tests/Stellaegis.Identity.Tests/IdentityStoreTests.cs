@@ -369,33 +369,50 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
 
         Assert.True(Assert.Single(await Logins.GetRecentAsync(user.UserUniqueId, 10, Ct)).Success);
         Assert.NotNull(await Tokens.GetAsync(live.TokenHash, Ct));
-        Assert.Null(await Verifications.GetByEmailAsync(email, Ct));
+        Assert.Null(await Verifications.GetAsync(email, EmailVerificationPurpose.Registration, Ct));
     }
 
     [Fact]
-    public async Task An_email_verification_is_one_per_email_replaced_by_a_new_request_counted_marked_and_deleted()
+    public async Task An_email_verification_is_one_per_email_and_purpose_replaced_by_a_new_request_counted_marked_and_deleted()
     {
+        const EmailVerificationPurpose Registration = EmailVerificationPurpose.Registration;
+        const EmailVerificationPurpose Change = EmailVerificationPurpose.EmailChange;
         var email = $"{Guid.NewGuid():N}@acme.test";
-        await Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "1234", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct);
-        await Verifications.IncrementAttemptsAsync(email, Ct);
-        await Verifications.IncrementAttemptsAsync(email, Ct);
-        Assert.Equal(2, (await Verifications.GetByEmailAsync(email, Ct))!.Attempts);
+        await Verifications.UpsertAsync(new EmailVerification { Email = email, Purpose = Registration, Code = "1234", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct);
+        await Verifications.IncrementAttemptsAsync(email, Registration, Ct);
+        await Verifications.IncrementAttemptsAsync(email, Registration, Ct);
+        Assert.Equal(2, (await Verifications.GetAsync(email, Registration, Ct))!.Attempts);
+
+        // Another purpose on the same e-mail is another row, with its requester; the registration's stays as it was.
+        var jane = Guid.NewGuid();
+        await Verifications.UpsertAsync(new EmailVerification { Email = email, Purpose = Change, RequestedBy = jane, Code = "5678", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct);
+        var change = await Verifications.GetAsync(email, Change, Ct);
+        Assert.Equal(Change, change!.Purpose);
+        Assert.Equal(jane, change.RequestedBy);
+        Assert.Equal("5678", change.Code);
+        Assert.Equal("1234", (await Verifications.GetAsync(email, Registration, Ct))!.Code);
+        Assert.Null((await Verifications.GetAsync(email, Registration, Ct))!.RequestedBy);
 
         _clock.Advance(TimeSpan.FromMinutes(1));
-        await Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "9876543210", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15), IpAddress = "10.0.0.3" }, Ct);
-        var replaced = await Verifications.GetByEmailAsync(email, Ct);
+        await Verifications.UpsertAsync(new EmailVerification { Email = email, Purpose = Registration, Code = "9876543210", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15), IpAddress = "10.0.0.3" }, Ct);
+        var replaced = await Verifications.GetAsync(email, Registration, Ct);
         Assert.Equal("9876543210", replaced!.Code);
         Assert.Equal(0, replaced.Attempts);
         Assert.False(replaced.IsVerified);
 
-        await Verifications.MarkVerifiedAsync(email, Ct);
-        Assert.True((await Verifications.GetByEmailAsync(email, Ct))!.IsVerified);
-        await Verifications.DeleteByEmailAsync(email, Ct);
-        Assert.Null(await Verifications.GetByEmailAsync(email, Ct));
+        await Verifications.MarkVerifiedAsync(email, Registration, Ct);
+        Assert.True((await Verifications.GetAsync(email, Registration, Ct))!.IsVerified);
+        Assert.False((await Verifications.GetAsync(email, Change, Ct))!.IsVerified);
+        await Verifications.DeleteAsync(email, Registration, Ct);
+        Assert.Null(await Verifications.GetAsync(email, Registration, Ct));
+        Assert.NotNull(await Verifications.GetAsync(email, Change, Ct));
+        await Verifications.DeleteAsync(email, Change, Ct);
 
-        // A code that is not 4 to 10 digits is refused by the schema.
+        // A code that is not 4 to 10 digits is refused by the schema; so is a requester that does not go with the purpose.
         await AssertRefusedAsync(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "12a", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct), Refusal.Check);
         await AssertRefusedAsync(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Code = "123", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct), Refusal.Check);
+        await AssertRefusedAsync(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Purpose = Registration, RequestedBy = jane, Code = "1234", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct), Refusal.Check);
+        await AssertRefusedAsync(() => Verifications.UpsertAsync(new EmailVerification { Email = email, Purpose = Change, RequestedBy = null, Code = "1234", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct), Refusal.Check);
     }
 
     [Fact]
@@ -409,7 +426,7 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
             new EmailVerification { Email = email, Code = $"{1000 + i}", CreatedAt = _clock.Now, ExpiresAt = _clock.Now.AddMinutes(15) }, Ct)));
         await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Mfa.SetPendingSecretAsync(user.UserUniqueId, "JBSWY3DPEHPK3PXP", Ct)));
 
-        Assert.NotNull(await Verifications.GetByEmailAsync(email, Ct));
+        Assert.NotNull(await Verifications.GetAsync(email, EmailVerificationPurpose.Registration, Ct));
         Assert.Equal("JBSWY3DPEHPK3PXP", (await Mfa.GetAsync(user.UserUniqueId, Ct))!.PendingSecret);
     }
 

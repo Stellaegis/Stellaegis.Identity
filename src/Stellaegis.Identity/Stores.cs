@@ -81,26 +81,26 @@ public interface IAccountTokenStore
     Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Where the e-mail verifications are kept, one per e-mail.</summary>
+/// <summary>Where the e-mail verifications are kept, one per e-mail and purpose.</summary>
 public interface IEmailVerificationStore
 {
-    /// <summary>Creates or replaces the verification of its e-mail.</summary>
+    /// <summary>Creates or replaces the verification of its e-mail and purpose.</summary>
     Task UpsertAsync(EmailVerification verification, CancellationToken cancellationToken = default);
 
     /// <summary>Deletes the verifications that expired before <paramref name="before"/>, and returns how many.</summary>
     Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default);
 
-    /// <summary>The verification of that e-mail, or <see langword="null"/>.</summary>
-    Task<EmailVerification?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+    /// <summary>The verification of that e-mail for that purpose, or <see langword="null"/>.</summary>
+    Task<EmailVerification?> GetAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default);
 
-    /// <summary>Counts one more attempt against the verification of that e-mail.</summary>
-    Task IncrementAttemptsAsync(string email, CancellationToken cancellationToken = default);
+    /// <summary>Counts one more attempt against the verification of that e-mail for that purpose.</summary>
+    Task IncrementAttemptsAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default);
 
-    /// <summary>Marks the e-mail verified.</summary>
-    Task MarkVerifiedAsync(string email, CancellationToken cancellationToken = default);
+    /// <summary>Marks the e-mail verified for that purpose.</summary>
+    Task MarkVerifiedAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default);
 
-    /// <summary>Removes the verification of that e-mail, once the account exists or the change is done.</summary>
-    Task DeleteByEmailAsync(string email, CancellationToken cancellationToken = default);
+    /// <summary>Removes the verification of that e-mail for that purpose, once the account exists or the change is done.</summary>
+    Task DeleteAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Where the second factors are kept.</summary>

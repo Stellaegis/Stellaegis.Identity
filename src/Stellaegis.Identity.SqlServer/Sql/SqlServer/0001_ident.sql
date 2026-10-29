@@ -110,20 +110,29 @@ create table ident.account_tokens (
 create index ix_account_tokens_user_purpose on ident.account_tokens (user_unique_id, purpose);
 
 -- ── E-mail verifications ─────────────────────────────────────────────────────
--- The code sent to an e-mail before an account is created with it, or before an account takes
--- it. One per e-mail: a new request replaces the previous code. The code has as many digits as
--- the module is configured for, between 4 and 10.
+-- The code sent to an e-mail before an account is created with it (registration), before an
+-- account takes it (email_change), or to prove the address an account already has (current_email).
+-- One per e-mail and purpose: a new request for the same replaces the previous code, and a
+-- registration pending on an address is not touched by an account asking for it. requested_by is
+-- the account that asked, null for a registration: a code proves the e-mail to its requester only.
+-- The code has as many digits as the module is configured for, between 4 and 10.
 
 create table ident.email_verifications (
-  email        nvarchar(320)     not null,
-  code         nvarchar(10)      not null,
-  created_at   datetimeoffset(3) not null,
-  expires_at   datetimeoffset(3) not null,
-  attempts     int               not null constraint df_email_verifications_attempts default 0,
-  is_verified  bit               not null constraint df_email_verifications_is_verified default 0,
-  ip_address   nvarchar(45)      null,
+  email         nvarchar(320)     not null,
+  purpose       nvarchar(20)      not null,
+  requested_by  uniqueidentifier  null,
+  code          nvarchar(10)      not null,
+  created_at    datetimeoffset(3) not null,
+  expires_at    datetimeoffset(3) not null,
+  attempts      int               not null constraint df_email_verifications_attempts default 0,
+  is_verified   bit               not null constraint df_email_verifications_is_verified default 0,
+  ip_address    nvarchar(45)      null,
 
-  constraint pk_email_verifications primary key (email),
+  constraint pk_email_verifications primary key (email, purpose),
+  constraint ck_email_verifications_purpose check (purpose collate Latin1_General_100_BIN2 in (N'registration', N'email_change', N'current_email')),
+  constraint ck_email_verifications_requested_by check (
+    (purpose collate Latin1_General_100_BIN2 = N'registration' and requested_by is null)
+    or (purpose collate Latin1_General_100_BIN2 <> N'registration' and requested_by is not null)),
   constraint ck_email_verifications_code check (
     len(code) between 4 and 10 and code collate Latin1_General_100_BIN2 not like N'%[^0-9]%'),
   constraint ck_email_verifications_attempts check (attempts >= 0)

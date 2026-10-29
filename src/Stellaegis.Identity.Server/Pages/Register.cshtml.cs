@@ -91,7 +91,7 @@ internal sealed class RegisterModel(
         }
         else
         {
-            var issued = await verification.RequestVerificationAsync(email, address, cancellationToken);
+            var issued = await verification.RequestVerificationAsync(email, EmailVerificationPurpose.Registration, null, address, cancellationToken);
             if (issued.IsFailure)
             {
                 ModelState.AddModelError(string.Empty, texts.Describe(issued.Error!));

@@ -43,7 +43,7 @@ public sealed class RegistrationService(
             return Result.Failure<Guid>(IdentityErrors.RegistrationClosed);
 
         var normalized = Emails.Normalize(email);
-        if (!await emailVerification.IsEmailVerifiedAsync(normalized, cancellationToken))
+        if (!await emailVerification.IsEmailVerifiedAsync(normalized, EmailVerificationPurpose.Registration, null, cancellationToken))
             return Result.Failure<Guid>(IdentityErrors.EmailNotVerified);
         if (await users.GetByEmailAsync(normalized, cancellationToken) is not null)
             return Result.Failure<Guid>(IdentityErrors.EmailTaken);
@@ -64,7 +64,7 @@ public sealed class RegistrationService(
             ModifiedAt = now,
             ModifiedBy = self,
         }, cancellationToken);
-        await emailVerification.CleanupAsync(normalized, cancellationToken);
+        await emailVerification.CleanupAsync(normalized, EmailVerificationPurpose.Registration, cancellationToken);
         await events.PublishAsync(new UserRegisteredEvent { OccurredAt = now, UserUniqueId = id, Email = normalized, DisplayName = displayName.Trim() }, cancellationToken);
 
         logger.LogInformation("Account {UserUniqueId} registered by {Email}", id, normalized);

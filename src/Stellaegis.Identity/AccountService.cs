@@ -63,9 +63,8 @@ public sealed class AccountService(
         if (await users.GetByEmailAsync(normalized, cancellationToken) is not null)
             return Result.Failure<string>(IdentityErrors.EmailTaken);
 
-        // A verification left by an abandoned registration on this e-mail would otherwise stand in the way.
-        await emailVerification.CleanupAsync(normalized, cancellationToken);
-        var issued = await emailVerification.RequestVerificationAsync(normalized, ipAddress, cancellationToken);
+        // A registration pending on this e-mail keeps its own verification: this one is the account's.
+        var issued = await emailVerification.RequestVerificationAsync(normalized, EmailVerificationPurpose.EmailChange, userUniqueId, ipAddress, cancellationToken);
         if (issued.IsFailure)
             return issued;
         logger.LogInformation("E-mail change of {UserUniqueId} requested", userUniqueId);
@@ -82,7 +81,7 @@ public sealed class AccountService(
     public async Task<Result<EmailChanged>> ConfirmEmailChangeAsync(Guid userUniqueId, string newEmail, string? code, CancellationToken cancellationToken = default)
     {
         var normalized = Emails.Normalize(newEmail);
-        var verified = await emailVerification.VerifyCodeAsync(normalized, code, cancellationToken);
+        var verified = await emailVerification.VerifyCodeAsync(normalized, EmailVerificationPurpose.EmailChange, userUniqueId, code, cancellationToken);
         if (verified.IsFailure)
             return Result.Failure<EmailChanged>(verified.Error!);
         // Checked again: another account may have taken the e-mail between the request and the code.
@@ -97,7 +96,7 @@ public sealed class AccountService(
         if (options.Value.EmailChange.RequireApprovalByPrevious)
         {
             var approval = await tokens.IssueAsync(user, AccountTokenPurpose.EmailChangeApproval, TokenDelivery.Email, user.AsActor(), now, options.Value.EmailChange.ApprovalLifetime, null, cancellationToken, email: normalized);
-            await emailVerification.CleanupAsync(normalized, cancellationToken);
+            await emailVerification.CleanupAsync(normalized, EmailVerificationPurpose.EmailChange, cancellationToken);
             logger.LogInformation("E-mail change of {UserUniqueId} waits for the approval of its previous address", userUniqueId);
             return Result.Success(new EmailChanged(previous, normalized, null, approval));
         }
@@ -109,7 +108,7 @@ public sealed class AccountService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
-        await emailVerification.CleanupAsync(normalized, cancellationToken);
+        await emailVerification.CleanupAsync(normalized, EmailVerificationPurpose.EmailChange, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed", userUniqueId);
         return Result.Success(new EmailChanged(previous, normalized, revert, null));
     }
@@ -263,8 +262,7 @@ public sealed class AccountService(
             return Result.Failure<string>(IdentityErrors.AccountNotFound);
         if (user.EmailVerified)
             return Result.Failure<string>(IdentityErrors.EmailAlreadyVerified);
-        await emailVerification.CleanupAsync(user.Email, cancellationToken);
-        return await emailVerification.RequestVerificationAsync(user.Email, ipAddress, cancellationToken);
+        return await emailVerification.RequestVerificationAsync(user.Email, EmailVerificationPurpose.CurrentEmail, userUniqueId, ipAddress, cancellationToken);
     }
 
     /// <summary>Marks the account's current e-mail verified once <paramref name="code"/> proves it.</summary>
@@ -273,14 +271,14 @@ public sealed class AccountService(
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
         if (user is null || !user.IsEnabled)
             return Result.Failure(IdentityErrors.AccountNotFound);
-        var verified = await emailVerification.VerifyCodeAsync(user.Email, code, cancellationToken);
+        var verified = await emailVerification.VerifyCodeAsync(user.Email, EmailVerificationPurpose.CurrentEmail, userUniqueId, code, cancellationToken);
         if (verified.IsFailure)
             return verified;
         user.EmailVerified = true;
         user.ModifiedAt = clock.GetUtcNow();
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
-        await emailVerification.CleanupAsync(user.Email, cancellationToken);
+        await emailVerification.CleanupAsync(user.Email, EmailVerificationPurpose.CurrentEmail, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} verified", userUniqueId);
         return Result.Success();
     }

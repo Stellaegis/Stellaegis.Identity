@@ -119,7 +119,7 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 | `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, confirms a password, undoes a change of e-mail from the link the previous address received. A password typed from a session to confirm one of these is a login attempt: refused while the account is locked out, counted toward the lockout when wrong, traced, and answered in the same time |
 | `ProfileService` | Reads and changes what a person chose of their own profile: the name of the account, the language, the time zone, the avatar |
 | `PasswordResetService` | Issues a reset link sent by e-mail to a proven address, and spends its token once |
-| `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read |
+| `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read, for one purpose — a registration, a change of e-mail, the current address of an account — and to its requester only: a registration pending on an address is not touched by an account asking for the same, and a code proves nothing to who did not ask for it |
 | `MfaService`, `LoginOtpService` | Enrolls an authenticator app (TOTP) or the e-mail as second factor, checks a code |
 | `RecoveryCodeService` | Issues the recovery codes of a second factor, hashed, and consumes one |
 | `AccountAdministrationService` | What an administrator does: create an account without a password and issue its activation link, issue a reset link, block, unblock, delete, reset the failed logins or the second factor; each write names its actor. An administrator never knows a password |
