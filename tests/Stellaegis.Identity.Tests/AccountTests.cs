@@ -251,6 +251,24 @@ public sealed class AccountTests
 public sealed class PasswordResetTests
 {
     [Fact]
+    public async Task A_second_link_to_the_same_account_waits_for_the_interval_and_the_first_still_works()
+    {
+        using var host = new TestHost(o => o.PasswordReset.MinimumInterval = TimeSpan.FromMinutes(1));
+        await host.CreateUserAsync();
+        var reset = host.Get<PasswordResetService>();
+
+        var first = await reset.RequestResetAsync("jane@acme.test");
+        Assert.NotNull(first);
+        Assert.Null(await reset.RequestResetAsync("jane@acme.test"));
+        Assert.True(await reset.ValidateTokenAsync(first));
+
+        host.Clock.Advance(TimeSpan.FromSeconds(61));
+        var second = await reset.RequestResetAsync("jane@acme.test");
+        Assert.NotNull(second);
+        Assert.False(await reset.ValidateTokenAsync(first));   // the newer one replaces it, as it always did
+    }
+
+    [Fact]
     public async Task A_token_resets_the_password_once_and_an_unknown_email_gets_none()
     {
         using var host = new TestHost();
@@ -401,6 +419,24 @@ public sealed class EmailVerificationTests
         // A purpose and its requester go together; a caller that gets it wrong is told so.
         await Assert.ThrowsAsync<ArgumentException>(() => verification.RequestVerificationAsync("new@acme.test", Registration, jane));
         await Assert.ThrowsAsync<ArgumentException>(() => verification.RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.CurrentEmail, null));
+    }
+
+    [Fact]
+    public async Task A_second_code_to_the_same_address_waits_for_the_interval_whoever_asks()
+    {
+        using var host = new TestHost(o => o.EmailVerification.MinimumInterval = TimeSpan.FromMinutes(1));
+        var verification = host.Get<EmailVerificationService>();
+
+        var code = (await verification.RequestVerificationAsync("new@acme.test", Registration, null)).Value;
+        Assert.Equal(IdentityErrors.VerificationThrottled, (await verification.RequestVerificationAsync("new@acme.test", Registration, null)).Error);
+        // The code sent still works; another purpose or another address is not held back; another requester is.
+        Assert.True((await verification.VerifyCodeAsync("new@acme.test", Registration, null, code)).IsSuccess);
+        Assert.True((await verification.RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.EmailChange, Guid.NewGuid())).IsSuccess);
+        Assert.True((await verification.RequestVerificationAsync("other@acme.test", Registration, null)).IsSuccess);
+        Assert.Equal(IdentityErrors.VerificationThrottled, (await verification.RequestVerificationAsync("new@acme.test", EmailVerificationPurpose.EmailChange, Guid.NewGuid())).Error);
+
+        host.Clock.Advance(TimeSpan.FromSeconds(61));
+        Assert.True((await verification.RequestVerificationAsync("new@acme.test", Registration, null)).IsSuccess);
     }
 }
 

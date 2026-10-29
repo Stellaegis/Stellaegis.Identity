@@ -162,6 +162,12 @@ internal sealed class InMemoryAccountTokenStore(InMemoryIdentityData data) : IAc
         }
         return Task.CompletedTask;
     }
+
+    public Task<DateTimeOffset?> LastIssuedAtAsync(Guid userUniqueId, AccountTokenPurpose purpose, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.AccountTokens.Values
+            .Where(t => t.UserUniqueId == userUniqueId && t.Purpose == purpose)
+            .Select(t => (DateTimeOffset?)t.CreatedAt)
+            .Max());
 }
 
 internal sealed class InMemoryEmailVerificationStore(InMemoryIdentityData data) : IEmailVerificationStore

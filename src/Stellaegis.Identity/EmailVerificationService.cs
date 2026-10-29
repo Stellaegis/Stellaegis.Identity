@@ -15,17 +15,26 @@ public sealed class EmailVerificationService(IEmailVerificationStore store, IOpt
     /// <summary>
     /// Issues a code for <paramref name="email"/> and <paramref name="purpose"/>, replacing the one pending for the
     /// same — verified or not: the person starts over —, and returns it for the host to send. A registration has
-    /// no <paramref name="requestedBy"/>; every other purpose names the account that asks.
+    /// no <paramref name="requestedBy"/>; every other purpose names the account that asks. Asked again within
+    /// <see cref="EmailVerificationOptions.MinimumInterval"/> of the last code to that e-mail for that purpose,
+    /// whoever asked it, nothing is issued: <see cref="IdentityErrors.VerificationThrottled"/>, which a page keeps to
+    /// itself.
     /// </summary>
     public async Task<Result<string>> RequestVerificationAsync(string email, EmailVerificationPurpose purpose, Guid? requestedBy, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
         CheckRequester(purpose, requestedBy);
         var settings = options.Value.EmailVerification;
         var now = clock.GetUtcNow();
+        var normalized = Emails.Normalize(email);
+        if (settings.MinimumInterval > TimeSpan.Zero
+            && await store.GetAsync(normalized, purpose, cancellationToken) is { } last
+            && last.CreatedAt + settings.MinimumInterval > now)
+            return Result.Failure<string>(IdentityErrors.VerificationThrottled);
+
         var code = GenerateCode(settings.CodeLength);
         await store.UpsertAsync(new EmailVerification
         {
-            Email = Emails.Normalize(email),
+            Email = normalized,
             Purpose = purpose,
             RequestedBy = requestedBy,
             Code = code,

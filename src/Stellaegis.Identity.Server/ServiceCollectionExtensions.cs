@@ -67,6 +67,7 @@ public static class IdentityPagesServiceCollectionExtensions
         services.TryAddSingleton<PagesCulture>();
         services.TryAddSingleton<PendingStates>();
         services.TryAddSingleton<PasswordRules>();
+        services.TryAddSingleton<PagesRateLimiter>();
         services.AddRazorPages()
             .AddApplicationPart(typeof(IdentityPagesOptions).Assembly);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<RazorPagesOptions>, IdentityPagesConventions>());
@@ -112,8 +113,9 @@ public static class IdentityPagesEndpointRouteBuilderExtensions
 }
 
 /// <summary>
-/// What the package asks of its own pages, and of no other page of the host: the rate limiting policy named in the
-/// options, the culture they are read in (<see cref="PagesCulture"/>), and the refusal to be framed by another page.
+/// What the package asks of its own pages, and of no other page of the host: the rate limiting of the package
+/// (<see cref="PagesRateLimiter"/>) and the policy of the host named in the options, the culture they are read in
+/// (<see cref="PagesCulture"/>), and the refusal to be framed by another page.
 /// </summary>
 internal sealed class IdentityPagesConventions(IOptions<IdentityPagesOptions> options) : IConfigureOptions<RazorPagesOptions>
 {
@@ -128,6 +130,8 @@ internal sealed class IdentityPagesConventions(IOptions<IdentityPagesOptions> op
                 return;
             if (!string.IsNullOrWhiteSpace(options.RateLimitingPolicy))
                 model.EndpointMetadata.Add(new EnableRateLimitingAttribute(options.RateLimitingPolicy));
+            if (options.RateLimiting.Enabled)
+                model.Filters.Add(new RateLimitFilter());
             model.Filters.Add(new CultureFilter());
             model.Filters.Add(new FrameAncestorsFilter());
         }

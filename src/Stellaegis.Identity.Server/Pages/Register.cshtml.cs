@@ -21,12 +21,14 @@ internal sealed class RegisterModel(
     IdentityTexts texts,
     IOptions<IdentityOptions> identity,
     ILogger<RegisterModel> logger,
-    IIdentityMailer? mailer = null) : PageModel
+    IIdentityMailer? mailer = null) : PageModel, INamesAnEmail
 {
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
     public string? ReturnUrl { get; private set; }
+
+    string? INamesAnEmail.NamedEmail => Input.Email;
 
     public bool Open => identity.Value.SelfRegistration == SelfRegistration.Open;
 
@@ -91,20 +93,24 @@ internal sealed class RegisterModel(
         }
         else
         {
+            // A code asked again too soon is not sent, and the page goes on as if it were: the one sent still works.
             var issued = await verification.RequestVerificationAsync(email, EmailVerificationPurpose.Registration, null, address, cancellationToken);
-            if (issued.IsFailure)
+            if (issued.IsFailure && issued.Error != IdentityErrors.VerificationThrottled)
             {
                 ModelState.AddModelError(string.Empty, texts.Describe(issued.Error!));
                 return Page();
             }
-            try
+            if (issued.IsSuccess)
             {
-                await mailer.SendVerificationCodeAsync(email, issued.Value, identity.Value.EmailVerification.Lifetime, cancellationToken);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                logger.LogError(exception, "The verification code of {Email} was not sent", email);
-                TempData["SendFailed"] = true;
+                try
+                {
+                    await mailer.SendVerificationCodeAsync(email, issued.Value, identity.Value.EmailVerification.Lifetime, cancellationToken);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    logger.LogError(exception, "The verification code of {Email} was not sent", email);
+                    TempData["SendFailed"] = true;
+                }
             }
         }
 

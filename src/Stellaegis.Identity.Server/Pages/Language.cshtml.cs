@@ -10,6 +10,7 @@ namespace Stellaegis.Identity.Server.Pages;
 /// The language chosen on the pages: kept in the culture cookie of ASP.NET Core for whoever is not signed in, and in
 /// the account of whoever is — whose session is signed in again so that the next page shows it.
 /// </summary>
+[NotRateLimited]
 internal sealed class LanguageModel(PagesCulture cultures, ProfileService profiles, CookieSignIn signIn) : PageModel
 {
     private static readonly TimeSpan Kept = TimeSpan.FromDays(365);

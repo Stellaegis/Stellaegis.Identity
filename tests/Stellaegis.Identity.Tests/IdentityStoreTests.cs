@@ -301,8 +301,11 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
             TokenHash = hash, UserUniqueId = owner ?? user.UserUniqueId, Purpose = purpose, Delivery = TokenDelivery.Hand, Email = user.Email,
             CreatedAt = _clock.Now, CreatedBy = Actor.Parse("admin"), ExpiresAt = _clock.Now.AddHours(1), IpAddress = "10.0.0.2",
         };
+        Assert.Null(await Tokens.LastIssuedAtAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, Ct));
         var token = Issued(AccountTokens.New().Hash);
         await Tokens.CreateAsync(token, Ct);
+        Assert.Equal(_clock.Now, await Tokens.LastIssuedAtAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, Ct));
+        Assert.Null(await Tokens.LastIssuedAtAsync(user.UserUniqueId, AccountTokenPurpose.Activation, Ct));
 
         var found = await Tokens.GetAsync(token.TokenHash, Ct);
         Assert.NotNull(found);

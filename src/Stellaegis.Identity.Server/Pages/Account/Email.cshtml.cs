@@ -23,10 +23,12 @@ internal sealed class AccountEmailModel(
     IdentityTexts texts,
     IOptions<IdentityOptions> identity,
     ILogger<AccountEmailModel> logger,
-    IIdentityMailer? mailer = null) : PageModel
+    IIdentityMailer? mailer = null) : PageModel, INamesAnEmail
 {
     [BindProperty]
     public string? NewEmail { get; set; }
+
+    string? INamesAnEmail.NamedEmail => NewEmail;
 
     [BindProperty]
     public string? Password { get; set; }
@@ -60,22 +62,26 @@ internal sealed class AccountEmailModel(
             ModelState.AddModelError(string.Empty, texts["Account.Email.NoMailer"]);
             return Page();
         }
+        // A code asked again too soon is not sent, and the page goes on as if it were: the one sent still works.
         var issued = await account.RequestEmailVerificationAsync(userId, this.ClientAddress(), cancellationToken);
-        if (issued.IsFailure)
+        if (issued.IsFailure && issued.Error != IdentityErrors.VerificationThrottled)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(issued.Error!));
             CurrentVerified = await IsCurrentVerifiedAsync(cancellationToken);
             return Page();
         }
-        try
+        if (issued.IsSuccess)
         {
-            await mailer.SendVerificationCodeAsync(CurrentEmail, issued.Value, identity.Value.EmailVerification.Lifetime, cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            logger.LogError(exception, "The verification code of {Email} was not sent", CurrentEmail);
-            ModelState.AddModelError(string.Empty, texts["VerifyEmail.SendFailed"]);
-            return Page();
+            try
+            {
+                await mailer.SendVerificationCodeAsync(CurrentEmail, issued.Value, identity.Value.EmailVerification.Lifetime, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "The verification code of {Email} was not sent", CurrentEmail);
+                ModelState.AddModelError(string.Empty, texts["VerifyEmail.SendFailed"]);
+                return Page();
+            }
         }
         pending.Write(HttpContext, PendingStates.EmailChange, CurrentEmail);
         return Redirect("/account/email");
@@ -105,20 +111,23 @@ internal sealed class AccountEmailModel(
 
         var email = Emails.Normalize(NewEmail!);
         var issued = await account.RequestEmailChangeAsync(userId, email, this.ClientAddress(), cancellationToken);
-        if (issued.IsFailure)
+        if (issued.IsFailure && issued.Error != IdentityErrors.VerificationThrottled)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(issued.Error!));
             return Page();
         }
-        try
+        if (issued.IsSuccess)
         {
-            await mailer.SendVerificationCodeAsync(email, issued.Value, identity.Value.EmailVerification.Lifetime, cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            logger.LogError(exception, "The verification code of {Email} was not sent", email);
-            ModelState.AddModelError(string.Empty, texts["VerifyEmail.SendFailed"]);
-            return Page();
+            try
+            {
+                await mailer.SendVerificationCodeAsync(email, issued.Value, identity.Value.EmailVerification.Lifetime, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "The verification code of {Email} was not sent", email);
+                ModelState.AddModelError(string.Empty, texts["VerifyEmail.SendFailed"]);
+                return Page();
+            }
         }
         pending.Write(HttpContext, PendingStates.EmailChange, email);
         return Redirect("/account/email");

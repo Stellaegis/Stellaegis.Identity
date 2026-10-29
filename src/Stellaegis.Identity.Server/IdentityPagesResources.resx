@@ -520,6 +520,9 @@
   <data name="VerifyEmail.Resent" xml:space="preserve">
     <value>A new code was sent.</value>
   </data>
+  <data name="Pages.TooManyRequests" xml:space="preserve">
+    <value>Too many attempts. Try again in {0} seconds.</value>
+  </data>
   <data name="VerifyEmail.SendFailed" xml:space="preserve">
     <value>The code could not be sent. Use Send the code again below.</value>
   </data>

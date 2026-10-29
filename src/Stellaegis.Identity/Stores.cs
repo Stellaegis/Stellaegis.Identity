@@ -79,6 +79,9 @@ public interface IAccountTokenStore
 
     /// <summary>Revokes the tokens of the account for <paramref name="purpose"/> still usable: a newer one replaces them.</summary>
     Task RevokeOutstandingAsync(Guid userUniqueId, AccountTokenPurpose purpose, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
+
+    /// <summary>When the latest token of the account for <paramref name="purpose"/> was issued, used or not, or <see langword="null"/> when none was.</summary>
+    Task<DateTimeOffset?> LastIssuedAtAsync(Guid userUniqueId, AccountTokenPurpose purpose, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Where the e-mail verifications are kept, one per e-mail and purpose.</summary>

@@ -205,6 +205,14 @@ public sealed class EmailVerificationOptions : IValidatableOptions
     /// <summary>How many wrong codes are tried before the verification is spent. 5 unless set.</summary>
     public int MaxAttempts { get; set; } = 5;
 
+    /// <summary>
+    /// The least time between two codes to one e-mail for one purpose, whoever asks. One minute unless set; zero for
+    /// none. A request inside it issues nothing, <c>Verification.Throttled</c>, and the pages say what they always
+    /// say: the code sent still works. Against a mailbox flooded with codes, and against a code the person waits for
+    /// being replaced by one a stranger asked.
+    /// </summary>
+    public TimeSpan MinimumInterval { get; set; } = TimeSpan.FromMinutes(1);
+
     /// <inheritdoc/>
     public string? FindError()
     {
@@ -214,6 +222,8 @@ public sealed class EmailVerificationOptions : IValidatableOptions
             return $"{nameof(Lifetime)} must be positive.";
         if (MaxAttempts < 1)
             return $"{nameof(MaxAttempts)} must be at least 1.";
+        if (MinimumInterval < TimeSpan.Zero)
+            return $"{nameof(MinimumInterval)} cannot be negative.";
         return null;
     }
 }
@@ -224,8 +234,22 @@ public sealed class PasswordResetOptions : IValidatableOptions
     /// <summary>How long a reset link works. One hour unless set.</summary>
     public TimeSpan TokenLifetime { get; set; } = TimeSpan.FromHours(1);
 
+    /// <summary>
+    /// The least time between two reset links to one account, whoever asks. One minute unless set; zero for none. A
+    /// request inside it issues nothing, and the caller says what it always says: the link sent still works. Against
+    /// a mailbox flooded with links, and against a link the person waits for being revoked by one a stranger asked.
+    /// </summary>
+    public TimeSpan MinimumInterval { get; set; } = TimeSpan.FromMinutes(1);
+
     /// <inheritdoc/>
-    public string? FindError() => TokenLifetime <= TimeSpan.Zero ? $"{nameof(TokenLifetime)} must be positive." : null;
+    public string? FindError()
+    {
+        if (TokenLifetime <= TimeSpan.Zero)
+            return $"{nameof(TokenLifetime)} must be positive.";
+        if (MinimumInterval < TimeSpan.Zero)
+            return $"{nameof(MinimumInterval)} cannot be negative.";
+        return null;
+    }
 }
 
 /// <summary>The links that activate an account an administrator created, without a password.</summary>

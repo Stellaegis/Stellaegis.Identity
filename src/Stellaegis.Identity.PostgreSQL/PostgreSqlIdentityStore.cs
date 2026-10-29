@@ -174,6 +174,12 @@ internal sealed class PostgreSqlIdentityStore
         await uow.Repo<AccountTokenRepository>().RevokeOutstandingAsync(userUniqueId, purpose, revokedAt, cancellationToken).ConfigureAwait(false);
     }
 
+    async Task<DateTimeOffset?> IAccountTokenStore.LastIssuedAtAsync(Guid userUniqueId, AccountTokenPurpose purpose, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<AccountTokenRepository>().LastIssuedAtAsync(userUniqueId, purpose, cancellationToken).ConfigureAwait(false);
+    }
+
     // ── E-mail verifications ─────────────────────────────────────────────────
 
     async Task IEmailVerificationStore.UpsertAsync(EmailVerification verification, CancellationToken cancellationToken)

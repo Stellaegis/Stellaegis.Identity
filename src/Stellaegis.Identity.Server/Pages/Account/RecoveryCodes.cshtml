@@ -34,5 +34,6 @@ else
     <form method="post" asp-page-handler="Regenerate">
         <button class="auth-btn" type="submit">@T["RecoveryCodes.Regenerate"]</button>
         <p class="auth-help auth-small">@T["RecoveryCodes.RegenerateWarning"]</p>
+        <partial name="_Errors" />
     </form>
 }

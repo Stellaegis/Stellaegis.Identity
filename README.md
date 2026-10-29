@@ -202,7 +202,9 @@ Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no fa
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
 Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and Keys:<slot>, secrets of the deployment
 Stellaegis:Identity:EmailVerification:CodeLength   6 digits, for Lifetime, 15 minutes, MaxAttempts 5
+Stellaegis:Identity:EmailVerification:MinimumInterval  1 minute between two codes to one address; asked sooner, nothing is sent and the pages say the same
 Stellaegis:Identity:PasswordReset:TokenLifetime    1 hour
+Stellaegis:Identity:PasswordReset:MinimumInterval  1 minute between two links to one account; asked sooner, nothing is sent and the page says the same
 Stellaegis:Identity:Activation:TokenLifetime       7 days
 Stellaegis:Identity:EmailChange:RequireApprovalByPrevious  true: a change of e-mail applies once the previous address approved it
 Stellaegis:Identity:EmailChange:ApprovalLifetime   7 days: the link by which the previous address approves the change
@@ -342,6 +344,18 @@ sets, and `X-Frame-Options: DENY` when the host sets none —, so that no page l
 by a link send no referrer, so that the token in their address goes nowhere. What a host adds of its own — a full
 Content-Security-Policy, HSTS, `ForwardedHeaders` behind a proxy — is the host's.
 
+**The pages limit what comes too fast, whatever the host set up.** Every POST of the pages — a GET is never counted —
+is counted against the address of the client, `Pages:RateLimiting:RequestsPerClient`, sixty a minute unless set, and
+against the e-mail the form names when it names one — the one the person signs in as, registers with, asks a code or
+a link for —, `Pages:RateLimiting:RequestsPerEmail`, ten a minute unless set; the window, `Pages:RateLimiting:Window`,
+slides. Over either limit the page comes back with the seconds to wait, status 429 and `Retry-After`, and nothing is
+tried. Behind a proxy without `ForwardedHeaders` every client has the address of the proxy, and the e-mail is what still
+tells the targets apart. A host that limits the pages by a policy of its own names it in `Pages:RateLimitingPolicy`,
+which applies to every page, GETs included, and may turn the package's off, `Pages:RateLimiting:Enabled`. Apart from
+the pages, a code or a link asked again too soon for one address is not sent — `EmailVerification:MinimumInterval`,
+`PasswordReset:MinimumInterval`, a minute unless set —, and the page says what it always says: the one sent still works,
+and a stranger neither floods a mailbox nor replaces what the person waits for.
+
 ### What the pages send
 
 Eight messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
@@ -375,7 +389,7 @@ From the lightest gesture to the heaviest, each one leaving the others untouched
 
 | Gesture | How |
 | --- | --- |
-| The name, the logo, a support link, the culture | `IdentityPagesOptions`: `ApplicationName`, `LogoPath`, `SupportUrl`, `Culture`, `DefaultCulture`; also `RedirectRoot`, `DefaultReturnUrl`, `PasswordResetEnabled`, `RateLimitingPolicy`, `AvatarCornerRadius`, `GravatarImport` |
+| The name, the logo, a support link, the culture | `IdentityPagesOptions`: `ApplicationName`, `LogoPath`, `SupportUrl`, `Culture`, `DefaultCulture`; also `RedirectRoot`, `DefaultReturnUrl`, `PasswordResetEnabled`, `RateLimiting`, `RateLimitingPolicy`, `AvatarCornerRadius`, `GravatarImport` |
 | A text or several | `Texts`, per culture, in the configuration: `Stellaegis:Identity:Pages:Texts:fr:Login.Title = Bienvenue`. The keys are those of `IdentityPagesResources.resx` |
 | The colors, the typography, the spacing | a stylesheet of the host that redefines the CSS variables of `identity.css`, named in `StylesheetPath` — or served at the same path, which wins over the package's |
 | A layout, a page | a file of the host at the same path — `Pages/Shared/_Layout.cshtml`, `_AuthLayout.cshtml`, `_AccountLayout.cshtml`, `Pages/Login.cshtml` — replaces the package's: ASP.NET Core resolves a page in the host first, then in the libraries |

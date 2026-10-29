@@ -20,7 +20,9 @@ public sealed class PasswordResetService(
     /// there; <see langword="null"/> when no enabled account has that e-mail, or when the e-mail of the account was
     /// never proven — a mistyped address would hand the account to whoever holds it. The caller shows the same
     /// message either way, so that the answer does not say which e-mails have an account. A newer token revokes the
-    /// previous ones; only its hash is kept.
+    /// previous ones; only its hash is kept. Asked again within <see cref="PasswordResetOptions.MinimumInterval"/> of
+    /// the last one, whoever asked it, nothing is issued and <see langword="null"/> is answered too: the link sent
+    /// still works, and a stranger neither floods the mailbox nor revokes the link the person waits for.
     /// </summary>
     public async Task<string?> RequestResetAsync(string email, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
@@ -33,9 +35,18 @@ public sealed class PasswordResetService(
             logger.LogWarning("Password reset of {UserUniqueId} not sent: its e-mail was never verified", user.UserUniqueId);
             return null;
         }
+        var now = clock.GetUtcNow();
+        var interval = options.Value.PasswordReset.MinimumInterval;
+        if (interval > TimeSpan.Zero
+            && await tokens.LastIssuedAtAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, cancellationToken) is { } last
+            && last + interval > now)
+        {
+            logger.LogInformation("Password reset of {UserUniqueId} not sent again: one was issued less than {Interval} ago", user.UserUniqueId, interval);
+            return null;
+        }
         var token = await tokens.IssueAsync(
             user, AccountTokenPurpose.PasswordReset, TokenDelivery.Email, user.AsActor(),
-            clock.GetUtcNow(), options.Value.PasswordReset.TokenLifetime, ipAddress, cancellationToken);
+            now, options.Value.PasswordReset.TokenLifetime, ipAddress, cancellationToken);
         logger.LogInformation("Password reset requested for {UserUniqueId}", user.UserUniqueId);
         return token;
     }

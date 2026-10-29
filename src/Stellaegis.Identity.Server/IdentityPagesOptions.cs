@@ -63,9 +63,15 @@ public sealed class IdentityPagesOptions : IValidatableOptions
     public string? DefaultCulture { get; set; }
 
     /// <summary>
-    /// The name of a rate limiting policy of the host applied to every page — <c>identity_auth</c> in the
-    /// Stellaegis framework, ten requests a minute —, which the host registers and enables itself. None unless
-    /// set.
+    /// The rate limiting the package applies to its own pages, whatever the host set up: every POST counted against
+    /// the address of the client and against the e-mail the form names, refused over the limit. On unless turned off.
+    /// </summary>
+    public PagesRateLimitingOptions RateLimiting { get; set; } = new();
+
+    /// <summary>
+    /// The name of a rate limiting policy of the host applied to every page, GETs included, which the host registers
+    /// and enables itself by <c>AddRateLimiter</c> and <c>UseRateLimiter</c>. None unless set; in addition to
+    /// <see cref="RateLimiting"/>, which a host that limits the pages by its own policy may turn off.
     /// </summary>
     public string? RateLimitingPolicy { get; set; }
 
@@ -119,6 +125,8 @@ public sealed class IdentityPagesOptions : IValidatableOptions
             return $"{nameof(AvatarCornerRadius)} is a percent of the side, from 0 for a square to 50 for a circle.";
         if (RateLimitingPolicy is not null && string.IsNullOrWhiteSpace(RateLimitingPolicy))
             return $"{nameof(RateLimitingPolicy)} must name a policy, or be absent.";
+        if (RateLimiting.FindError() is { } limiting)
+            return $"{nameof(RateLimiting)}:{limiting}";
         return null;
     }
 
@@ -140,5 +148,42 @@ public sealed class IdentityPagesOptions : IValidatableOptions
         {
             return false;
         }
+    }
+}
+
+/// <summary>
+/// The rate limiting the package applies to its own pages, whatever the host set up — a host that set up none opens
+/// nothing. Every POST of the pages counts, GETs never: against the address of the client, and against the e-mail
+/// the form names when it names one — the one the person signs in as, registers with, asks a code or a link for.
+/// Over either limit the page answers 429 with the seconds to wait, and nothing is tried. Behind a proxy, the
+/// address of the client is the proxy's unless the host enables <c>ForwardedHeaders</c>: every client then shares
+/// one count, and the e-mail is what still tells the targets apart.
+/// </summary>
+public sealed class PagesRateLimitingOptions : IValidatableOptions
+{
+    /// <summary>Whether the package limits its pages itself. Yes unless set; a host that limits them by a policy of its own may turn it off.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>How many POSTs one client address may send to the pages in <see cref="Window"/>. 60 unless set.</summary>
+    public int RequestsPerClient { get; set; } = 60;
+
+    /// <summary>How many POSTs may name one e-mail in <see cref="Window"/>, from every client together. 10 unless set.</summary>
+    public int RequestsPerEmail { get; set; } = 10;
+
+    /// <summary>The window the counts slide over. One minute unless set.</summary>
+    public TimeSpan Window { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <inheritdoc/>
+    public string? FindError()
+    {
+        if (!Enabled)
+            return null;
+        if (RequestsPerClient < 1)
+            return $"{nameof(RequestsPerClient)} must be at least 1.";
+        if (RequestsPerEmail < 1)
+            return $"{nameof(RequestsPerEmail)} must be at least 1.";
+        if (Window <= TimeSpan.Zero)
+            return $"{nameof(Window)} must be positive.";
+        return null;
     }
 }

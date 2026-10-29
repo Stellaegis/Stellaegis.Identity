@@ -276,7 +276,11 @@ internal sealed class LoginEventRepository(DbConnection connection, Func<DbTrans
 /// <summary>The rows of <c>ident.account_tokens</c>, keyed by the hash of the token.</summary>
 internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTransaction?> transaction)
 {
-    static AccountTokenRepository() => SnakeCaseTypeMap<AccountTokenRow>.Register();
+    static AccountTokenRepository()
+    {
+        SnakeCaseTypeMap<AccountTokenRow>.Register();
+        SnakeCaseTypeMap<IssuedRow>.Register();
+    }
 
     private const string Columns =
         "token_hash, user_unique_id, purpose, delivery, email, created_at, created_by, expires_at, consumed_at, revoked_at, ip_address";
@@ -314,6 +318,19 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
         => connection.ExecuteAsync(new CommandDefinition(
             "delete from ident.account_tokens where expires_at < @before",
             new { before }, transaction(), cancellationToken: cancellationToken));
+
+    public async Task<DateTimeOffset?> LastIssuedAtAsync(Guid userUniqueId, AccountTokenPurpose purpose, CancellationToken cancellationToken)
+    {
+        var row = await connection.QuerySingleAsync<IssuedRow>(new CommandDefinition(
+            "select max(created_at) as created_at from ident.account_tokens where user_unique_id = @userUniqueId and purpose = @purpose",
+            new { userUniqueId, purpose = AccountTokenRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row.CreatedAt;
+    }
+
+    private sealed class IssuedRow
+    {
+        public DateTimeOffset? CreatedAt { get; set; }
+    }
 
     private sealed class AccountTokenRow
     {

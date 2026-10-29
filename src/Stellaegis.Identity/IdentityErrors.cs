@@ -55,6 +55,9 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="InvalidVerificationCode"/>: the code is wrong.</summary>
     public const string InvalidVerificationCodeCode = "Verification.Invalid";
 
+    /// <summary>The code of <see cref="VerificationThrottled"/>: a code went to that e-mail a moment ago, and no new one is issued yet.</summary>
+    public const string VerificationThrottledCode = "Verification.Throttled";
+
     /// <summary>The code of <see cref="InvalidResetToken"/>: the reset link is unknown, consumed, or for a disabled account.</summary>
     public const string InvalidResetTokenCode = "PasswordReset.Invalid";
 
@@ -166,6 +169,13 @@ public static class IdentityErrors
     /// <summary>The verification code is wrong.</summary>
     public static Error InvalidVerificationCode { get; } =
         Error.Validation(InvalidVerificationCodeCode, "The verification code is incorrect.");
+
+    /// <summary>
+    /// A code went to that e-mail less than <see cref="EmailVerificationOptions.MinimumInterval"/> ago, and no new one
+    /// is issued: the one sent still works. A page says nothing of it, and goes on as if a code had been sent.
+    /// </summary>
+    public static Error VerificationThrottled { get; } =
+        Error.Conflict(VerificationThrottledCode, "A code was sent to this e-mail address a moment ago, and still works.");
 
     /// <summary>The reset link is unknown, consumed, or for a disabled account.</summary>
     public static Error InvalidResetToken { get; } =

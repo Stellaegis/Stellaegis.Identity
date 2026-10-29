@@ -36,6 +36,9 @@ internal static class WebTestHost
             options.PasswordHasher.Iterations = 1000;
             options.LoginPolicy.MinResponseTime = TimeSpan.Zero;
             options.SelfRegistration = SelfRegistration.Open;
+            // Codes and links asked again at once: the intervals are tested where they are set.
+            options.EmailVerification.MinimumInterval = TimeSpan.Zero;
+            options.PasswordReset.MinimumInterval = TimeSpan.Zero;
         });
         builder.Services.AddStellaegisLocalBlockedUsersSource();
         return builder;

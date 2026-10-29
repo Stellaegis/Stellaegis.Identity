@@ -17,10 +17,12 @@ internal sealed class ForgotPasswordModel(
     IOptions<IdentityOptions> identity,
     IOptions<IdentityPagesOptions> pages,
     ILogger<ForgotPasswordModel> logger,
-    IIdentityMailer? mailer = null) : PageModel
+    IIdentityMailer? mailer = null) : PageModel, INamesAnEmail
 {
     [BindProperty]
     public string? Email { get; set; }
+
+    string? INamesAnEmail.NamedEmail => Email;
 
     public bool Sent { get; private set; }
 

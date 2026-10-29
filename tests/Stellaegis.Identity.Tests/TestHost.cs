@@ -48,6 +48,9 @@ internal sealed class TestHost : IDisposable
             options.PasswordHasher.Iterations = 1000;   // fast; the count does not change what is tested
             options.LoginPolicy.MinResponseTime = TimeSpan.Zero;
             options.SelfRegistration = SelfRegistration.Open;
+            // Codes and links asked again at once: the intervals are tested where they are set.
+            options.EmailVerification.MinimumInterval = TimeSpan.Zero;
+            options.PasswordReset.MinimumInterval = TimeSpan.Zero;
             configure?.Invoke(options);
         });
         services.AddStellaegisLocalBlockedUsersSource();

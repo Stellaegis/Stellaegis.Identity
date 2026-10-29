@@ -14,7 +14,7 @@ internal sealed class VerifyEmailModel(
     IdentityTexts texts,
     IOptions<IdentityOptions> identity,
     ILogger<VerifyEmailModel> logger,
-    IIdentityMailer? mailer = null) : PageModel
+    IIdentityMailer? mailer = null) : PageModel, INamesAnEmail
 {
     [BindProperty]
     public string? Code { get; set; }
@@ -22,6 +22,8 @@ internal sealed class VerifyEmailModel(
     public string Email { get; private set; } = "";
 
     public string? ReturnUrl { get; private set; }
+
+    string? INamesAnEmail.NamedEmail => pending.Read(HttpContext, PendingStates.Registration) is { Length: 5 } parts ? parts[0] : null;
 
     public IActionResult OnGet()
     {
@@ -70,7 +72,13 @@ internal sealed class VerifyEmailModel(
         if (mailer is null)
             throw new InvalidOperationException($"The registration is open and no {nameof(IIdentityMailer)} is registered.");
 
+        // A code asked again too soon is not sent, and the page says what it always says: the one sent still works.
         var issued = await verification.RequestVerificationAsync(state.Email, EmailVerificationPurpose.Registration, null, this.ClientAddress(), cancellationToken);
+        if (issued.IsFailure && issued.Error == IdentityErrors.VerificationThrottled)
+        {
+            TempData["Resent"] = true;
+            return Redirect("/verify-email");
+        }
         if (issued.IsFailure)
         {
             ModelState.AddModelError(string.Empty, texts.Describe(issued.Error!));

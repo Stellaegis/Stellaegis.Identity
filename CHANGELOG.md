@@ -71,6 +71,23 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 ### Added
 
+- **The pages limit what comes too fast, whatever the host set up.** Every POST of the pages — a GET is never
+  counted — is counted against the address of the client, `Pages:RateLimiting:RequestsPerClient`, sixty a minute
+  unless set, and against the e-mail the form names when it names one — the one the person signs in as, registers
+  with, asks a code or a link for —, `Pages:RateLimiting:RequestsPerEmail`, ten a minute unless set, over a sliding
+  `Pages:RateLimiting:Window`. Over either limit the page comes back with the seconds to wait, status 429 and
+  `Retry-After`, and nothing is tried; the pages of the language choice are never counted. Until then, the pages were
+  limited only by a policy of the host named in `Pages:RateLimitingPolicy`, and a host that named none had no limit at
+  all: a password could be tried on every address, a mailbox flooded with codes. `Pages:RateLimitingPolicy` stays, in
+  addition; a host that limits the pages by its own policy turns the package's off, `Pages:RateLimiting:Enabled`.
+  `PagesRateLimitingOptions` holds the settings.
+- **A code or a link asked again too soon for one address is not sent**, whoever asks: `EmailVerification:MinimumInterval`
+  between two codes to one e-mail for one purpose, `PasswordReset:MinimumInterval` between two reset links to one
+  account, a minute each unless set, zero for none. `EmailVerificationService.RequestVerificationAsync` answers
+  `Verification.Throttled`, which the pages keep to themselves, and `PasswordResetService.RequestResetAsync` answers
+  `null` as for an unknown address: the page says what it always says, and the code or the link sent still works. A
+  stranger could flood a mailbox with codes and links, and each one replaced the one the person was waiting for.
+  `IAccountTokenStore.LastIssuedAtAsync` says when the latest token of an account for a purpose was issued.
 - **`IPasswordBlocklist`**, the port a host registers to refuse the passwords everyone chooses or the breaches hold,
   asked wherever a password is accepted — `PasswordStrengthEvaluator.RefuseAsync`, which the registration, the
   activation, the reset, the change and the registration page go through —, answered `Password.Blocked`. The module
@@ -93,14 +110,17 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 1. **The schema `ident` is installed again**: `0001` is corrected in place — `ck_account_tokens_purpose` takes
    `email_revert` and `email_change_approval`, `email_verifications` is keyed by e-mail and purpose and carries
    `requested_by` —, so the installation and the verification refuse the schema of a 6.x. Drop it, then `install`.
-2. **A store written outside the package implements `RecordFailedLoginAsync`**, and the e-mail verifications by
-   e-mail and purpose; the three of the package do. **A caller of `EmailVerificationService`** passes the purpose and
-   the requester.
+2. **A store written outside the package implements `RecordFailedLoginAsync`**, `LastIssuedAtAsync`, and the e-mail
+   verifications by e-mail and purpose; the three of the package do. **A caller of `EmailVerificationService`** passes
+   the purpose and the requester, and treats `Verification.Throttled` as a code sent.
+3. **A host that limits the pages by a policy of its own** keeps `Pages:RateLimitingPolicy` and sets
+   `Pages:RateLimiting:Enabled` to false, or lets both apply. A host that set up nothing has the package's limits now,
+   and enables `ForwardedHeaders` behind a proxy so that the count is the client's rather than the proxy's.
    **An `IIdentityMailer` implements `SendEmailChangeApprovalAsync`**, the approval link to the previous address,
    **`SendEmailChangedAsync`**, the notice to the previous address with its link, and **`SendAccountLockedAsync`**,
    the notice that the account is locked out.
    **A caller of `AccountService.ConfirmEmailChangeAsync`** reads a `Result<EmailChanged>`, and sends the notice.
-3. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
+4. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.
 
 ## [6.3.0] — 2026-10-28

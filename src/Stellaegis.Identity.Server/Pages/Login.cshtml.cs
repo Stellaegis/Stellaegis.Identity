@@ -20,7 +20,7 @@ internal sealed class LoginModel(
     IOptions<IdentityOptions> identity,
     IOptions<IdentityPagesOptions> pages,
     ILogger<LoginModel> logger,
-    IIdentityMailer? mailer = null) : PageModel
+    IIdentityMailer? mailer = null) : PageModel, INamesAnEmail
 {
     private static readonly TimeSpan LoginCodeLifetime = TimeSpan.FromMinutes(10);
 
@@ -28,6 +28,8 @@ internal sealed class LoginModel(
     public InputModel Input { get; set; } = new();
 
     public string? ReturnUrl { get; private set; }
+
+    string? INamesAnEmail.NamedEmail => Input.Email;
 
     public bool RegistrationOpen => identity.Value.SelfRegistration == SelfRegistration.Open;
 
