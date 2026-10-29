@@ -57,6 +57,9 @@ public sealed class AdminEndpointsTests
         var duplicate = await client.PostAsJsonAsync("/api/admin/identity/users", new CreateAccountRequest("jane@acme.test", "Jane"), Ct);
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         Assert.Equal(IdentityErrors.EmailTakenCode, await duplicate.CodeOfAsync(Ct));
+        var malformed = await client.PostAsJsonAsync("/api/admin/identity/users", new CreateAccountRequest("jane@acme\r\nBcc: all@acme.test", "Jane"), Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
+        Assert.Equal("Account.Invalid", await malformed.CodeOfAsync(Ct));
 
         var page = await client.GetFromJsonAsync<AccountPage>("/api/admin/identity/users?skip=0&take=10", Ct);
         Assert.Equal(1, page!.TotalCount);

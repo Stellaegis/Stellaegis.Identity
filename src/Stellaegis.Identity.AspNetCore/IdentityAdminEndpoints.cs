@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -122,8 +123,8 @@ public static class IdentityAdminEndpoints
 
         users.MapPost("/", async (CreateAccountRequest request, HttpContext http, AccountAdministrationService accounts, IOptions<IdentityOptions> options, CancellationToken ct) =>
             {
-                if (request is null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.DisplayName))
-                    return Result.Failure(Error.Validation("Account.Invalid", "An account has an e-mail and a display name; its person chooses its password.")).ToHttpResult();
+                if (request is null || string.IsNullOrWhiteSpace(request.Email) || !new EmailAddressAttribute().IsValid(request.Email) || string.IsNullOrWhiteSpace(request.DisplayName))
+                    return Result.Failure(Error.Validation("Account.Invalid", "An account has an e-mail address and a display name; its person chooses its password.")).ToHttpResult();
                 var delivery = Delivery.Of(request.Delivery, http, options.Value);
                 if (delivery.IsFailure)
                     return delivery.ToHttpResult();
