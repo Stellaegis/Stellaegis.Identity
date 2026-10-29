@@ -7,6 +7,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+A wrong second factor is a failed login. For the ten minutes of a pending login, codes could be tried without
+limit — three valid authenticator codes in a million per try, one in a million by e-mail —, and every try also
+hashed each recovery code left. And the failed logins were counted by the service on the row it had read: attempts
+sent together each wrote "one more" over the same value, and a lockout of five could be outrun.
+
+### Added
+
+- **`LoginService.CompleteWithSecondFactorAsync`**: the second step of a login, in the service. A locked account is
+  refused before the code is read; a recovery code is recognized by its shape — ten letters or digits — and tried
+  alone, `RecoveryCodeService.LooksLikeCode`; a wrong code counts as a failed login and locks the account out like a
+  wrong password, traced as `LoginFailureReasons.InvalidSecondFactor`; the answer takes `LoginPolicy:MinResponseTime`
+  at least. `/login/mfa` signs in on its answer, and leaves the pending login on a lockout.
+- **`IAuthUserStore.RecordFailedLoginAsync`**: one more failed login counted and the lockout set in one write on the
+  stored row, answering `FailedLogin` — the count, and until when the account is locked out. Both engines write it
+  in one statement; the in-memory store under a lock.
+
+### Updating from 6.3.0
+
+1. **Nothing to install**: the schema is unchanged.
+2. **A store written outside the package implements `RecordFailedLoginAsync`**; the three of the package do.
+3. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
+   calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.
+
 ## [6.3.0] — 2026-10-28
 
 When the person proved who they are. The session said how, not when: an issuer had nothing to answer `max_age`

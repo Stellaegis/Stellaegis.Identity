@@ -111,7 +111,7 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 
 | Service | What it does |
 | --- | --- |
-| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due, and builds the principal — `sub`, `email`, `name`, and `locale`, `zoneinfo`, `picture` when the person chose them — a host signs in |
+| `LoginService` | Verifies an e-mail and a password, counts the failed attempts and locks the account out after too many, answers in the same time whether the account exists or not, says whether a second factor is due and completes the login by it — a one-time code or a recovery code, a wrong one counting as a failed login —, and builds the principal — `sub`, `email`, `name`, and `locale`, `zoneinfo`, `picture` when the person chose them — a host signs in |
 | `RegistrationService` | Creates an account when the self-registration is open, after the e-mail was proved by a code |
 | `ActivationService` | Lets the person of an account an administrator created choose its first password, by the link of its activation |
 | `AccountService` | Changes the password, the e-mail, verifies the current address by a code, deletes the account, verifies a password |
@@ -126,7 +126,8 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 The stores are ports, each atomic: `IAuthUserStore`, `IEmailVerificationStore`, `IAccountTokenStore`,
 `ILoginEventStore`, `IMfaStore`, `IAvatarStore`, `IRecoveryCodeStore`. `AddStellaegisIdentityInMemory` registers their in-memory
 form, for development and tests; `AddStellaegisIdentityPostgreSQL` and `AddStellaegisIdentitySqlServer` those of
-the two engines.
+the two engines. A failed login is counted by the store in one write, `IAuthUserStore.RecordFailedLoginAsync`, so
+that attempts sent together all count and a lockout cannot be outrun.
 
 ### The links an account receives
 
@@ -192,7 +193,7 @@ when the host starts:
 Stellaegis:Identity:PasswordHasher:Pepper          required; a secret of the deployment, never in the repository
 Stellaegis:Identity:PasswordHasher:Iterations      310000
 Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a password must mix
-Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5, then a lockout of LockoutDuration, 15 minutes
+Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
 Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and Keys:<slot>, secrets of the deployment
@@ -376,7 +377,8 @@ circle.
 A login whose password held and awaits its second factor, a registration that awaits its code, a change of
 e-mail that awaits its code: each waits in a cookie of its own, protected by the data protection of the host, out
 of scripts, for ten to fifteen minutes. The registration keeps the password there until the code proves the e-mail,
-and the time zone of the browser, written into the account at its creation.
+and the time zone of the browser, written into the account at its creation. A wrong code on `/login/mfa` is a
+failed login: it counts toward the lockout of the account, and the lockout ends the pending login.
 
 ## Tests
 
