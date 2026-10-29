@@ -215,10 +215,12 @@ enterprise, a solution installed for one organization — opens nothing. `Open` 
 
 ### Events
 
-The module publishes four events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
-with its reason, `UserUnblocked`, and `UserProfileChanged` when what others see of the person changes, the name or
-the avatar —, records implementing `IEvent`. A registry that keeps a copy of the name and the avatar for the
-people who share a compartment with the person refreshes it on the last one. It publishes to whatever bus the host
+The module publishes five events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
+with its reason, `UserUnblocked`, `UserProfileChanged` when what others see of the person changes, the name or
+the avatar, and `UserPasswordChanged` with its reason, changed, reset or removed —, records implementing `IEvent`. A
+registry that keeps a copy of the name and the avatar for the people who share a compartment with the person refreshes
+it on `UserProfileChanged`; an issuer revokes the refresh tokens and the authorizations of the subject on
+`UserPasswordChanged`, since what was issued on the former password is no longer the person's. It publishes to whatever bus the host
 registered, and nowhere when the host registered none; it subscribes to nothing. A host that wants a block to
 apply at once connects its bus to the admission (below).
 

@@ -34,6 +34,10 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 ### Added
 
+- **`UserPasswordChangedEvent`**, published when the password is changed by its person, reset by a link, or removed by
+  the link that undoes a change of e-mail, with its reason: an issuer revokes the refresh tokens and the authorizations
+  of the subject on it — what was issued on the former password is no longer the person's. Until then, a stolen
+  password that had served to obtain tokens went on serving after the reset.
 - **`LoginService.CompleteWithSecondFactorAsync`**: the second step of a login, in the service. A locked account is
   refused before the code is read; a recovery code is recognized by its shape — ten letters or digits — and tried
   alone, `RecoveryCodeService.LooksLikeCode`; a wrong code counts as a failed login and locks the account out like a

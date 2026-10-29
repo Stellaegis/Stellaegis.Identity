@@ -36,13 +36,15 @@ public sealed class AccountService(
             return Result.Failure(IdentityErrors.PasswordRejected(violations));
 
         var user = confirmed.Value;
+        var now = clock.GetUtcNow();
         user.PasswordHash = hasher.Hash(newPassword);
         user.FailedLoginCount = 0;
         user.FailedLoginLast = null;
         user.BlockedUntil = null;
-        user.ModifiedAt = clock.GetUtcNow();
+        user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await events.PublishAsync(new UserPasswordChangedEvent { OccurredAt = now, UserUniqueId = userUniqueId, Reason = UserPasswordChangedEvent.ChangedReason }, cancellationToken);
         logger.LogInformation("Password of {UserUniqueId} changed", userUniqueId);
         return Result.Success();
     }
@@ -154,6 +156,7 @@ public sealed class AccountService(
             await recoveryCodes.DeleteAllAsync(user.UserUniqueId, cancellationToken);
         }
         var reset = await tokens.IssueAsync(user, AccountTokenPurpose.PasswordReset, TokenDelivery.Email, user.AsActor(), now, options.Value.PasswordReset.TokenLifetime, null, cancellationToken);
+        await events.PublishAsync(new UserPasswordChangedEvent { OccurredAt = now, UserUniqueId = user.UserUniqueId, Reason = UserPasswordChangedEvent.RemovedReason }, cancellationToken);
         logger.LogWarning("E-mail of {UserUniqueId} restored by its previous address: the password is removed", user.UserUniqueId);
         return Result.Success(new EmailReverted(user.Email, reset));
     }

@@ -24,6 +24,9 @@ public sealed class AccountTests
         Assert.Equal(1, user.FailedLoginCount);   // the wrong one just typed; the three before went with the change
         Assert.Null(user.BlockedUntil);
         Assert.Equal(user.AsActor(), user.ModifiedBy);
+        var changed = Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events));
+        Assert.Equal(id, changed.UserUniqueId);
+        Assert.Equal(UserPasswordChangedEvent.ChangedReason, changed.Reason);
     }
 
     [Fact]
@@ -104,9 +107,11 @@ public sealed class AccountTests
         Assert.Equal("jane@acme.test", await account.ValidateRevertTokenAsync(first.RevertToken));
         Assert.Equal("thief@evil.test", await account.ValidateRevertTokenAsync(second.RevertToken));
 
+        host.Events.Events.Clear();
         var reverted = await account.RevertEmailChangeAsync(first.RevertToken);
         Assert.True(reverted.IsSuccess, reverted.Error?.ToString());
         Assert.Equal("jane@acme.test", reverted.Value.Email);
+        Assert.Equal(UserPasswordChangedEvent.RemovedReason, Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events)).Reason);
         var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!;
         Assert.Equal("jane@acme.test", user.Email);
         Assert.True(user.EmailVerified);
@@ -121,7 +126,9 @@ public sealed class AccountTests
         // The thief's password opens nothing; the person chooses a new one by the link, and signs in.
         var login = host.Get<LoginService>();
         Assert.Equal(LoginStep.Failed, (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
+        host.Events.Events.Clear();
         Assert.True((await reset.ResetPasswordAsync(reverted.Value.ResetToken, "Another-Horse-7")).IsSuccess);
+        Assert.Equal(UserPasswordChangedEvent.ResetReason, Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events)).Reason);
         Assert.True((await login.AuthenticateAsync("jane@acme.test", "Another-Horse-7")).Succeeded);
 
         // A second factor enrolled before the change stays through a revert.

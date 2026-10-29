@@ -57,6 +57,33 @@ public sealed record UserBlockedEvent : IEvent
     public required string Reason { get; init; }
 }
 
+/// <summary>
+/// Published when the password of an account changes — chosen anew by its person, reset by a link, or removed by the
+/// link that undoes a change of e-mail. What was issued on the former password is no longer the person's: an issuer
+/// revokes the refresh tokens and the authorizations of the subject, so that whoever held the former password keeps
+/// nothing that goes on; a host closes its other sessions when it can tell them apart.
+/// </summary>
+public sealed record UserPasswordChangedEvent : IEvent
+{
+    /// <summary>The <see cref="Reason"/> of a password the person changed, the current one confirmed.</summary>
+    public const string ChangedReason = "changed";
+
+    /// <summary>The <see cref="Reason"/> of a password reset by the link sent to the address of the account.</summary>
+    public const string ResetReason = "reset";
+
+    /// <summary>The <see cref="Reason"/> of a password removed by the link that undid a change of e-mail: the account waits for a new one.</summary>
+    public const string RemovedReason = "removed";
+
+    /// <inheritdoc/>
+    public required DateTimeOffset OccurredAt { get; init; }
+
+    /// <summary>The identity of the account, which its <c>sub</c> claim carries.</summary>
+    public required Guid UserUniqueId { get; init; }
+
+    /// <summary>How the password changed, for the journal: <see cref="ChangedReason"/>, <see cref="ResetReason"/> or <see cref="RemovedReason"/>.</summary>
+    public required string Reason { get; init; }
+}
+
 /// <summary>Published when a disabled account is enabled again.</summary>
 public sealed record UserUnblockedEvent : IEvent
 {

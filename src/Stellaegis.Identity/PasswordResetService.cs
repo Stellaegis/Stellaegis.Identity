@@ -10,6 +10,7 @@ public sealed class PasswordResetService(
     IAccountTokenStore tokens,
     PasswordHasher hasher,
     PasswordStrengthEvaluator passwords,
+    IEventPublisher events,
     IOptions<IdentityOptions> options,
     TimeProvider clock,
     ILogger<PasswordResetService> logger)
@@ -48,7 +49,8 @@ public sealed class PasswordResetService(
 
     /// <summary>
     /// Sets the new password of the account <paramref name="token"/> was issued for; the token is spent first, so
-    /// that two uses at once cannot both succeed. A lockout in progress ends with it.
+    /// that two uses at once cannot both succeed. A lockout in progress ends with it, and
+    /// <see cref="UserPasswordChangedEvent"/> says the former password is no longer the person's.
     /// </summary>
     public async Task<Result> ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
     {
@@ -74,6 +76,7 @@ public sealed class PasswordResetService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await events.PublishAsync(new UserPasswordChangedEvent { OccurredAt = now, UserUniqueId = user.UserUniqueId, Reason = UserPasswordChangedEvent.ResetReason }, cancellationToken);
         logger.LogInformation("Password of {UserUniqueId} reset", user.UserUniqueId);
         return Result.Success();
     }
