@@ -126,12 +126,15 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         return row is null ? null : new FailedLogin(row.FailedLoginCount, row.BlockedUntil);
     }
 
+    // The address goes with the deletion, replaced by a mark that names the account: the address is free for a new
+    // account, and the row keeps the identity, which is never reused.
     public async Task<bool> SoftDeleteAsync(Guid userUniqueId, Actor deletedBy, DateTimeOffset deletedAt, CancellationToken cancellationToken)
     {
         var rows = await connection.ExecuteAsync(new CommandDefinition(
             """
             update ident.users
             set is_deleted = true, deleted_at = @deletedAt, deleted_by = @deletedBy,
+                email = 'deleted:' || replace(user_unique_id::text, '-', ''),
                 modified_at = @deletedAt, modified_by = @deletedBy
             where user_unique_id = @userUniqueId and is_deleted = false
             """,

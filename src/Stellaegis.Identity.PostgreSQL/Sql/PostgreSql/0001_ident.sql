@@ -59,7 +59,7 @@ create table ident.users (
 
 comment on table  ident.users                is 'The accounts: who can sign in, with which e-mail and which password. The second factor and the recovery codes are kept apart.';
 comment on column ident.users.user_unique_id is 'The identity of the account, which its sub claim carries. Never reused: a deleted account stays, marked.';
-comment on column ident.users.email          is 'Lowercase and trimmed by the module before it reaches the store. Unique among the accounts, deleted ones included.';
+comment on column ident.users.email          is 'Lowercase and trimmed by the module before it reaches the store. Unique among the accounts; a deleted account keeps deleted:{id} instead, so that its address is free again.';
 comment on column ident.users.locale         is 'The language the person chose, a culture name the module checks: the locale claim. Null while they chose none.';
 comment on column ident.users.time_zone      is 'The time zone the person chose, an IANA name the module checks: the zoneinfo claim. Null while they chose none.';
 comment on column ident.users.email_verified is 'Whether the e-mail was proven: a code, or a link the system sent there. While it was not, no reset link is sent to it.';

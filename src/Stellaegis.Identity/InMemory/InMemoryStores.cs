@@ -81,6 +81,7 @@ internal sealed class InMemoryAuthUserStore(InMemoryIdentityData data) : IAuthUs
         user.IsDeleted = true;
         user.DeletedAt = DateTimeOffset.UtcNow;
         user.DeletedBy = deletedBy;
+        user.Email = $"deleted:{userUniqueId:N}";
         data.Avatars.TryRemove(userUniqueId, out _);
         return Task.FromResult(true);
     }

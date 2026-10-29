@@ -236,6 +236,7 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
     public async Task A_deleted_account_stays_hidden_and_keeps_its_id_and_a_disabled_one_is_blocked_at_the_door()
     {
         var deleted = NewUser();
+        var address = deleted.Email;
         var disabled = NewUser(enabled: false);
         var fine = NewUser();
         await Users.CreateAsync(deleted, Ct);
@@ -253,6 +254,10 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         Assert.True(withDeleted.IsDeleted);
         Assert.Equal(Actor.Parse("admin"), withDeleted.DeletedBy);
         Assert.Equal(_clock.Now, withDeleted.DeletedAt);
+        // The address went with the deletion: it is free for a new account, under a new identity.
+        Assert.Equal($"deleted:{deleted.UserUniqueId:N}", withDeleted.Email);
+        await Users.CreateAsync(NewUser(email: address), Ct);
+        Assert.NotEqual(deleted.UserUniqueId, (await Users.GetByEmailAsync(address, Ct))!.UserUniqueId);
         Assert.True(await Users.CountAsync(includeDeleted: true, Ct) > await Users.CountAsync(cancellationToken: Ct));
 
         // The id of a deleted account is taken for good.

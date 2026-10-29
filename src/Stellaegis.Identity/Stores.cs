@@ -38,8 +38,9 @@ public interface IAuthUserStore
     Task<FailedLogin?> RecordFailedLoginAsync(Guid userUniqueId, DateTimeOffset now, int maxAttempts, TimeSpan lockoutDuration, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Marks the account deleted, by <paramref name="deletedBy"/>, and removes its avatar in the same gesture: the
-    /// account stays so that its id is never reused, the image goes since it identifies the person.
+    /// Marks the account deleted, by <paramref name="deletedBy"/>, replaces its e-mail by <c>deleted:{id}</c> and
+    /// removes its avatar in the same gesture: the account stays so that its id is never reused, the address is free
+    /// for a new account — a person who returns is a new account —, the image goes since it identifies the person.
     /// <see langword="false"/> when no account with that id exists, or it is deleted already.
     /// </summary>
     Task<bool> SoftDeleteAsync(Guid userUniqueId, Primitives.Actor deletedBy, CancellationToken cancellationToken = default);

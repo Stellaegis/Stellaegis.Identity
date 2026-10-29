@@ -28,7 +28,8 @@
 -- The audit columns carry an actor, as Stellaegis.Primitives writes one: at most 128 characters,
 -- and never a default — an actor forgotten is an error, not "system".
 -- email is lowercase and trimmed by the module before it reaches the store, unique among the
--- accounts, deleted ones included. email_verified says whether it was proven: a code, or a link
+-- accounts; a deleted account keeps deleted:{id} instead, so that its address is free again.
+-- email_verified says whether it was proven: a code, or a link
 -- the system sent there; while it was not, no reset link is sent to it.
 
 create table ident.users (

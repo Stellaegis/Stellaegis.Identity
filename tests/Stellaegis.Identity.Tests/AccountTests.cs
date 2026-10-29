@@ -30,6 +30,20 @@ public sealed class AccountTests
     }
 
     [Fact]
+    public async Task The_address_of_a_deleted_account_is_free_again_and_a_return_is_a_new_account()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        Assert.True((await host.Get<AccountService>().DeleteAccountAsync(id, "Correct-Horse-9")).IsSuccess);
+
+        var again = await host.CreateUserAsync();
+        Assert.NotEqual(id, again);
+        var users = host.Get<IAuthUserStore>();
+        Assert.Equal(again, (await users.GetByEmailAsync("jane@acme.test"))!.UserUniqueId);
+        Assert.Equal($"deleted:{id:N}", (await users.ListAsync(0, 10, includeDeleted: true)).Single(user => user.UserUniqueId == id).Email);
+    }
+
+    [Fact]
     public async Task A_password_typed_to_confirm_an_operation_is_a_login_attempt_counted_locked_out_and_traced()
     {
         using var host = new TestHost(o => { o.LoginPolicy.MaxFailedAttempts = 3; o.LoginPolicy.LockoutDuration = TimeSpan.FromMinutes(15); });
