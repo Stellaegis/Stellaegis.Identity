@@ -319,12 +319,15 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         // Revoking reaches the usable tokens of the purpose, and a revoked token is not consumed.
         var reset = Issued(AccountTokens.New().Hash);
         var activation = Issued(AccountTokens.New().Hash, AccountTokenPurpose.Activation);
+        var revert = Issued(AccountTokens.New().Hash, AccountTokenPurpose.EmailRevert);
         await Tokens.CreateAsync(reset, Ct);
         await Tokens.CreateAsync(activation, Ct);
+        await Tokens.CreateAsync(revert, Ct);
         await Tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, _clock.Now, Ct);
         Assert.NotNull((await Tokens.GetAsync(reset.TokenHash, Ct))!.RevokedAt);
         Assert.False(await Tokens.TryConsumeAsync(reset.TokenHash, _clock.Now, Ct));
         Assert.True((await Tokens.GetAsync(activation.TokenHash, Ct))!.IsValidAt(_clock.Now));
+        Assert.Equal(AccountTokenPurpose.EmailRevert, (await Tokens.GetAsync(revert.TokenHash, Ct))!.Purpose);
 
         // A token of an account that does not exist, or a hash that is not one, is refused by the schema.
         await AssertRefusedAsync(() => Tokens.CreateAsync(Issued(AccountTokens.New().Hash, owner: Guid.NewGuid()), Ct), Refusal.MissingAccount);

@@ -19,7 +19,12 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 - **Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password**, as
   disabling the second factor and deleting the account did. A wrong or missing password shows the form again.
 - **The previous address is told of a change of e-mail**, `IIdentityMailer.SendEmailChangedAsync`, once the new one
-  is confirmed.
+  is confirmed, with the link that undoes it — good for `EmailChange:RevertLifetime`, seven days unless set. The link,
+  `/revert-email`, restores the address, removes the password, revokes the reset links and a second factor enrolled
+  since the change, and sends a reset link to the restored address; the sessions close at their next reading, an
+  account without a password keeping none. A second change does not kill the link of the first.
+  `AccountService.ConfirmEmailChangeAsync` answers the token with the change; `RevertEmailChangeAsync` and
+  `ValidateRevertTokenAsync` carry the link; `AccountTokenPurpose.EmailRevert` is its purpose.
 
 ### Added
 
@@ -34,9 +39,11 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 ### Updating from 6.3.0
 
-1. **Nothing to install**: the schema is unchanged.
+1. **The schema `ident` is installed again**: `0001` is corrected in place — `ck_account_tokens_purpose` takes
+   `email_revert` —, so the installation and the verification refuse the schema of a 6.x. Drop it, then `install`.
 2. **A store written outside the package implements `RecordFailedLoginAsync`**; the three of the package do.
-   **An `IIdentityMailer` implements `SendEmailChangedAsync`**, the notice to the previous address.
+   **An `IIdentityMailer` implements `SendEmailChangedAsync`**, the notice to the previous address with its link.
+   **A caller of `AccountService.ConfirmEmailChangeAsync`** reads a `Result<EmailChanged>`, and sends the notice.
 3. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.
 

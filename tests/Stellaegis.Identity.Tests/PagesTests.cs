@@ -456,8 +456,28 @@ public sealed class PagesTests
         var notice = app.Mailer().LastTo(Email)!;
         Assert.Equal(InMemoryIdentityMailer.EmailChanged, notice.Kind);
         Assert.Equal("jane.doe@acme.test", notice.Code);
-        using var scope = app.Services.CreateScope();
-        Assert.Equal("jane.doe@acme.test", (await scope.ServiceProvider.GetRequiredService<IAuthUserStore>().GetByEmailAsync("jane.doe@acme.test", Ct))!.Email);
+        using (var scope = app.Services.CreateScope())
+            Assert.NotNull(await scope.ServiceProvider.GetRequiredService<IAuthUserStore>().GetByEmailAsync("jane.doe@acme.test", Ct));
+
+        // The notice carries the link that undoes the change: the address comes back, the password goes, a reset link follows.
+        var revertPath = notice.Link!.PathAndQuery;
+        var token = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(notice.Link.Query)["token"].ToString();
+        await browser.GetAsync(revertPath, Ct);
+        Assert.Contains("Restore this address", browser.Html);
+        Assert.Contains(Email, browser.Html);
+        var reverted = await browser.PostFormAsync(revertPath, new Dictionary<string, string> { ["Token"] = token }, Ct);
+        Assert.Equal("/revert-email?done=true", reverted.Headers.Location!.ToString());
+        await browser.GetAsync("/revert-email?done=true", Ct);
+        Assert.Contains("Address restored", browser.Html);
+        Assert.Equal(InMemoryIdentityMailer.PasswordResetLink, app.Mailer().LastTo(Email)!.Kind);
+        using (var scope = app.Services.CreateScope())
+        {
+            var restored = await scope.ServiceProvider.GetRequiredService<IAuthUserStore>().GetByEmailAsync(Email, Ct);
+            Assert.NotNull(restored);
+            Assert.Null(restored.PasswordHash);
+        }
+        await browser.GetAsync(revertPath, Ct);
+        Assert.Contains("Invalid link", browser.Html);   // spent
     }
 
     private static string Code(string secretBase32, bool next = false)

@@ -12,6 +12,9 @@ public static class IdentityLinks
     /// <summary>The path of the page that activates an account, <c>/activate</c>.</summary>
     public const string ActivatePath = "/activate";
 
+    /// <summary>The path of the page that restores the e-mail an account had before a change, <c>/revert-email</c>.</summary>
+    public const string RevertEmailPath = "/revert-email";
+
     /// <summary>
     /// The absolute link to <paramref name="path"/> carrying <paramref name="token"/>: from
     /// <see cref="LinkOptions.PublicBaseUrl"/> when it is set, from <paramref name="request"/> otherwise — which

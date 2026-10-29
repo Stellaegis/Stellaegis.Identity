@@ -4,13 +4,20 @@ using Stellaegis.Primitives;
 
 namespace Stellaegis.Identity;
 
-/// <summary>What a person does to their own account: changing the password or the e-mail, deleting it.</summary>
+/// <summary>
+/// What a person does to their own account: changing the password or the e-mail, deleting it; and undoing a change of
+/// e-mail from the link the previous address received.
+/// </summary>
 public sealed class AccountService(
     IAuthUserStore users,
+    IAccountTokenStore tokens,
+    IMfaStore mfa,
+    IRecoveryCodeStore recoveryCodes,
     EmailVerificationService emailVerification,
     PasswordHasher hasher,
     PasswordStrengthEvaluator passwords,
     IEventPublisher events,
+    IOptions<IdentityOptions> options,
     TimeProvider clock,
     ILogger<AccountService> logger)
 {
@@ -60,28 +67,99 @@ public sealed class AccountService(
         return issued;
     }
 
-    /// <summary>Completes the change of e-mail once <paramref name="code"/> proves the new one. The host then renews the session.</summary>
-    public async Task<Result> ConfirmEmailChangeAsync(Guid userUniqueId, string newEmail, string? code, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Completes the change of e-mail once <paramref name="code"/> proves the new one, and issues the token of the
+    /// link that undoes it, for the host to send to the previous address with the notice. The host then signs the
+    /// session out: it carries the previous address.
+    /// </summary>
+    public async Task<Result<EmailChanged>> ConfirmEmailChangeAsync(Guid userUniqueId, string newEmail, string? code, CancellationToken cancellationToken = default)
     {
         var normalized = Emails.Normalize(newEmail);
         var verified = await emailVerification.VerifyCodeAsync(normalized, code, cancellationToken);
         if (verified.IsFailure)
-            return verified;
+            return Result.Failure<EmailChanged>(verified.Error!);
         // Checked again: another account may have taken the e-mail between the request and the code.
         if (await users.GetByEmailAsync(normalized, cancellationToken) is not null)
-            return Result.Failure(IdentityErrors.EmailTaken);
+            return Result.Failure<EmailChanged>(IdentityErrors.EmailTaken);
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
         if (user is null || !user.IsEnabled)
-            return Result.Failure(IdentityErrors.AccountNotFound);
+            return Result.Failure<EmailChanged>(IdentityErrors.AccountNotFound);
 
+        var now = clock.GetUtcNow();
+        var previous = user.Email;
+        // Issued before the change, so that the token keeps the address to restore; kept beside the earlier ones, so
+        // that a second change does not kill the link of the first — the earliest link restores the earliest address.
+        var revert = await tokens.IssueAsync(user, AccountTokenPurpose.EmailRevert, TokenDelivery.Email, user.AsActor(), now, options.Value.EmailChange.RevertLifetime, null, cancellationToken, keepOutstanding: true);
         user.Email = normalized;
         user.EmailVerified = true;
-        user.ModifiedAt = clock.GetUtcNow();
+        user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
         await emailVerification.CleanupAsync(normalized, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed", userUniqueId);
-        return Result.Success();
+        return Result.Success(new EmailChanged(previous, normalized, revert));
+    }
+
+    /// <summary>
+    /// The address <paramref name="token"/> would restore, when it can still be used, or <see langword="null"/>: to
+    /// show the page, or refuse the link. Reading it spends nothing.
+    /// </summary>
+    public async Task<string?> ValidateRevertTokenAsync(string token, CancellationToken cancellationToken = default)
+        => await FindRevertAsync(token, cancellationToken) is { } stored
+            && stored.IsValidAt(clock.GetUtcNow())
+            && await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken) is { IsEnabled: true }
+            ? stored.Email
+            : null;
+
+    /// <summary>
+    /// Undoes the change of e-mail <paramref name="token"/> was issued for — the act of a person whose session was not
+    /// theirs: the previous address is restored, the password removed, since whoever changed the address knew it, the
+    /// reset links and the other links of this kind revoked, a second factor enrolled since the change removed. The
+    /// sessions close at their next reading: an account without a password keeps none. A reset token is issued for
+    /// the host to send to the restored address, by which the person chooses a new password.
+    /// </summary>
+    public async Task<Result<EmailReverted>> RevertEmailChangeAsync(string token, CancellationToken cancellationToken = default)
+    {
+        var stored = await FindRevertAsync(token, cancellationToken);
+        if (stored is null || stored.ConsumedAt is not null || stored.RevokedAt is not null)
+            return Result.Failure<EmailReverted>(IdentityErrors.InvalidRevertToken);
+        var now = clock.GetUtcNow();
+        if (stored.ExpiresAt < now)
+            return Result.Failure<EmailReverted>(IdentityErrors.RevertTokenExpired);
+        var user = await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken);
+        if (user is null || !user.IsEnabled)
+            return Result.Failure<EmailReverted>(IdentityErrors.InvalidRevertToken);
+        if (!string.Equals(user.Email, stored.Email, StringComparison.Ordinal) && await users.GetByEmailAsync(stored.Email, cancellationToken) is not null)
+            return Result.Failure<EmailReverted>(IdentityErrors.EmailTaken);
+        if (!await tokens.TryConsumeAsync(stored.TokenHash, now, cancellationToken))
+            return Result.Failure<EmailReverted>(IdentityErrors.InvalidRevertToken);
+
+        user.Email = stored.Email;
+        user.EmailVerified = true;   // the link reached it
+        user.PasswordHash = null;
+        user.FailedLoginCount = 0;
+        user.FailedLoginLast = null;
+        user.BlockedUntil = null;
+        user.ModifiedAt = now;
+        user.ModifiedBy = user.AsActor();
+        await users.UpdateAsync(user, cancellationToken);
+        await tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.EmailRevert, now, cancellationToken);
+        if (await mfa.GetAsync(user.UserUniqueId, cancellationToken) is { IsEnabled: true, EnabledAt: { } enabledAt } && enabledAt >= stored.CreatedAt)
+        {
+            await mfa.DisableAsync(user.UserUniqueId, cancellationToken);
+            await recoveryCodes.DeleteAllAsync(user.UserUniqueId, cancellationToken);
+        }
+        var reset = await tokens.IssueAsync(user, AccountTokenPurpose.PasswordReset, TokenDelivery.Email, user.AsActor(), now, options.Value.PasswordReset.TokenLifetime, null, cancellationToken);
+        logger.LogWarning("E-mail of {UserUniqueId} restored by its previous address: the password is removed", user.UserUniqueId);
+        return Result.Success(new EmailReverted(user.Email, reset));
+    }
+
+    private async Task<AccountToken?> FindRevertAsync(string token, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
+        var stored = await tokens.GetAsync(AccountTokens.Hash(token), cancellationToken);
+        return stored?.Purpose == AccountTokenPurpose.EmailRevert ? stored : null;
     }
 
     /// <summary>

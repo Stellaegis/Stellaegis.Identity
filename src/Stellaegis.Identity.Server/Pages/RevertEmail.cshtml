@@ -1,0 +1,30 @@
+@page "/revert-email"
+@model RevertEmailModel
+@{
+    ViewData["Title"] = T["RevertEmail.Title"];
+    Layout = "_AuthLayout";
+}
+
+@if (Model.Done)
+{
+    <h2 class="auth-h2">@T["RevertEmail.DoneHeading"]</h2>
+    <p class="auth-help">@(Model.SendFailed ? T["RevertEmail.SendFailed"] : T["RevertEmail.DoneHelp"])</p>
+    <div class="auth-links">
+        <a href="/login" class="auth-btn">@T["Nav.SignIn"]</a>
+    </div>
+}
+else if (Model.TokenInvalid)
+{
+    <h2 class="auth-h2">@T["RevertEmail.InvalidHeading"]</h2>
+    <p class="auth-help">@T["RevertEmail.InvalidHelp"]</p>
+}
+else
+{
+    <h2 class="auth-h2">@T["RevertEmail.Heading"]</h2>
+    <p class="auth-help">@T.Format("RevertEmail.Help", Model.Email!)</p>
+    <form class="auth-form" method="post">
+        <input type="hidden" asp-for="Token" />
+        <button class="auth-btn auth-btn-danger" type="submit">@T["RevertEmail.Submit"]</button>
+        <partial name="_Errors" />
+    </form>
+}

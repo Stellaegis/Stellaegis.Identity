@@ -46,6 +46,9 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>The links that activate an account an administrator created.</summary>
     public ActivationOptions Activation { get; set; } = new();
 
+    /// <summary>What a change of e-mail leaves to the previous address: the link that undoes it.</summary>
+    public EmailChangeOptions EmailChange { get; set; } = new();
+
     /// <summary>How the links an account receives are written and delivered.</summary>
     public LinkOptions Links { get; set; } = new();
 
@@ -73,6 +76,7 @@ public sealed class IdentityOptions : IValidatableOptions
         ?? Prefix(nameof(EmailVerification), EmailVerification.FindError())
         ?? Prefix(nameof(PasswordReset), PasswordReset.FindError())
         ?? Prefix(nameof(Activation), Activation.FindError())
+        ?? Prefix(nameof(EmailChange), EmailChange.FindError())
         ?? Prefix(nameof(Links), Links.FindError())
         ?? Prefix(nameof(Retention), Retention.FindError())
         ?? Prefix(nameof(Session), Session.FindError())
@@ -234,7 +238,21 @@ public sealed class ActivationOptions : IValidatableOptions
     public string? FindError() => TokenLifetime <= TimeSpan.Zero ? $"{nameof(TokenLifetime)} must be positive." : null;
 }
 
-/// <summary>How the links an account receives — a reset, an activation — are written and delivered.</summary>
+/// <summary>
+/// What a change of e-mail leaves to the previous address: a notice, with the link that restores that address, removes
+/// the password and closes every session — the one act a person can take when a session that was not theirs changed
+/// their e-mail. The link lives longer than a reset's: the person reads that mailbox when they read it.
+/// </summary>
+public sealed class EmailChangeOptions : IValidatableOptions
+{
+    /// <summary>How long the link that restores the previous e-mail works. Seven days unless set.</summary>
+    public TimeSpan RevertLifetime { get; set; } = TimeSpan.FromDays(7);
+
+    /// <inheritdoc/>
+    public string? FindError() => RevertLifetime <= TimeSpan.Zero ? $"{nameof(RevertLifetime)} must be positive." : null;
+}
+
+/// <summary>How the links an account receives — a reset, an activation, the restoring of an e-mail — are written and delivered.</summary>
 public sealed class LinkOptions : IValidatableOptions
 {
     /// <summary>

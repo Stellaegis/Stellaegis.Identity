@@ -41,9 +41,67 @@ public sealed class AccountTests
         Assert.True(code.IsSuccess);
 
         Assert.Equal(IdentityErrors.InvalidVerificationCode, (await account.ConfirmEmailChangeAsync(id, "jane.doe@acme.test", "000000")).Error);
-        Assert.True((await account.ConfirmEmailChangeAsync(id, "jane.doe@acme.test", code.Value)).IsSuccess);
+        var changed = await account.ConfirmEmailChangeAsync(id, "jane.doe@acme.test", code.Value);
+        Assert.True(changed.IsSuccess);
+        Assert.Equal("jane@acme.test", changed.Value.PreviousEmail);
+        Assert.Equal("jane.doe@acme.test", changed.Value.NewEmail);
+        Assert.Equal("jane@acme.test", await account.ValidateRevertTokenAsync(changed.Value.RevertToken));
         Assert.Equal("jane.doe@acme.test", (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.Email);
         Assert.Null(await host.Get<IEmailVerificationStore>().GetByEmailAsync("jane.doe@acme.test"));
+    }
+
+    [Fact]
+    public async Task The_link_sent_to_the_previous_address_undoes_the_change_removes_the_password_and_what_came_after()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var account = host.Get<AccountService>();
+        var reset = host.Get<PasswordResetService>();
+        async Task<EmailChanged> ChangeAsync(string to)
+        {
+            var code = await account.RequestEmailChangeAsync(id, to);
+            return (await account.ConfirmEmailChangeAsync(id, to, code.Value)).Value;
+        }
+
+        // Two changes in a row — what a thief does to shake off the first notice —: the first link survives the second.
+        var first = await ChangeAsync("thief@evil.test");
+        host.Clock.Advance(TimeSpan.FromMinutes(1));
+        var second = await ChangeAsync("other@evil.test");
+        host.Clock.Advance(TimeSpan.FromMinutes(1));
+        // What the thief set up since: a second factor, a reset link to the new address.
+        await host.Get<MfaService>().EnableEmailAsync(id);
+        var thiefReset = await reset.RequestResetAsync("other@evil.test");
+        Assert.NotNull(thiefReset);
+        Assert.Equal("jane@acme.test", await account.ValidateRevertTokenAsync(first.RevertToken));
+        Assert.Equal("thief@evil.test", await account.ValidateRevertTokenAsync(second.RevertToken));
+
+        var reverted = await account.RevertEmailChangeAsync(first.RevertToken);
+        Assert.True(reverted.IsSuccess, reverted.Error?.ToString());
+        Assert.Equal("jane@acme.test", reverted.Value.Email);
+        var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!;
+        Assert.Equal("jane@acme.test", user.Email);
+        Assert.True(user.EmailVerified);
+        Assert.Null(user.PasswordHash);
+        Assert.False(await host.Get<MfaService>().IsEnabledAsync(id));
+        Assert.False(await reset.ValidateTokenAsync(thiefReset!));
+        Assert.True(await reset.ValidateTokenAsync(reverted.Value.ResetToken));
+        Assert.Null(await account.ValidateRevertTokenAsync(second.RevertToken));   // revoked with the revert
+        Assert.Equal(IdentityErrors.InvalidRevertToken, (await account.RevertEmailChangeAsync(first.RevertToken)).Error);
+        Assert.Equal(IdentityErrors.InvalidRevertToken, (await account.RevertEmailChangeAsync(second.RevertToken)).Error);
+
+        // The thief's password opens nothing; the person chooses a new one by the link, and signs in.
+        var login = host.Get<LoginService>();
+        Assert.Equal(LoginStep.Failed, (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
+        Assert.True((await reset.ResetPasswordAsync(reverted.Value.ResetToken, "Another-Horse-7")).IsSuccess);
+        Assert.True((await login.AuthenticateAsync("jane@acme.test", "Another-Horse-7")).Succeeded);
+
+        // A second factor enrolled before the change stays through a revert.
+        host.Clock.Advance(TimeSpan.FromMinutes(1));
+        await host.Get<MfaService>().EnableEmailAsync(id);
+        host.Clock.Advance(TimeSpan.FromMinutes(1));
+        var third = await ChangeAsync("thief@evil.test");
+        Assert.True((await account.RevertEmailChangeAsync(third.RevertToken)).IsSuccess);
+        Assert.True(await host.Get<MfaService>().IsEnabledAsync(id));
     }
 
     [Fact]

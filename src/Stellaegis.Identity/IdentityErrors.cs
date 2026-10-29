@@ -64,6 +64,12 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="ActivationTokenExpired"/>: the activation link is too old.</summary>
     public const string ActivationTokenExpiredCode = "Activation.Expired";
 
+    /// <summary>The code of <see cref="InvalidRevertToken"/>: the link that restores the previous e-mail is unknown, used, or for a disabled account.</summary>
+    public const string InvalidRevertTokenCode = "EmailRevert.Invalid";
+
+    /// <summary>The code of <see cref="RevertTokenExpired"/>: the link that restores the previous e-mail is too old.</summary>
+    public const string RevertTokenExpiredCode = "EmailRevert.Expired";
+
     /// <summary>The code of <see cref="AccountAlreadyActivated"/>: the account has a password already.</summary>
     public const string AccountAlreadyActivatedCode = "Account.AlreadyActivated";
 
@@ -163,6 +169,14 @@ public static class IdentityErrors
     /// <summary>The activation link is too old.</summary>
     public static Error ActivationTokenExpired { get; } =
         Error.PreconditionFailed(ActivationTokenExpiredCode, "This activation link has expired. Ask the administrator for a new one.");
+
+    /// <summary>The link that restores the previous e-mail is unknown, used, or for a disabled account.</summary>
+    public static Error InvalidRevertToken { get; } =
+        Error.NotFound(InvalidRevertTokenCode, "This link is invalid or has already been used.");
+
+    /// <summary>The link that restores the previous e-mail is too old.</summary>
+    public static Error RevertTokenExpired { get; } =
+        Error.PreconditionFailed(RevertTokenExpiredCode, "This link has expired.");
 
     /// <summary>The account has a password already: a reset, not an activation.</summary>
     public static Error AccountAlreadyActivated { get; } =

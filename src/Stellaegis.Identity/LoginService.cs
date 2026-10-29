@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -203,21 +204,23 @@ public sealed class LoginService(
     /// <summary>
     /// The principal of an account whose credentials were verified already — after the one-time code of a second
     /// factor, for instance —, saying by <paramref name="methods"/> how (<see cref="AuthenticationMethods"/>) and that
-    /// it was now (<see cref="AuthenticationTime"/>), or <see langword="null"/> when the account is gone or disabled since.
+    /// it was now (<see cref="AuthenticationTime"/>), or <see langword="null"/> when the account is gone, disabled or
+    /// without a password since.
     /// </summary>
     public async Task<ClaimsPrincipal?> CreatePrincipalAsync(
         Guid userUniqueId, IReadOnlyCollection<string> methods, string authenticationType = DefaultAuthenticationType, CancellationToken cancellationToken = default)
     {
         Guard.Satisfies(Guard.NotNull(methods), m => m.Count > 0, "A principal says how the person proved who they are.");
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        return user is null || user.IsBlockedAtDoor ? null : await BuildPrincipalAsync(user, methods, clock.GetUtcNow(), authenticationType, cancellationToken);
+        return HasSession(user) ? await BuildPrincipalAsync(user, methods, clock.GetUtcNow(), authenticationType, cancellationToken) : null;
     }
 
     /// <summary>
     /// The principal of a session that goes on, its account read again as it is now — a name or a language changed —,
     /// keeping from <paramref name="session"/> how and when the person proved who they are; <see langword="null"/> when
-    /// the account is gone or disabled since, or when the session says neither whose it is nor how it was proved.
-    /// A session that does not say when keeps saying nothing: an older session is not given the time of its renewal.
+    /// the account is gone, disabled or without a password since, or when the session says neither whose it is nor how
+    /// it was proved. A session that does not say when keeps saying nothing: an older session is not given the time
+    /// of its renewal.
     /// </summary>
     public async Task<ClaimsPrincipal?> RenewPrincipalAsync(
         ClaimsPrincipal session, string authenticationType = DefaultAuthenticationType, CancellationToken cancellationToken = default)
@@ -227,10 +230,11 @@ public sealed class LoginService(
         if (methods.Count == 0 || !Guid.TryParse(session.FindFirst("sub")?.Value, out var userUniqueId))
             return null;
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        return user is null || user.IsBlockedAtDoor
-            ? null
-            : await BuildPrincipalAsync(user, methods, AuthenticationTime.Of(session), authenticationType, cancellationToken);
+        return HasSession(user) ? await BuildPrincipalAsync(user, methods, AuthenticationTime.Of(session), authenticationType, cancellationToken) : null;
     }
+
+    // An account without a password keeps no session: its password was removed because whoever held the session knew it.
+    private static bool HasSession([NotNullWhen(true)] AuthUser? user) => user is { IsBlockedAtDoor: false, IsActivated: true };
 
     private async Task<ClaimsPrincipal> BuildPrincipalAsync(
         AuthUser user, IReadOnlyCollection<string> methods, DateTimeOffset? authenticatedAt, string authenticationType, CancellationToken cancellationToken)

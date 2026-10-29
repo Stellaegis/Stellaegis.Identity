@@ -547,6 +547,33 @@
   <data name="Activate.Submit" xml:space="preserve">
     <value>Activer le compte</value>
   </data>
+  <data name="RevertEmail.Title" xml:space="preserve">
+    <value>Rétablir l'adresse e-mail</value>
+  </data>
+  <data name="RevertEmail.Heading" xml:space="preserve">
+    <value>Rétablir l'adresse e-mail</value>
+  </data>
+  <data name="RevertEmail.Help" xml:space="preserve">
+    <value>L'adresse e-mail du compte a été changée. Rétablir {0} comme adresse du compte retire aussi son mot de passe — un lien pour en choisir un nouveau y est envoyé — et ferme toutes les sessions.</value>
+  </data>
+  <data name="RevertEmail.Submit" xml:space="preserve">
+    <value>Rétablir cette adresse</value>
+  </data>
+  <data name="RevertEmail.InvalidHeading" xml:space="preserve">
+    <value>Lien invalide</value>
+  </data>
+  <data name="RevertEmail.InvalidHelp" xml:space="preserve">
+    <value>Ce lien est invalide, a expiré ou a déjà été utilisé. Si l'adresse du compte a été changée par quelqu'un d'autre, contacter l'administrateur.</value>
+  </data>
+  <data name="RevertEmail.DoneHeading" xml:space="preserve">
+    <value>Adresse rétablie</value>
+  </data>
+  <data name="RevertEmail.DoneHelp" xml:space="preserve">
+    <value>L'adresse est rétablie et toutes les sessions sont fermées. Un lien pour choisir un nouveau mot de passe y a été envoyé.</value>
+  </data>
+  <data name="RevertEmail.SendFailed" xml:space="preserve">
+    <value>L'adresse est rétablie et toutes les sessions sont fermées. Le lien pour choisir un nouveau mot de passe n'a pas pu être envoyé. Le redemander par Mot de passe oublié, depuis la page de connexion.</value>
+  </data>
   <data name="Activate.Title" xml:space="preserve">
     <value>Activer le compte</value>
   </data>

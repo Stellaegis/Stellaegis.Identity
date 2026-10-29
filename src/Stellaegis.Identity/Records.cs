@@ -63,7 +63,24 @@ public enum AccountTokenPurpose
 
     /// <summary>Choosing the first password of an account an administrator created.</summary>
     Activation,
+
+    /// <summary>
+    /// Restoring the e-mail an account had before it was changed, from the link sent to that address: the one act
+    /// its person can take when a session that was not theirs changed it. The token keeps the address to restore.
+    /// </summary>
+    EmailRevert,
 }
+
+/// <summary>A change of e-mail done: what the previous address is told, and the token of the link that undoes it.</summary>
+/// <param name="PreviousEmail">The address the account had, where the notice goes.</param>
+/// <param name="NewEmail">The address the account has now.</param>
+/// <param name="RevertToken">The token of the link that restores <paramref name="PreviousEmail"/>, in clear this once: only its hash is kept.</param>
+public sealed record EmailChanged(string PreviousEmail, string NewEmail, string RevertToken);
+
+/// <summary>A change of e-mail undone: the address restored, and the token of the link by which its person chooses a new password.</summary>
+/// <param name="Email">The address restored, where the reset link goes.</param>
+/// <param name="ResetToken">The token of the reset link, in clear this once: only its hash is kept.</param>
+public sealed record EmailReverted(string Email, string ResetToken);
 
 /// <summary>How the link of an account token reached its holder: what its use proves about the address.</summary>
 public enum TokenDelivery
@@ -93,7 +110,7 @@ public sealed class AccountToken
     /// <summary>How its link reached its holder.</summary>
     public TokenDelivery Delivery { get; set; }
 
-    /// <summary>The e-mail of the account when the token was issued.</summary>
+    /// <summary>The e-mail of the account when the token was issued — for an <see cref="AccountTokenPurpose.EmailRevert"/>, the address to restore.</summary>
     public string Email { get; set; } = "";
 
     /// <summary>When the token was issued.</summary>

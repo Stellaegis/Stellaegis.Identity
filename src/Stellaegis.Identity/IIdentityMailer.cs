@@ -34,8 +34,10 @@ public interface IIdentityMailer
 
     /// <summary>
     /// Tells <paramref name="previousEmail"/> that the account it signed in with now has the e-mail
-    /// <paramref name="newEmail"/>. Sent to the address being left: a person whose session was taken learns of a
-    /// change they did not make, while they still read the address that can act on it.
+    /// <paramref name="newEmail"/>, and gives it <paramref name="revertLink"/>, good for <paramref name="lifetime"/>,
+    /// which restores the previous address, removes the password and closes every session. Sent to the address
+    /// being left: a person whose session was taken learns of a change they did not make, and can undo it from the
+    /// one address whoever changed it does not read.
     /// </summary>
-    Task SendEmailChangedAsync(string previousEmail, string newEmail, CancellationToken cancellationToken = default);
+    Task SendEmailChangedAsync(string previousEmail, string newEmail, Uri revertLink, TimeSpan lifetime, CancellationToken cancellationToken = default);
 }

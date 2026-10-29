@@ -331,7 +331,15 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
         {
             AccountTokenPurpose.PasswordReset => "password_reset",
             AccountTokenPurpose.Activation => "activation",
+            AccountTokenPurpose.EmailRevert => "email_revert",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null),
+        };
+
+        private static AccountTokenPurpose PurposeOf(string purpose) => purpose switch
+        {
+            "activation" => AccountTokenPurpose.Activation,
+            "email_revert" => AccountTokenPurpose.EmailRevert,
+            _ => AccountTokenPurpose.PasswordReset,
         };
 
         public static AccountTokenRow From(AccountToken token) => new()
@@ -353,7 +361,7 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
         {
             TokenHash = TokenHash,
             UserUniqueId = UserUniqueId,
-            Purpose = Purpose == "activation" ? AccountTokenPurpose.Activation : AccountTokenPurpose.PasswordReset,
+            Purpose = PurposeOf(Purpose),
             Delivery = Delivery == "hand" ? TokenDelivery.Hand : TokenDelivery.Email,
             Email = Email,
             CreatedAt = CreatedAt,

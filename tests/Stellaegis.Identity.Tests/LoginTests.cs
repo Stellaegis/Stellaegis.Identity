@@ -218,6 +218,24 @@ public sealed class LoginTests
     }
 
     [Fact]
+    public async Task An_account_that_lost_its_password_keeps_no_session()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var login = host.Get<LoginService>();
+        var session = (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Principal!;
+        Assert.NotNull(await login.RenewPrincipalAsync(session));
+
+        var users = host.Get<IAuthUserStore>();
+        var user = (await users.GetByUniqueIdAsync(id))!;
+        user.PasswordHash = null;
+        await users.UpdateAsync(user);
+
+        Assert.Null(await login.RenewPrincipalAsync(session));
+        Assert.Null(await login.CreatePrincipalAsync(id, AuthenticationMethods.PasswordAndCode));
+    }
+
+    [Fact]
     public void The_email_one_time_code_is_spent_on_its_first_match_and_dies_after_ten_minutes()
     {
         var clock = new TestClock();

@@ -547,6 +547,33 @@
   <data name="Activate.Submit" xml:space="preserve">
     <value>Activate the account</value>
   </data>
+  <data name="RevertEmail.Title" xml:space="preserve">
+    <value>Restore the e-mail</value>
+  </data>
+  <data name="RevertEmail.Heading" xml:space="preserve">
+    <value>Restore the e-mail</value>
+  </data>
+  <data name="RevertEmail.Help" xml:space="preserve">
+    <value>The e-mail of the account was changed. Restoring {0} as its address also removes its password — a link to choose a new one is sent there — and closes every session.</value>
+  </data>
+  <data name="RevertEmail.Submit" xml:space="preserve">
+    <value>Restore this address</value>
+  </data>
+  <data name="RevertEmail.InvalidHeading" xml:space="preserve">
+    <value>Invalid link</value>
+  </data>
+  <data name="RevertEmail.InvalidHelp" xml:space="preserve">
+    <value>This link is invalid, expired or already used. If the address of the account was changed by someone else, contact the administrator.</value>
+  </data>
+  <data name="RevertEmail.DoneHeading" xml:space="preserve">
+    <value>Address restored</value>
+  </data>
+  <data name="RevertEmail.DoneHelp" xml:space="preserve">
+    <value>The address is restored and every session is closed. A link to choose a new password was sent to it.</value>
+  </data>
+  <data name="RevertEmail.SendFailed" xml:space="preserve">
+    <value>The address is restored and every session is closed. The link to choose a new password could not be sent. Ask for it again with Forgot password, from the sign-in page.</value>
+  </data>
   <data name="Activate.Title" xml:space="preserve">
     <value>Activate the account</value>
   </data>

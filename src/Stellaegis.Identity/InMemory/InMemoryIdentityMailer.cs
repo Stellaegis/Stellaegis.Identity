@@ -6,7 +6,7 @@ namespace Stellaegis.Identity.InMemory;
 /// <param name="Kind">One of <see cref="InMemoryIdentityMailer.VerificationCode"/>, <see cref="InMemoryIdentityMailer.LoginCode"/>, <see cref="InMemoryIdentityMailer.PasswordResetLink"/>, <see cref="InMemoryIdentityMailer.ActivationLink"/>, <see cref="InMemoryIdentityMailer.AccountAlreadyExists"/>, <see cref="InMemoryIdentityMailer.EmailChanged"/>.</param>
 /// <param name="Email">The recipient.</param>
 /// <param name="Code">The code, for the two kinds that carry one; the new e-mail, for the notice that it changed.</param>
-/// <param name="Link">The link, for a password reset or an activation.</param>
+/// <param name="Link">The link, for a password reset, an activation, or the notice that the e-mail changed.</param>
 public sealed record IdentityMail(string Kind, string Email, string? Code, Uri? Link);
 
 /// <summary>
@@ -77,9 +77,9 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
     }
 
     /// <inheritdoc/>
-    public Task SendEmailChangedAsync(string previousEmail, string newEmail, CancellationToken cancellationToken = default)
+    public Task SendEmailChangedAsync(string previousEmail, string newEmail, Uri revertLink, TimeSpan lifetime, CancellationToken cancellationToken = default)
     {
-        _sent.Enqueue(new IdentityMail(EmailChanged, previousEmail, newEmail, null));
+        _sent.Enqueue(new IdentityMail(EmailChanged, previousEmail, newEmail, revertLink));
         return Task.CompletedTask;
     }
 }

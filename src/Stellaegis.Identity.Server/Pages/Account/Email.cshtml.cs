@@ -160,7 +160,8 @@ internal sealed class AccountEmailModel(
         {
             try
             {
-                await mailer.SendEmailChangedAsync(CurrentEmail, Pending, cancellationToken);
+                var revert = IdentityLinks.Of(identity.Value.Links, Request, IdentityLinks.RevertEmailPath, result.Value.RevertToken);
+                await mailer.SendEmailChangedAsync(result.Value.PreviousEmail, result.Value.NewEmail, revert, identity.Value.EmailChange.RevertLifetime, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

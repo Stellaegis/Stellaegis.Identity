@@ -49,9 +49,9 @@ public sealed class LoggingMailer(ILogger<LoggingMailer> logger) : IIdentityMail
         return Task.CompletedTask;
     }
 
-    public Task SendEmailChangedAsync(string previousEmail, string newEmail, CancellationToken cancellationToken = default)
+    public Task SendEmailChangedAsync(string previousEmail, string newEmail, Uri revertLink, TimeSpan lifetime, CancellationToken cancellationToken = default)
     {
-        logger.LogWarning("MAIL to {Email}: the e-mail of your account is now {NewEmail}", previousEmail, newEmail);
+        logger.LogWarning("MAIL to {Email}: the e-mail of your account is now {NewEmail}; if this was not you, restore it at {Link}, valid for {Lifetime}", previousEmail, newEmail, revertLink, lifetime);
         return Task.CompletedTask;
     }
 }
