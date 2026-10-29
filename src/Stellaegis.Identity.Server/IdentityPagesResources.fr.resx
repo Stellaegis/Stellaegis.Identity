@@ -196,6 +196,9 @@
   <data name="Error.Mfa.NotPending" xml:space="preserve">
     <value>Aucune vérification en deux étapes n'est en cours de configuration.</value>
   </data>
+  <data name="Error.Mfa.MethodNotAllowed" xml:space="preserve">
+    <value>Cette méthode n'est pas disponible ici.</value>
+  </data>
   <data name="Error.Password.InvalidCurrent" xml:space="preserve">
     <value>Le mot de passe actuel est incorrect.</value>
   </data>

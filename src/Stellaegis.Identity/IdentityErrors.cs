@@ -58,6 +58,9 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="VerificationThrottled"/>: a code went to that e-mail a moment ago, and no new one is issued yet.</summary>
     public const string VerificationThrottledCode = "Verification.Throttled";
 
+    /// <summary>The code of <see cref="MfaMethodNotAllowed"/>: the installation does not allow that second factor.</summary>
+    public const string MfaMethodNotAllowedCode = "Mfa.MethodNotAllowed";
+
     /// <summary>The code of <see cref="InvalidResetToken"/>: the reset link is unknown, consumed, or for a disabled account.</summary>
     public const string InvalidResetTokenCode = "PasswordReset.Invalid";
 
@@ -229,6 +232,10 @@ public static class IdentityErrors
     /// <summary>The one-time code is wrong.</summary>
     public static Error InvalidMfaCode { get; } =
         Error.Unauthorized(InvalidMfaCodeCode, "The code is incorrect.");
+
+    /// <summary>The installation does not allow that second factor (<see cref="MfaPolicyOptions.AllowedMethods"/>).</summary>
+    public static Error MfaMethodNotAllowed { get; } =
+        Error.Forbidden(MfaMethodNotAllowedCode, "This second factor is not allowed here.");
 
     /// <summary>The name is empty, or longer than the store keeps.</summary>
     public static Error InvalidDisplayName { get; } =

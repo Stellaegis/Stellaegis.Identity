@@ -5,8 +5,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Stellaegis.Identity.Server.Pages;
 
 /// <summary>
-/// The second factor of the person: by authenticator or by e-mail, enabled or disabled, the password confirmed either
-/// way — enabling the e-mail method on an authenticator replaces the stronger factor by the weaker one.
+/// The second factor of the person: by authenticator or by e-mail, among the methods the installation allows, enabled
+/// or disabled, the password confirmed either way — enabling the e-mail method on an authenticator replaces the
+/// stronger factor by the weaker one.
 /// </summary>
 [Authorize]
 internal sealed class AccountMfaModel(MfaService mfa, AccountService account, IdentityTexts texts, IIdentityMailer? mailer = null) : PageModel
@@ -19,6 +20,12 @@ internal sealed class AccountMfaModel(MfaService mfa, AccountService account, Id
     public DateTimeOffset? EnabledAt { get; private set; }
 
     public string Method { get; private set; } = MfaMethod.Totp;
+
+    /// <summary>Whether the installation lets a person enroll an authenticator.</summary>
+    public bool AllowsAuthenticator => mfa.Allows(MfaMethod.Totp);
+
+    /// <summary>Whether the installation lets a person take the code by e-mail.</summary>
+    public bool AllowsEmail => mfa.Allows(MfaMethod.Email);
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -40,7 +47,13 @@ internal sealed class AccountMfaModel(MfaService mfa, AccountService account, Id
         }
         if (!await PasswordHoldsAsync(userId, cancellationToken))
             return Page();
-        await mfa.EnableEmailAsync(userId, cancellationToken);
+        var enabled = await mfa.EnableEmailAsync(userId, cancellationToken);
+        if (enabled.IsFailure)
+        {
+            ModelState.AddModelError(string.Empty, texts.Describe(enabled.Error!));
+            await LoadAsync(userId, cancellationToken);
+            return Page();
+        }
         TempData["Notice"] = "Account.Mfa.EmailEnabled";
         return Redirect("/account/mfa");
     }

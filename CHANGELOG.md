@@ -71,6 +71,14 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 ### Added
 
+- **The methods of the second factor are the installation's to allow**, `Mfa:AllowedMethods`: the authenticator alone
+  unless set, the code by e-mail where the host opens it. The pages offer the allowed ones only;
+  `MfaService.EnableEmailAsync`, which answers a `Result` now, and `ConfirmSetupAsync` refuse the others,
+  `Mfa.MethodNotAllowed`; an account whose method is no longer allowed keeps it; `MfaService.Allows` says. Until then
+  every account could take the code by e-mail, and a host had no say.
+- **A code sent by e-mail is no longer a second factor**: the session says `pwd` and `otp`, without `mfa`. The mailbox
+  is the channel of a reset link, so whoever holds it holds the password too — one factor proven twice —, and an
+  operation that requires a second factor was satisfied by it. `AuthenticationMethods.PasswordAndEmailCode` names it.
 - **The pages limit what comes too fast, whatever the host set up.** Every POST of the pages — a GET is never
   counted — is counted against the address of the client, `Pages:RateLimiting:RequestsPerClient`, sixty a minute
   unless set, and against the e-mail the form names when it names one — the one the person signs in as, registers
@@ -113,14 +121,18 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 2. **A store written outside the package implements `RecordFailedLoginAsync`**, `LastIssuedAtAsync`, and the e-mail
    verifications by e-mail and purpose; the three of the package do. **A caller of `EmailVerificationService`** passes
    the purpose and the requester, and treats `Verification.Throttled` as a code sent.
-3. **A host that limits the pages by a policy of its own** keeps `Pages:RateLimitingPolicy` and sets
+3. **A host whose people take the code by e-mail as second factor** names it, `Mfa:AllowedMethods:1 = email`: the
+   pages offer the authenticator alone otherwise. And a decision that required `mfa` is no longer satisfied by a
+   code by e-mail: such people enroll an authenticator, or the host reconsiders what it requires. A caller of
+   `MfaService.EnableEmailAsync` reads a `Result`.
+4. **A host that limits the pages by a policy of its own** keeps `Pages:RateLimitingPolicy` and sets
    `Pages:RateLimiting:Enabled` to false, or lets both apply. A host that set up nothing has the package's limits now,
    and enables `ForwardedHeaders` behind a proxy so that the count is the client's rather than the proxy's.
    **An `IIdentityMailer` implements `SendEmailChangeApprovalAsync`**, the approval link to the previous address,
    **`SendEmailChangedAsync`**, the notice to the previous address with its link, and **`SendAccountLockedAsync`**,
    the notice that the account is locked out.
    **A caller of `AccountService.ConfirmEmailChangeAsync`** reads a `Result<EmailChanged>`, and sends the notice.
-4. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
+5. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.
 
 ## [6.3.0] — 2026-10-28

@@ -196,6 +196,9 @@
   <data name="Error.Mfa.NotPending" xml:space="preserve">
     <value>No two-step verification is being set up.</value>
   </data>
+  <data name="Error.Mfa.MethodNotAllowed" xml:space="preserve">
+    <value>This method is not available here.</value>
+  </data>
   <data name="Error.Password.InvalidCurrent" xml:space="preserve">
     <value>The current password is wrong.</value>
   </data>

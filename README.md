@@ -147,9 +147,16 @@ link is mailed there: a mistyped address would hand the account to whoever holds
 ### How the person proved who they are
 
 The principal of a session carries one `amr` claim per method, with the values of RFC 8176: `pwd` after a password
-alone; `pwd`, `otp` and `mfa` after the code of an authenticator or one sent by e-mail; `pwd` and `mfa` after a
-recovery code. `AuthenticationMethods` names them. An issuer carries the claim into its tokens, so that a decision
-asks whether a second factor was used for this session, not whether the account has one.
+alone; `pwd`, `otp` and `mfa` after the code of an authenticator; `pwd` and `mfa` after a recovery code; `pwd` and
+`otp`, without `mfa`, after a code sent by e-mail — the mailbox is the channel of a reset link, so whoever holds it
+holds the password too: one factor proven twice, and an operation that requires a second factor refuses the session.
+`AuthenticationMethods` names them. An issuer carries the claim into its tokens, so that a decision asks whether a
+second factor was used for this session, not whether the account has one.
+
+The methods a person may enable are the installation's to say, `Mfa:AllowedMethods`: the authenticator alone unless
+set, the code by e-mail where the host opens it knowingly, `totp` and `email`. The pages offer the allowed ones only,
+`MfaService.EnableEmailAsync` and `ConfirmSetupAsync` refuse the others, `Mfa.MethodNotAllowed`, and an account whose
+method is no longer allowed keeps it.
 
 It carries the time of the login too, `auth_time`, in seconds since the epoch as OpenID Connect writes it
 (`AuthenticationTime`). The time is set at the login and kept for the whole session: a new reading of the account,
@@ -200,6 +207,7 @@ Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a passw
 Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes, told to the person by e-mail
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
+Stellaegis:Identity:Mfa:AllowedMethods             totp alone; email where the host opens the code by e-mail
 Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and Keys:<slot>, secrets of the deployment
 Stellaegis:Identity:EmailVerification:CodeLength   6 digits, for Lifetime, 15 minutes, MaxAttempts 5
 Stellaegis:Identity:EmailVerification:MinimumInterval  1 minute between two codes to one address; asked sooner, nothing is sent and the pages say the same

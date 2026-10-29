@@ -27,6 +27,8 @@ internal sealed class AccountMfaSetupModel(MfaService mfa, AccountService accoun
     {
         if (this.UserId() is not { } userId)
             return Forbid();
+        if (!mfa.Allows(MfaMethod.Totp))
+            return NotFound();
         if (await mfa.IsEnabledAsync(userId, cancellationToken))
             return Redirect("/account/mfa");
         var secret = await mfa.BeginSetupAsync(userId, cancellationToken);

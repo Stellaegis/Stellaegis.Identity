@@ -187,10 +187,10 @@ public sealed class LoginService(
             return null;
         if (RecoveryCodeService.LooksLikeCode(code))
             return await recoveryCodes.TryConsumeAsync(userUniqueId, code, cancellationToken) ? AuthenticationMethods.PasswordAndRecoveryCode : null;
-        var held = await mfa.GetMethodAsync(userUniqueId, cancellationToken) == MfaMethod.Email
-            ? loginCodes.Validate(userUniqueId, code)
-            : await mfa.ValidateCodeAsync(userUniqueId, code, cancellationToken);
-        return held ? AuthenticationMethods.PasswordAndCode : null;
+        // A code by e-mail proves the mailbox, which a reset link proves as well: not a second factor.
+        if (await mfa.GetMethodAsync(userUniqueId, cancellationToken) == MfaMethod.Email)
+            return loginCodes.Validate(userUniqueId, code) ? AuthenticationMethods.PasswordAndEmailCode : null;
+        return await mfa.ValidateCodeAsync(userUniqueId, code, cancellationToken) ? AuthenticationMethods.PasswordAndCode : null;
     }
 
     private async Task PadAsync(Stopwatch started, LoginPolicyOptions policy, CancellationToken cancellationToken)

@@ -284,6 +284,9 @@ public static class MfaMethod
     /// <summary>A time-based one-time code from an authenticator application.</summary>
     public const string Totp = "totp";
 
-    /// <summary>A one-time code sent by e-mail.</summary>
+    /// <summary>A one-time code sent by e-mail: the same channel as a reset link, so not a second factor in its own right.</summary>
     public const string Email = "email";
+
+    /// <summary>Every method the module knows, the ones <see cref="MfaPolicyOptions.AllowedMethods"/> may name.</summary>
+    public static IReadOnlyList<string> All { get; } = [Totp, Email];
 }

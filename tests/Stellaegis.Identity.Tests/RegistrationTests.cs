@@ -78,6 +78,23 @@ public sealed class ServiceRegistrationTests
         => new() { PasswordHasher = { Pepper = "p" }, Mfa = { SecretKeys = new KeySlots { Keys = { [1] = "k" } } } };
 
     [Fact]
+    public void The_methods_of_the_second_factor_are_named_among_the_known_ones_and_the_authenticator_stays_while_required()
+    {
+        var options = Valid();
+        Assert.Equal([MfaMethod.Totp], options.Mfa.AllowedMethods);
+        options.Mfa.AllowedMethods = [];
+        Assert.Equal("Mfa: AllowedMethods names at least one method: totp, email.", options.FindError());
+        options.Mfa.AllowedMethods = [MfaMethod.Totp, "sms"];
+        Assert.Equal("Mfa: AllowedMethods names 'sms', which is not a method: totp, email.", options.FindError());
+        options.Mfa.AllowedMethods = [MfaMethod.Email];
+        Assert.Null(options.FindError());
+        options.Mfa.RequireForAllUsers = true;
+        Assert.StartsWith("Mfa: AllowedMethods includes totp while RequireForAllUsers is set", options.FindError());
+        options.Mfa.AllowedMethods = [MfaMethod.Email, MfaMethod.Totp];
+        Assert.Null(options.FindError());
+    }
+
+    [Fact]
     public void Every_registration_declares_the_module_once_and_resolves_every_service()
     {
         using var host = new TestHost();

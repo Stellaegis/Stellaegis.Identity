@@ -22,8 +22,15 @@ public static class AuthenticationMethods
     /// <summary>A password alone.</summary>
     public static IReadOnlyList<string> PasswordOnly { get; } = [Password];
 
-    /// <summary>A password and a one-time code of the second factor.</summary>
+    /// <summary>A password and a one-time code of an authenticator: two factors.</summary>
     public static IReadOnlyList<string> PasswordAndCode { get; } = [Password, OneTimePassword, MultipleFactors];
+
+    /// <summary>
+    /// A password and a one-time code sent by e-mail: a code was typed, <c>otp</c>, but the mailbox is the channel of
+    /// a reset link, so whoever holds it holds the password too — one factor proven twice, never <c>mfa</c>. An
+    /// operation that requires a second factor refuses such a session.
+    /// </summary>
+    public static IReadOnlyList<string> PasswordAndEmailCode { get; } = [Password, OneTimePassword];
 
     /// <summary>
     /// A password and a recovery code: a second factor, but no code generated for this login — an application that

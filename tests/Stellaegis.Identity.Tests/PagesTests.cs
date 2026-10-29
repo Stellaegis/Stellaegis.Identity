@@ -408,7 +408,7 @@ public sealed class PagesTests
     [Fact]
     public async Task The_account_pages_change_the_password_and_enroll_an_authenticator()
     {
-        await using var app = await PagesTestHost.StartAsync(Ct);
+        await using var app = await PagesTestHost.StartAsync(Ct, identity: o => o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]);
         await app.CreateAccountAsync(Email, Password, Ct);
         var browser = new Browser(app);
         await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
@@ -453,6 +453,28 @@ public sealed class PagesTests
         Assert.Contains("Keep these recovery codes now.", browser.Html);
         await browser.GetAsync("/account/mfa", Ct);
         Assert.Contains("Enabled, by authenticator app", browser.Html);
+    }
+
+    [Fact]
+    public async Task The_code_by_email_is_offered_only_where_the_installation_allows_it()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);   // the authenticator alone, unless set
+        await app.CreateAccountAsync(Email, Password, Ct);
+        var browser = new Browser(app);
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+
+        await browser.GetAsync("/account/mfa", Ct);
+        Assert.Contains("/account/mfa/setup", browser.Html);
+        Assert.DoesNotContain("handler=EnableEmail", browser.Html);
+        Assert.DoesNotContain("Code by e-mail", browser.Html);
+
+        // Posted anyway, with the password: refused by the service, not by the page alone.
+        var refused = await browser.PostFormAsync("/account/mfa", new Dictionary<string, string> { ["Password"] = Password }, Ct, postPath: "/account/mfa?handler=EnableEmail");
+        Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
+        Assert.Contains("This method is not available here.", browser.Html);
+        using var scope = app.Services.CreateScope();
+        var id = (await scope.ServiceProvider.GetRequiredService<IAuthUserStore>().GetByEmailAsync(Email, Ct))!.UserUniqueId;
+        Assert.False(await scope.ServiceProvider.GetRequiredService<MfaService>().IsEnabledAsync(id, Ct));
     }
 
     [Fact]

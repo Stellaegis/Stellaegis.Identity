@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using Microsoft.Extensions.Options;
 using OtpNet;
 using Stellaegis.Primitives;
 
@@ -7,12 +8,16 @@ namespace Stellaegis.Identity;
 
 /// <summary>
 /// The second factor of an account: setting an authenticator up, checking a code at login, enabling the e-mail
-/// method, disabling. Time-based one-time codes follow RFC 6238, as every authenticator application does: a code
-/// is accepted once — the one that confirmed the setup included —, never one of an earlier step, and the secret is
-/// kept protected (<see cref="TotpSecretProtector"/>).
+/// method, disabling — each method enabled only where <see cref="MfaPolicyOptions.AllowedMethods"/> allows it. Time-based
+/// one-time codes follow RFC 6238, as every authenticator application does: a code is accepted once — the one that
+/// confirmed the setup included —, never one of an earlier step, and the secret is kept protected
+/// (<see cref="TotpSecretProtector"/>).
 /// </summary>
-public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, TimeProvider clock)
+public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, IOptions<IdentityOptions> options, TimeProvider clock)
 {
+    /// <summary>Whether <paramref name="method"/> is one a person may enable in this installation.</summary>
+    public bool Allows(string method) => options.Value.Mfa.Allows(method);
+
     /// <summary>Generates a 20-byte secret, keeps it protected pending a first code, and returns it base32 for the enrollment QR code.</summary>
     public async Task<string> BeginSetupAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
     {
@@ -27,6 +32,8 @@ public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, T
     /// </summary>
     public async Task<Result> ConfirmSetupAsync(Guid userUniqueId, string code, CancellationToken cancellationToken = default)
     {
+        if (!Allows(MfaMethod.Totp))
+            return Result.Failure(IdentityErrors.MfaMethodNotAllowed);
         var record = await store.GetAsync(userUniqueId, cancellationToken);
         if (record?.PendingSecret is null)
             return Result.Failure(IdentityErrors.MfaNotPending);
@@ -63,9 +70,14 @@ public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, T
     public async Task<bool> IsEnabledAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
         => (await store.GetAsync(userUniqueId, cancellationToken))?.IsEnabled == true;
 
-    /// <summary>Enables the second factor by e-mail, which needs no setup.</summary>
-    public Task EnableEmailAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
-        => store.EnableEmailAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
+    /// <summary>Enables the second factor by e-mail, which needs no setup, where the installation allows it: <see cref="IdentityErrors.MfaMethodNotAllowed"/> otherwise.</summary>
+    public async Task<Result> EnableEmailAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
+    {
+        if (!Allows(MfaMethod.Email))
+            return Result.Failure(IdentityErrors.MfaMethodNotAllowed);
+        await store.EnableEmailAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
+        return Result.Success();
+    }
 
     /// <summary>How the account's second factor is checked; <see cref="MfaMethod.Totp"/> when none was set up.</summary>
     public async Task<string> GetMethodAsync(Guid userUniqueId, CancellationToken cancellationToken = default)

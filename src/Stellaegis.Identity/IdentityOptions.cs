@@ -169,14 +169,28 @@ public sealed class LoginPolicyOptions : IValidatableOptions
 }
 
 /// <summary>
-/// Whether a second factor is required of everyone. When it is, a person whose password holds but who has no
-/// second factor is asked to set one up before the login completes, <see cref="LoginStep.RequiresMfaSetup"/>;
-/// otherwise the second factor is the person's own choice.
+/// Whether a second factor is required of everyone, and which methods the installation allows. When it is required,
+/// a person whose password holds but who has no second factor is asked to set one up before the login completes,
+/// <see cref="LoginStep.RequiresMfaSetup"/>; otherwise the second factor is the person's own choice, among the
+/// methods allowed.
 /// </summary>
 public sealed class MfaPolicyOptions : IValidatableOptions
 {
     /// <summary>Whether every account must have a second factor. No unless set.</summary>
     public bool RequireForAllUsers { get; set; }
+
+    /// <summary>
+    /// The methods a person may enable, among <see cref="MfaMethod.All"/>: the authenticator alone unless set. The
+    /// code by e-mail goes through the mailbox, the channel of a reset link, so whoever holds the mailbox holds the
+    /// account already: an installation opens it knowingly, <c>Mfa:AllowedMethods:0 = totp</c>,
+    /// <c>Mfa:AllowedMethods:1 = email</c>. An account whose method is no longer allowed keeps it; the pages offer the
+    /// allowed ones only. The authenticator stays allowed while <see cref="RequireForAllUsers"/> is set: the enrollment
+    /// asked at the login offers nothing else.
+    /// </summary>
+    public List<string> AllowedMethods { get; set; } = [MfaMethod.Totp];
+
+    /// <summary>Whether <paramref name="method"/> is one a person may enable here.</summary>
+    public bool Allows(string method) => AllowedMethods.Contains(Guard.NotWhiteSpace(method), StringComparer.Ordinal);
 
     /// <summary>
     /// The keys the TOTP secrets are protected with at rest (<see cref="TotpSecretProtector"/>), in two slots for a
@@ -190,7 +204,18 @@ public sealed class MfaPolicyOptions : IValidatableOptions
     public KeySlots SecretKeys { get; set; } = new();
 
     /// <inheritdoc/>
-    public string? FindError() => SecretKeys.FindError() is { } error ? $"{nameof(SecretKeys)}: {error}" : null;
+    public string? FindError()
+    {
+        if (SecretKeys.FindError() is { } error)
+            return $"{nameof(SecretKeys)}: {error}";
+        if (AllowedMethods.Count == 0)
+            return $"{nameof(AllowedMethods)} names at least one method: {string.Join(", ", MfaMethod.All)}.";
+        if (AllowedMethods.FirstOrDefault(method => !MfaMethod.All.Contains(method, StringComparer.Ordinal)) is { } unknown)
+            return $"{nameof(AllowedMethods)} names '{unknown}', which is not a method: {string.Join(", ", MfaMethod.All)}.";
+        if (RequireForAllUsers && !Allows(MfaMethod.Totp))
+            return $"{nameof(AllowedMethods)} includes {MfaMethod.Totp} while {nameof(RequireForAllUsers)} is set: the enrollment asked at the login offers the authenticator only.";
+        return null;
+    }
 }
 
 /// <summary>The codes sent to verify an e-mail.</summary>

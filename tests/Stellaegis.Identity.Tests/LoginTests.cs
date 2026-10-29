@@ -187,7 +187,7 @@ public sealed class LoginTests
     [Fact]
     public async Task A_recovery_code_an_email_code_and_a_blocked_account_complete_the_login_or_not()
     {
-        using var host = new TestHost();
+        using var host = new TestHost(o => o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]);
         var id = await host.CreateUserAsync();
         await EnrollAuthenticatorAsync(host, id);
         var login = host.Get<LoginService>();
@@ -208,7 +208,7 @@ public sealed class LoginTests
         Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, "000000")).Step);
         var byEmail = await login.CompleteWithSecondFactorAsync(id, sent);
         Assert.True(byEmail.Succeeded);
-        Assert.Equal(["pwd", "otp", "mfa"], byEmail.Principal!.FindAll("amr").Select(c => c.Value));
+        Assert.Equal(["pwd", "otp"], byEmail.Principal!.FindAll("amr").Select(c => c.Value));   // the mailbox is not a second factor
         Assert.Equal(0, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
 
         await host.Get<AccountAdministrationService>().BlockAsync(id, Actor.Parse("admin"));
@@ -390,15 +390,42 @@ public sealed class MfaTests
     [Fact]
     public async Task The_email_method_needs_no_setup()
     {
-        using var host = new TestHost();
+        using var host = new TestHost(o => o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]);
         var id = await host.CreateUserAsync();
         var mfa = host.Get<MfaService>();
 
-        await mfa.EnableEmailAsync(id);
+        Assert.True((await mfa.EnableEmailAsync(id)).IsSuccess);
 
         Assert.True(await mfa.IsEnabledAsync(id));
         Assert.Equal(MfaMethod.Email, await mfa.GetMethodAsync(id));
         Assert.Equal([id], await host.Get<IMfaStore>().GetEnabledUserIdsAsync([id, Guid.NewGuid()]));
+    }
+
+    [Fact]
+    public async Task A_method_the_installation_does_not_allow_cannot_be_enabled_and_an_account_that_has_it_keeps_it()
+    {
+        using var host = new TestHost();   // the authenticator alone, unless set
+        var id = await host.CreateUserAsync();
+        var mfa = host.Get<MfaService>();
+
+        Assert.True(mfa.Allows(MfaMethod.Totp));
+        Assert.False(mfa.Allows(MfaMethod.Email));
+        Assert.Equal(IdentityErrors.MfaMethodNotAllowed, (await mfa.EnableEmailAsync(id)).Error);
+        Assert.False(await mfa.IsEnabledAsync(id));
+
+        // Enabled before the installation closed the method — written by the store, as a 6.x did —, the account keeps it and still signs in by it.
+        await host.Get<IMfaStore>().EnableEmailAsync(id, host.Clock.Now);
+        Assert.Equal(MfaMethod.Email, await mfa.GetMethodAsync(id));
+        var login = host.Get<LoginService>();
+        Assert.Equal(LoginStep.RequiresMfa, (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
+        var byEmail = await login.CompleteWithSecondFactorAsync(id, host.Get<LoginOtpService>().Generate(id));
+        Assert.True(byEmail.Succeeded);
+        Assert.Equal(["pwd", "otp"], byEmail.Principal!.FindAll("amr").Select(c => c.Value));
+
+        using var closed = new TestHost(o => o.Mfa.AllowedMethods = [MfaMethod.Email]);
+        var other = await closed.CreateUserAsync();
+        var secret = await closed.Get<MfaService>().BeginSetupAsync(other);
+        Assert.Equal(IdentityErrors.MfaMethodNotAllowed, (await closed.Get<MfaService>().ConfirmSetupAsync(other, new Totp(Base32Encoding.ToBytes(secret)).ComputeTotp(closed.Clock.Now.UtcDateTime))).Error);
     }
 
     [Fact]

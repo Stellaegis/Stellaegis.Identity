@@ -174,7 +174,7 @@ public sealed class AccountTests
     [Fact]
     public async Task The_link_sent_to_the_previous_address_undoes_the_change_removes_the_password_and_what_came_after()
     {
-        using var host = new TestHost(o => o.EmailChange.RequireApprovalByPrevious = false);
+        using var host = new TestHost(o => { o.EmailChange.RequireApprovalByPrevious = false; o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]; });
         var id = await host.CreateUserAsync();
         var account = host.Get<AccountService>();
         var reset = host.Get<PasswordResetService>();
@@ -591,7 +591,7 @@ public sealed class AdministrationTests
     [Fact]
     public async Task The_failed_logins_the_second_factor_and_the_password_are_reset_by_the_administrator()
     {
-        using var host = new TestHost(o => o.LoginPolicy.MaxFailedAttempts = 1);
+        using var host = new TestHost(o => { o.LoginPolicy.MaxFailedAttempts = 1; o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]; });
         var id = await host.CreateUserAsync();
         var administration = host.Get<AccountAdministrationService>();
         await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "nope");
