@@ -22,6 +22,14 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
   address, and the sixth answer said whether it had an account. The lockout stays in `LoginStep.LockedOut`, for the
   host; the person is told by e-mail when it starts, `IIdentityMailer.SendAccountLockedAsync`, once per lockout. After a
   password that held, or from a session, `Account.LockedOut` is still said: there is nothing left to hide.
+- **A hash made with a former iteration count is remade at the login that verified it**, `PasswordHasher.NeedsRehash`:
+  raising `PasswordHasher:Iterations` now reaches the accounts, one login each. And the stand-in hash of an unknown
+  account is made with the configured count: a fixed one cost a different time, and told an unknown account from a
+  wrong password when the count was not the default.
+- **`Session:Lifetime`**, fourteen days unless set, is the expiry of the cookie, renewed by each request: the default of
+  ASP.NET Core, written as an option so that it is a decision. The culture cookie is sent over HTTPS only, as the others.
+- **`POST identity/users` checks the shape of the e-mail**, as the pages do: what it took reached the mailer as given.
+- **`Pages:DefaultReturnUrl` refuses `//` and `/\`**: both passed as local and failed at the first redirection.
 - **The pages refuse to be framed**: `Content-Security-Policy: frame-ancestors 'none'`, appended beside any policy the
   host sets, and `X-Frame-Options: DENY` when the host sets none. A page laid under a decoy could have the person click
   "Continue", "Disable" or "Enable" unknowing.

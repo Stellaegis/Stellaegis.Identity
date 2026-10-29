@@ -113,7 +113,7 @@ public sealed class IdentityPagesOptions : IValidatableOptions
             return $"{nameof(Culture)} must name a known culture, such as fr or en-GB.";
         if (!string.IsNullOrEmpty(DefaultCulture) && !IsCulture(DefaultCulture))
             return $"{nameof(DefaultCulture)} must name a known culture, such as fr or en-GB.";
-        if (string.IsNullOrWhiteSpace(DefaultReturnUrl) || !DefaultReturnUrl.StartsWith('/'))
+        if (string.IsNullOrWhiteSpace(DefaultReturnUrl) || !IsLocalPath(DefaultReturnUrl))
             return $"{nameof(DefaultReturnUrl)} must be a local path.";
         if (AvatarCornerRadius is < 0 or > 50)
             return $"{nameof(AvatarCornerRadius)} is a percent of the side, from 0 for a square to 50 for a circle.";
@@ -123,8 +123,12 @@ public sealed class IdentityPagesOptions : IValidatableOptions
     }
 
     private static bool IsPath(string value)
-        => value.StartsWith('/') && !value.StartsWith("//", StringComparison.Ordinal)
+        => IsLocalPath(value)
         || Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    // One slash, then anything but another or a backslash: "//host" and "/\host" are addresses of another host to a browser.
+    private static bool IsLocalPath(string value)
+        => value.StartsWith('/') && !value.StartsWith("//", StringComparison.Ordinal) && !value.StartsWith("/\\", StringComparison.Ordinal);
 
     private static bool IsCulture(string name)
     {

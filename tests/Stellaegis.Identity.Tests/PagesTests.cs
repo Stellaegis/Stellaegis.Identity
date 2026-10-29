@@ -357,6 +357,10 @@ public sealed class PagesTests
 
         var culture = await Assert.ThrowsAnyAsync<Exception>(() => PagesTestHost.StartAsync(Ct, pages: o => o.Culture = "zz-NOWHERE"));
         Assert.Contains("Culture", culture.Message);
+
+        // "//evil.test" starts with a slash and is another host to a browser.
+        var elsewhere = await Assert.ThrowsAnyAsync<Exception>(() => PagesTestHost.StartAsync(Ct, pages: o => o.DefaultReturnUrl = "//evil.test/account"));
+        Assert.Contains("DefaultReturnUrl", elsewhere.Message);
     }
 
     [Fact]

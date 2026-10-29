@@ -177,7 +177,9 @@ application on the same site shows it, one on another site reads the avatars of 
 
 ### What is kept, and for how long
 
-The trace of the logins holds an address and a browser; the tokens and the verifications hold an address.
+The trace of the logins holds an address and a browser — the address of the connection, so a host behind a proxy
+enables `ForwardedHeaders` for the trace to name the client rather than the proxy; the tokens and the verifications
+hold an address.
 `IdentityRetentionService.PurgeAsync` removes the attempts older than `Retention:LoginEvents` and the tokens and
 verifications expired longer than `Retention:Expired`, and says how much it removed. The module schedules nothing:
 the host runs the purge every day by its own scheduler, under `IdentityRetentionService.Job`, `job:identity_purge`.
@@ -207,6 +209,7 @@ Stellaegis:Identity:SelfRegistration               Closed, or Open
 Stellaegis:Identity:Retention:LoginEvents          180 days, and never less
 Stellaegis:Identity:Retention:Expired              30 days past their expiry, and never less
 Stellaegis:Identity:AvatarUrl                      none; the absolute address of /account/avatar, for picture
+Stellaegis:Identity:Session:Lifetime               14 days without a request, renewed by each; the cookie's expiry
 Stellaegis:Identity:Session:ValidationInterval     5 minutes; 00:00:00 reads the account on every request
 ```
 
@@ -227,7 +230,8 @@ apply at once connects its bus to the admission (below).
 ## The cookie
 
 `AddStellaegisIdentityCookie()` registers the cookie scheme as the default authentication of the host: the cookie
-`stellaegis_identity`, kept out of scripts, sent on same-site navigations, over HTTPS only, with `/login` for a
+`stellaegis_identity`, kept out of scripts, sent on same-site navigations, over HTTPS only, lasting
+`Session:Lifetime` without a request — fourteen days unless set, renewed by each request —, with `/login` for a
 challenge. `CookieSignIn` signs a person in — from the principal `LoginService` built, or by id, refusing a blocked
 account — and out. The pages of `Stellaegis.Identity.Server` use it; a host writing its own login page does the
 same. A host that authenticates its API otherwise, by a bearer token, registers that scheme too and chooses the
