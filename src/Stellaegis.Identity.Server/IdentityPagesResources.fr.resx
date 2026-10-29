@@ -521,7 +521,7 @@
     <value>Un nouveau code a été envoyé.</value>
   </data>
   <data name="Pages.TooManyRequests" xml:space="preserve">
-    <value>Trop de tentatives. Réessayez dans {0} secondes.</value>
+    <value>Trop de tentatives. Réessayer dans {0} secondes.</value>
   </data>
   <data name="VerifyEmail.SendFailed" xml:space="preserve">
     <value>Le code n'a pas pu être envoyé. Utiliser Renvoyer le code ci-dessous.</value>
