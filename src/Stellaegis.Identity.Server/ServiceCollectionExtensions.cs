@@ -113,7 +113,7 @@ public static class IdentityPagesEndpointRouteBuilderExtensions
 
 /// <summary>
 /// What the package asks of its own pages, and of no other page of the host: the rate limiting policy named in the
-/// options, and the culture they are read in (<see cref="PagesCulture"/>).
+/// options, the culture they are read in (<see cref="PagesCulture"/>), and the refusal to be framed by another page.
 /// </summary>
 internal sealed class IdentityPagesConventions(IOptions<IdentityPagesOptions> options) : IConfigureOptions<RazorPagesOptions>
 {
@@ -129,6 +129,25 @@ internal sealed class IdentityPagesConventions(IOptions<IdentityPagesOptions> op
             if (!string.IsNullOrWhiteSpace(options.RateLimitingPolicy))
                 model.EndpointMetadata.Add(new EnableRateLimitingAttribute(options.RateLimitingPolicy));
             model.Filters.Add(new CultureFilter());
+            model.Filters.Add(new FrameAncestorsFilter());
+        }
+    }
+
+    /// <summary>
+    /// Refuses the pages to any frame: a page of the host or of a third party could otherwise lay one over a decoy and
+    /// have the person click, unknowing, "Continue", "Disable" or "Enable". <c>frame-ancestors</c> is appended as a
+    /// policy of its own, so that one the host sets stays whole — several policies are all enforced —;
+    /// <c>X-Frame-Options</c>, for the browsers that read only it, is set when the host set none.
+    /// </summary>
+    private sealed class FrameAncestorsFilter : IAsyncResourceFilter
+    {
+        public Task OnResourceExecutionAsync(ResourceExecutingContext context, ResourceExecutionDelegate next)
+        {
+            var headers = context.HttpContext.Response.Headers;
+            headers.Append("Content-Security-Policy", "frame-ancestors 'none'");
+            if (!headers.ContainsKey("X-Frame-Options"))
+                headers.XFrameOptions = "DENY";
+            return next();
         }
     }
 

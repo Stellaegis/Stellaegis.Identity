@@ -22,6 +22,9 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
   address, and the sixth answer said whether it had an account. The lockout stays in `LoginStep.LockedOut`, for the
   host; the person is told by e-mail when it starts, `IIdentityMailer.SendAccountLockedAsync`, once per lockout. After a
   password that held, or from a session, `Account.LockedOut` is still said: there is nothing left to hide.
+- **The pages refuse to be framed**: `Content-Security-Policy: frame-ancestors 'none'`, appended beside any policy the
+  host sets, and `X-Frame-Options: DENY` when the host sets none. A page laid under a decoy could have the person click
+  "Continue", "Disable" or "Enable" unknowing.
 - **A password typed from a session to confirm an operation is a login attempt**: `AccountService` refuses it while the
   account is locked out, counts a wrong one toward the lockout, traces it as `LoginFailureReasons.InvalidCurrentPassword`,
   and answers in `LoginPolicy:MinResponseTime` at least. Six places let a taken session guess the password without limit.

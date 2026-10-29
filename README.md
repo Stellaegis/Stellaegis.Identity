@@ -328,6 +328,11 @@ app.MapStellaegisIdentityPages();       // the host's MapRazorPages, with the pa
 `MapStaticAssets()` serves the static files of the package from the manifest the build writes, in every
 environment. A host on `UseStaticFiles()` serves them too, but only in `Development` or once published.
 
+The pages refuse to be framed — `Content-Security-Policy: frame-ancestors 'none'`, appended beside any policy the host
+sets, and `X-Frame-Options: DENY` when the host sets none —, so that no page lays them under a decoy; the pages reached
+by a link send no referrer, so that the token in their address goes nowhere. What a host adds of its own — a full
+Content-Security-Policy, HSTS, `ForwardedHeaders` behind a proxy — is the host's.
+
 ### What the pages send
 
 Seven messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a

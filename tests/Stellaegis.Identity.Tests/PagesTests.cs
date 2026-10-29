@@ -32,6 +32,9 @@ public sealed class PagesTests
         Assert.Contains("mailto:help@acme.test", browser.Html);
         Assert.Contains("Sign in", browser.Html);
         Assert.Contains("lang=\"en\"", browser.Html);
+        // Refused to any frame: a page laid under a decoy would have the person click unknowing.
+        Assert.Contains("frame-ancestors 'none'", page.Headers.GetValues("Content-Security-Policy"));
+        Assert.Equal("DENY", page.Headers.GetValues("X-Frame-Options").Single());
     }
 
     [Fact]
