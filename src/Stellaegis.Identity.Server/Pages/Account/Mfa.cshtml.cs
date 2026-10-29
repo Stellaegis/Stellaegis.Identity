@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Stellaegis.Identity.Server.Pages;
 
-/// <summary>The second factor of the person: by authenticator or by e-mail, enabled, or disabled once the password is confirmed.</summary>
+/// <summary>
+/// The second factor of the person: by authenticator or by e-mail, enabled or disabled, the password confirmed either
+/// way — enabling the e-mail method on an authenticator replaces the stronger factor by the weaker one.
+/// </summary>
 [Authorize]
 internal sealed class AccountMfaModel(MfaService mfa, AccountService account, IdentityTexts texts, IIdentityMailer? mailer = null) : PageModel
 {
@@ -35,6 +38,8 @@ internal sealed class AccountMfaModel(MfaService mfa, AccountService account, Id
             await LoadAsync(userId, cancellationToken);
             return Page();
         }
+        if (!await PasswordHoldsAsync(userId, cancellationToken))
+            return Page();
         await mfa.EnableEmailAsync(userId, cancellationToken);
         TempData["Notice"] = "Account.Mfa.EmailEnabled";
         return Redirect("/account/mfa");
@@ -44,15 +49,24 @@ internal sealed class AccountMfaModel(MfaService mfa, AccountService account, Id
     {
         if (this.UserId() is not { } userId)
             return Forbid();
-        if (string.IsNullOrEmpty(Password) || !await account.VerifyCurrentPasswordAsync(userId, Password!, cancellationToken))
-        {
-            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
-            await LoadAsync(userId, cancellationToken);
+        if (!await PasswordHoldsAsync(userId, cancellationToken))
             return Page();
-        }
         await mfa.DisableAsync(userId, cancellationToken);
         TempData["Notice"] = "Account.Mfa.Disabled";
         return Redirect("/account/mfa");
+    }
+
+    // The page is loaded again for a refusal: the form is shown with the error.
+    private async Task<bool> PasswordHoldsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(Password))
+            ModelState.AddModelError(nameof(Password), texts["Field.CurrentPassword.Required"]);
+        else if (!await account.VerifyCurrentPasswordAsync(userId, Password, cancellationToken))
+            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
+        if (ModelState.IsValid)
+            return true;
+        await LoadAsync(userId, cancellationToken);
+        return false;
     }
 
     private async Task LoadAsync(Guid userId, CancellationToken cancellationToken)

@@ -28,6 +28,9 @@
   <data name="Account.Email.NoMailer" xml:space="preserve">
     <value>L'adresse e-mail ne peut pas être changée ici : ce serveur n'envoie aucun courrier.</value>
   </data>
+  <data name="Account.Email.PasswordHelp" xml:space="preserve">
+    <value>Pour changer l'adresse e-mail, confirmer le mot de passe.</value>
+  </data>
   <data name="Account.Email.SendCode" xml:space="preserve">
     <value>Envoyer le code de vérification</value>
   </data>
@@ -63,6 +66,9 @@
   </data>
   <data name="Account.Mfa.DisableHelp" xml:space="preserve">
     <value>Pour désactiver la vérification en deux étapes, confirmer le mot de passe.</value>
+  </data>
+  <data name="Account.Mfa.EnableHelp" xml:space="preserve">
+    <value>Pour activer la vérification en deux étapes, confirmer le mot de passe.</value>
   </data>
   <data name="Account.Mfa.Disabled" xml:space="preserve">
     <value>La vérification en deux étapes est désactivée.</value>

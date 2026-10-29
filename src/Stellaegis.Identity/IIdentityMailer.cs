@@ -2,7 +2,8 @@ namespace Stellaegis.Identity;
 
 /// <summary>
 /// What the accounts send by e-mail, and nothing of how: a code to verify an e-mail, a code to finish a login, a
-/// link to reset a password, a notice that an e-mail already has an account. The host implements it on its own
+/// link to reset a password, a link to activate an account, a notice that an e-mail already has an account, a notice
+/// that the e-mail of an account changed. The host implements it on its own
 /// messaging — <c>Stellaegis.Messaging</c>, an SMTP relay, anything —, with its own templates and wording; the
 /// module never sends anything itself. Without an implementation, the pages that need one refuse to start rather
 /// than fail at the first registration.
@@ -30,4 +31,11 @@ public interface IIdentityMailer
     /// attempt, the stranger learns nothing.
     /// </summary>
     Task SendAccountAlreadyExistsAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tells <paramref name="previousEmail"/> that the account it signed in with now has the e-mail
+    /// <paramref name="newEmail"/>. Sent to the address being left: a person whose session was taken learns of a
+    /// change they did not make, while they still read the address that can act on it.
+    /// </summary>
+    Task SendEmailChangedAsync(string previousEmail, string newEmail, CancellationToken cancellationToken = default);
 }

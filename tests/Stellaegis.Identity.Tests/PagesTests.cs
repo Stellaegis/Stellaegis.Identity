@@ -407,18 +407,57 @@ public sealed class PagesTests
         await browser.GetAsync("/account/password", Ct);
         Assert.Contains("Your password is changed.", browser.Html);
 
+        // Enabling a second factor asks the password: from a taken session, neither the e-mail method nor an authenticator.
+        var unconfirmed = await browser.PostFormAsync("/account/mfa", new Dictionary<string, string>(), Ct, postPath: "/account/mfa?handler=EnableEmail");
+        Assert.Equal(HttpStatusCode.OK, unconfirmed.StatusCode);
+        Assert.Contains("Enter your current password.", browser.Html);
+        var wrong = await browser.PostFormAsync("/account/mfa/setup", html => new Dictionary<string, string> { ["Code"] = "000000", ["Password"] = "nope" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
+        Assert.Contains("Wrong password.", browser.Html);
+        Assert.DoesNotContain("Wrong code.", browser.Html);
+
         // Each reading of the page keeps the secret it showed: the code is computed from the page the form is posted from.
         var enrolled = await browser.PostFormAsync("/account/mfa/setup", html =>
         {
             var secret = System.Text.RegularExpressions.Regex.Match(html, "class=\"auth-secret\">([A-Z2-7]+)<").Groups[1].Value;
             Assert.False(string.IsNullOrEmpty(secret));
-            return new Dictionary<string, string> { ["Code"] = Code(secret) };
+            return new Dictionary<string, string> { ["Code"] = Code(secret), ["Password"] = "Another-Horse-7" };
         }, Ct);
         Assert.Equal("/account/mfa/recovery-codes", enrolled.Headers.Location!.ToString());
         await browser.GetAsync("/account/mfa/recovery-codes", Ct);
         Assert.Contains("Keep these recovery codes now.", browser.Html);
         await browser.GetAsync("/account/mfa", Ct);
         Assert.Contains("Enabled, by authenticator app", browser.Html);
+    }
+
+    [Fact]
+    public async Task Changing_the_email_needs_the_password_and_tells_the_previous_address()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        await app.CreateAccountAsync(Email, Password, Ct);
+        var browser = new Browser(app);
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+
+        var unconfirmed = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["NewEmail"] = "jane.doe@acme.test" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, unconfirmed.StatusCode);
+        Assert.Contains("Enter your current password.", browser.Html);
+        var wrong = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["NewEmail"] = "jane.doe@acme.test", ["Password"] = "nope" }, Ct);
+        Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
+        Assert.Contains("Wrong password.", browser.Html);
+        Assert.Null(app.Mailer().LastTo("jane.doe@acme.test"));
+
+        var asked = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["NewEmail"] = "jane.doe@acme.test", ["Password"] = Password }, Ct);
+        Assert.Equal("/account/email", asked.Headers.Location!.ToString());
+        var mail = app.Mailer().LastTo("jane.doe@acme.test")!;
+        Assert.Equal(InMemoryIdentityMailer.VerificationCode, mail.Kind);
+
+        var confirmed = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["Code"] = mail.Code! }, Ct, postPath: "/account/email?handler=Confirm");
+        Assert.Equal("/login", confirmed.Headers.Location!.ToString());   // the session carried the old address: signed out
+        var notice = app.Mailer().LastTo(Email)!;
+        Assert.Equal(InMemoryIdentityMailer.EmailChanged, notice.Kind);
+        Assert.Equal("jane.doe@acme.test", notice.Code);
+        using var scope = app.Services.CreateScope();
+        Assert.Equal("jane.doe@acme.test", (await scope.ServiceProvider.GetRequiredService<IAuthUserStore>().GetByEmailAsync("jane.doe@acme.test", Ct))!.Email);
     }
 
     private static string Code(string secretBase32, bool next = false)

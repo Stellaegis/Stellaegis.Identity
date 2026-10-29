@@ -44,10 +44,15 @@ else
         <div class="auth-choice">
             <div class="auth-choice-title">@T["Account.Mfa.EmailTitle"]</div>
             <p class="auth-help">@T["Account.Mfa.EmailHelp"]</p>
-            <form method="post" asp-page-handler="EnableEmail">
+            <form class="auth-form" method="post" asp-page-handler="EnableEmail" autocomplete="off">
+                <p class="auth-help">@T["Account.Mfa.EnableHelp"]</p>
+                <div class="auth-field">
+                    <label class="auth-label" for="Password">@T["Field.Password"]</label>
+                    <input class="auth-input" asp-for="Password" type="password" autocomplete="current-password" />
+                </div>
                 <button type="submit" class="auth-btn">@T["Account.Mfa.EmailEnable"]</button>
+                <partial name="_Errors" />
             </form>
         </div>
     </div>
-    <partial name="_Errors" />
 }

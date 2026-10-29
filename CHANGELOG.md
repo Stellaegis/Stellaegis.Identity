@@ -10,7 +10,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 A wrong second factor is a failed login. For the ten minutes of a pending login, codes could be tried without
 limit — three valid authenticator codes in a million per try, one in a million by e-mail —, and every try also
 hashed each recovery code left. And the failed logins were counted by the service on the row it had read: attempts
-sent together each wrote "one more" over the same value, and a lockout of five could be outrun.
+sent together each wrote "one more" over the same value, and a lockout of five could be outrun. And a session taken
+from its person could change the e-mail of the account — then reset its password by that e-mail —, replace an
+authenticator by the e-mail method, or enroll an authenticator that locks the person out, all without the password.
+
+### Changed
+
+- **Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password**, as
+  disabling the second factor and deleting the account did. A wrong or missing password shows the form again.
+- **The previous address is told of a change of e-mail**, `IIdentityMailer.SendEmailChangedAsync`, once the new one
+  is confirmed.
 
 ### Added
 
@@ -27,6 +36,7 @@ sent together each wrote "one more" over the same value, and a lockout of five c
 
 1. **Nothing to install**: the schema is unchanged.
 2. **A store written outside the package implements `RecordFailedLoginAsync`**; the three of the package do.
+   **An `IIdentityMailer` implements `SendEmailChangedAsync`**, the notice to the previous address.
 3. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.
 

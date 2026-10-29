@@ -48,6 +48,12 @@ public sealed class LoggingMailer(ILogger<LoggingMailer> logger) : IIdentityMail
         logger.LogWarning("MAIL to {Email}: someone tried to register this address, which has an account already", email);
         return Task.CompletedTask;
     }
+
+    public Task SendEmailChangedAsync(string previousEmail, string newEmail, CancellationToken cancellationToken = default)
+    {
+        logger.LogWarning("MAIL to {Email}: the e-mail of your account is now {NewEmail}", previousEmail, newEmail);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>

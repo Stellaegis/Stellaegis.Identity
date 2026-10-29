@@ -28,6 +28,9 @@
   <data name="Account.Email.NoMailer" xml:space="preserve">
     <value>The e-mail cannot be changed here: no mail is sent by this host.</value>
   </data>
+  <data name="Account.Email.PasswordHelp" xml:space="preserve">
+    <value>To change the e-mail, confirm your password.</value>
+  </data>
   <data name="Account.Email.SendCode" xml:space="preserve">
     <value>Send the verification code</value>
   </data>
@@ -63,6 +66,9 @@
   </data>
   <data name="Account.Mfa.DisableHelp" xml:space="preserve">
     <value>To disable two-step verification, confirm your password.</value>
+  </data>
+  <data name="Account.Mfa.EnableHelp" xml:space="preserve">
+    <value>To enable two-step verification, confirm your password.</value>
   </data>
   <data name="Account.Mfa.Disabled" xml:space="preserve">
     <value>Two-step verification is disabled.</value>

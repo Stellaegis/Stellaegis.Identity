@@ -9,9 +9,10 @@ using Stellaegis.Identity.AspNetCore;
 namespace Stellaegis.Identity.Server.Pages;
 
 /// <summary>
-/// The person changes their e-mail: a code is sent to the new one, and the change is done once the code is
-/// typed. The cookie still carries the old e-mail then: the person signs in again. An e-mail never proven — the
-/// account was activated by a link handed over — is verified the same way, the code sent to the current one.
+/// The person changes their e-mail, their password confirmed first: a code is sent to the new one, the change is done
+/// once the code is typed, and the previous address is told. The cookie still carries the old e-mail then: the person
+/// signs in again. An e-mail never proven — the account was activated by a link handed over — is verified the same
+/// way, the code sent to the current one, without the password: it changes nothing.
 /// </summary>
 [Authorize]
 internal sealed class AccountEmailModel(
@@ -26,6 +27,9 @@ internal sealed class AccountEmailModel(
 {
     [BindProperty]
     public string? NewEmail { get; set; }
+
+    [BindProperty]
+    public string? Password { get; set; }
 
     [BindProperty]
     public string? Code { get; set; }
@@ -88,8 +92,14 @@ internal sealed class AccountEmailModel(
             return Page();
         }
         if (string.IsNullOrWhiteSpace(NewEmail) || !new EmailAddressAttribute().IsValid(NewEmail))
-        {
             ModelState.AddModelError(nameof(NewEmail), texts["Field.Email.Invalid"]);
+        if (string.IsNullOrEmpty(Password))
+            ModelState.AddModelError(nameof(Password), texts["Field.CurrentPassword.Required"]);
+        else if (!await account.VerifyCurrentPasswordAsync(userId, Password, cancellationToken))
+            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
+        if (!ModelState.IsValid)
+        {
+            CurrentVerified = await IsCurrentVerifiedAsync(cancellationToken);
             return Page();
         }
 
@@ -145,6 +155,17 @@ internal sealed class AccountEmailModel(
         {
             ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));
             return Page();
+        }
+        if (mailer is not null)
+        {
+            try
+            {
+                await mailer.SendEmailChangedAsync(CurrentEmail, Pending, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "The notice that the e-mail of {UserUniqueId} changed was not sent to its previous address", userId);
+            }
         }
         pending.Clear(HttpContext, PendingStates.EmailChange);
         await signIn.SignOutAsync(HttpContext);

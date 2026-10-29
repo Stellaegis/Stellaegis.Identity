@@ -6,14 +6,20 @@ using Stellaegis.Primitives;
 
 namespace Stellaegis.Identity.Server.Pages;
 
-/// <summary>The person enrolls an authenticator; the recovery codes follow, shown once.</summary>
+/// <summary>
+/// The person enrolls an authenticator, their password confirmed with the first code — an authenticator enrolled from a
+/// taken session would lock its owner out —; the recovery codes follow, shown once.
+/// </summary>
 [Authorize]
-internal sealed class AccountMfaSetupModel(MfaService mfa, RecoveryCodeService recoveryCodes, IdentityTexts texts, IOptions<IdentityPagesOptions> pages) : PageModel
+internal sealed class AccountMfaSetupModel(MfaService mfa, AccountService account, RecoveryCodeService recoveryCodes, IdentityTexts texts, IOptions<IdentityPagesOptions> pages) : PageModel
 {
     internal const string CodesTempDataKey = "RecoveryCodes";
 
     [BindProperty]
     public string? Code { get; set; }
+
+    [BindProperty]
+    public string? Password { get; set; }
 
     public MfaEnrollment Enrollment { get; private set; } = new("", "");
 
@@ -35,12 +41,19 @@ internal sealed class AccountMfaSetupModel(MfaService mfa, RecoveryCodeService r
         if (await mfa.IsEnabledAsync(userId, cancellationToken))
             return Redirect("/account/mfa");
 
-        var confirmed = string.IsNullOrWhiteSpace(Code)
-            ? Result.Failure(IdentityErrors.InvalidMfaCode)
-            : await mfa.ConfirmSetupAsync(userId, Code!, cancellationToken);
+        if (string.IsNullOrEmpty(Password))
+            ModelState.AddModelError(nameof(Password), texts["Field.CurrentPassword.Required"]);
+        else if (!await account.VerifyCurrentPasswordAsync(userId, Password, cancellationToken))
+            ModelState.AddModelError(nameof(Password), texts["Field.Password.Wrong"]);
+        var confirmed = !ModelState.IsValid
+            ? Result.Failure(IdentityErrors.InvalidCurrentPassword)
+            : string.IsNullOrWhiteSpace(Code)
+                ? Result.Failure(IdentityErrors.InvalidMfaCode)
+                : await mfa.ConfirmSetupAsync(userId, Code!, cancellationToken);
         if (confirmed.IsFailure)
         {
-            ModelState.AddModelError(nameof(Code), texts["MfaSetup.CodeInvalid"]);
+            if (confirmed.Error != IdentityErrors.InvalidCurrentPassword)
+                ModelState.AddModelError(nameof(Code), texts["MfaSetup.CodeInvalid"]);
             var record = await mfa.GetStatusAsync(userId, cancellationToken);
             var secret = record?.PendingSecret ?? await mfa.BeginSetupAsync(userId, cancellationToken);
             Enrollment = MfaEnrollment.Of(secret, this.UserEmail(), pages.Value.ApplicationName);

@@ -327,10 +327,14 @@ environment. A host on `UseStaticFiles()` serves them too, but only in `Developm
 
 ### What the pages send
 
-Five messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
-verification code, a login code, a password reset link, an activation link, and the notice that an e-mail has an
-account already. Without an implementation, a host whose self-registration is open or whose password reset is
-enabled refuses to start.
+Six messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
+verification code, a login code, a password reset link, an activation link, the notice that an e-mail has an
+account already, and the notice to the previous address that the e-mail of the account changed. Without an
+implementation, a host whose self-registration is open or whose password reset is enabled refuses to start.
+
+Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password first, as
+disabling the second factor and deleting the account do: a session taken from its person opens none of them, and the
+previous address is told of a change of e-mail.
 `AddStellaegisInMemoryIdentityMailer()` keeps the messages in memory, for development and tests.
 
 ### Making the pages the host's own

@@ -3,10 +3,10 @@ using System.Collections.Concurrent;
 namespace Stellaegis.Identity.InMemory;
 
 /// <summary>What the in-memory mailer was asked to send: the kind of message, to whom, with which code or link.</summary>
-/// <param name="Kind">One of <see cref="InMemoryIdentityMailer.VerificationCode"/>, <see cref="InMemoryIdentityMailer.LoginCode"/>, <see cref="InMemoryIdentityMailer.PasswordResetLink"/>, <see cref="InMemoryIdentityMailer.AccountAlreadyExists"/>.</param>
+/// <param name="Kind">One of <see cref="InMemoryIdentityMailer.VerificationCode"/>, <see cref="InMemoryIdentityMailer.LoginCode"/>, <see cref="InMemoryIdentityMailer.PasswordResetLink"/>, <see cref="InMemoryIdentityMailer.ActivationLink"/>, <see cref="InMemoryIdentityMailer.AccountAlreadyExists"/>, <see cref="InMemoryIdentityMailer.EmailChanged"/>.</param>
 /// <param name="Email">The recipient.</param>
-/// <param name="Code">The code, for the two kinds that carry one.</param>
-/// <param name="Link">The link, for a password reset.</param>
+/// <param name="Code">The code, for the two kinds that carry one; the new e-mail, for the notice that it changed.</param>
+/// <param name="Link">The link, for a password reset or an activation.</param>
 public sealed record IdentityMail(string Kind, string Email, string? Code, Uri? Link);
 
 /// <summary>
@@ -29,6 +29,9 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
 
     /// <summary>The kind of the notice that an e-mail has an account already.</summary>
     public const string AccountAlreadyExists = "account_already_exists";
+
+    /// <summary>The kind of the notice, to the previous e-mail, that the e-mail of the account changed.</summary>
+    public const string EmailChanged = "email_changed";
 
     private readonly ConcurrentQueue<IdentityMail> _sent = new();
 
@@ -70,6 +73,13 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
     public Task SendAccountAlreadyExistsAsync(string email, CancellationToken cancellationToken = default)
     {
         _sent.Enqueue(new IdentityMail(AccountAlreadyExists, email, null, null));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task SendEmailChangedAsync(string previousEmail, string newEmail, CancellationToken cancellationToken = default)
+    {
+        _sent.Enqueue(new IdentityMail(EmailChanged, previousEmail, newEmail, null));
         return Task.CompletedTask;
     }
 }
