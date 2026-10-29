@@ -126,6 +126,12 @@ internal sealed class SqlServerIdentityStore
         return await uow.Repo<UserRepository>().UpdateAsync(user, cancellationToken).ConfigureAwait(false);
     }
 
+    async Task<FailedLogin?> IAuthUserStore.RecordFailedLoginAsync(Guid userUniqueId, DateTimeOffset now, int maxAttempts, TimeSpan lockoutDuration, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<UserRepository>().RecordFailedLoginAsync(userUniqueId, now, maxAttempts, now.Add(lockoutDuration), cancellationToken).ConfigureAwait(false);
+    }
+
     async Task<bool> IAuthUserStore.SoftDeleteAsync(Guid userUniqueId, Actor deletedBy, CancellationToken cancellationToken)
     {
         Guard.NotNull(deletedBy);

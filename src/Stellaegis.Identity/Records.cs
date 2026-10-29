@@ -38,6 +38,21 @@ public static class LoginFailureReasons
 
     /// <summary>The account waits for its activation: it has no password yet. The person is told only that the credentials are invalid.</summary>
     public const string NotActivated = "NOT_ACTIVATED";
+
+    /// <summary>The password held, and the code of the second factor — one-time or recovery — is wrong.</summary>
+    public const string InvalidSecondFactor = "INVALID_SECOND_FACTOR";
+}
+
+/// <summary>
+/// The failed logins of an account after one more was counted (<see cref="IAuthUserStore.RecordFailedLoginAsync"/>):
+/// how many in a row, and until when the account is locked out, when it is.
+/// </summary>
+/// <param name="FailedLoginCount">Consecutive failed logins since the last successful one, this one included.</param>
+/// <param name="BlockedUntil">Until when the account is locked out, or <see langword="null"/> when it is not.</param>
+public sealed record FailedLogin(int FailedLoginCount, DateTimeOffset? BlockedUntil)
+{
+    /// <summary>Whether the account is locked out at <paramref name="now"/>.</summary>
+    public bool IsLockedOutAt(DateTimeOffset now) => BlockedUntil is { } until && until > now;
 }
 
 /// <summary>What an account token authorizes, once.</summary>

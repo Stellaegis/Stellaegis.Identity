@@ -204,6 +204,35 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
     }
 
     [Fact]
+    public async Task Failed_logins_counted_at_once_all_count_and_the_lockout_falls_where_the_policy_says()
+    {
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+        var lockout = TimeSpan.FromMinutes(15);
+
+        // Twenty attempts in flight together: a count read, raised and written back by each would lose most of them.
+        var results = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Users.RecordFailedLoginAsync(user.UserUniqueId, _clock.Now, 5, lockout, Ct)));
+
+        Assert.All(results, result => Assert.NotNull(result));
+        Assert.Equal(Enumerable.Range(1, 20), results.Select(result => result!.FailedLoginCount).Order());
+        Assert.Equal(4, results.Count(result => result!.BlockedUntil is null));
+        Assert.All(results.Where(result => result!.FailedLoginCount >= 5), result => Assert.Equal(_clock.Now.Add(lockout), result!.BlockedUntil));
+        var stored = await Users.GetByUniqueIdAsync(user.UserUniqueId, Ct);
+        Assert.Equal(20, stored!.FailedLoginCount);
+        Assert.Equal(_clock.Now, stored.FailedLoginLast);
+        Assert.Equal(_clock.Now.Add(lockout), stored.BlockedUntil);
+        Assert.All(results, result => Assert.Equal(result!.FailedLoginCount >= 5, result.IsLockedOutAt(_clock.Now)));
+
+        // A failure counted while the account is locked out starts the lockout again from that failure.
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var later = await Users.RecordFailedLoginAsync(user.UserUniqueId, _clock.Now, 5, lockout, Ct);
+        Assert.Equal(21, later!.FailedLoginCount);
+        Assert.Equal(_clock.Now.Add(lockout), later.BlockedUntil);
+
+        Assert.Null(await Users.RecordFailedLoginAsync(Guid.NewGuid(), _clock.Now, 5, lockout, Ct));
+    }
+
+    [Fact]
     public async Task A_deleted_account_stays_hidden_and_keeps_its_id_and_a_disabled_one_is_blocked_at_the_door()
     {
         var deleted = NewUser();

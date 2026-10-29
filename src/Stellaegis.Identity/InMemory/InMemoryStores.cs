@@ -17,6 +17,8 @@ public sealed class InMemoryIdentityData
 
 internal sealed class InMemoryAuthUserStore(InMemoryIdentityData data) : IAuthUserStore
 {
+    private readonly Lock _failures = new();
+
     public Task<AuthUser?> GetByUniqueIdAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
         => Task.FromResult(data.Users.TryGetValue(userUniqueId, out var user) && !user.IsDeleted ? user : null);
 
@@ -56,6 +58,20 @@ internal sealed class InMemoryAuthUserStore(InMemoryIdentityData data) : IAuthUs
             return Task.FromResult(false);
         data.Users[user.UserUniqueId] = user;
         return Task.FromResult(true);
+    }
+
+    public Task<FailedLogin?> RecordFailedLoginAsync(Guid userUniqueId, DateTimeOffset now, int maxAttempts, TimeSpan lockoutDuration, CancellationToken cancellationToken = default)
+    {
+        lock (_failures)
+        {
+            if (!data.Users.TryGetValue(userUniqueId, out var user) || user.IsDeleted)
+                return Task.FromResult<FailedLogin?>(null);
+            user.FailedLoginCount++;
+            user.FailedLoginLast = now;
+            if (user.FailedLoginCount >= maxAttempts)
+                user.BlockedUntil = now.Add(lockoutDuration);
+            return Task.FromResult<FailedLogin?>(new FailedLogin(user.FailedLoginCount, user.BlockedUntil));
+        }
     }
 
     public Task<bool> SoftDeleteAsync(Guid userUniqueId, Actor deletedBy, CancellationToken cancellationToken = default)

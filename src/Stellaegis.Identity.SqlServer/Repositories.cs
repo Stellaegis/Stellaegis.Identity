@@ -16,6 +16,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
     {
         PrimitiveTypeHandlers.Register();
         SnakeCaseTypeMap<UserRow>.Register();
+        SnakeCaseTypeMap<FailedLoginRow>.Register();
     }
 
     public async Task<AuthUser?> FindAsync(Guid userUniqueId, CancellationToken cancellationToken)
@@ -108,6 +109,23 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         return rows > 0;
     }
 
+    // One statement, on the stored count: two attempts at once both add one. The case reads the count before the
+    // update, as every expression of a set clause does.
+    public async Task<FailedLogin?> RecordFailedLoginAsync(Guid userUniqueId, DateTimeOffset now, int maxAttempts, DateTimeOffset lockedUntil, CancellationToken cancellationToken)
+    {
+        var row = await connection.QuerySingleOrDefaultAsync<FailedLoginRow>(new CommandDefinition(
+            """
+            update ident.users
+            set failed_login_count = failed_login_count + 1,
+                failed_login_last = @now,
+                blocked_until = case when failed_login_count + 1 >= @maxAttempts then @lockedUntil else blocked_until end
+            output inserted.failed_login_count, inserted.blocked_until
+            where user_unique_id = @userUniqueId and is_deleted = 0
+            """,
+            new { userUniqueId, now, maxAttempts, lockedUntil }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row is null ? null : new FailedLogin(row.FailedLoginCount, row.BlockedUntil);
+    }
+
     public async Task<bool> SoftDeleteAsync(Guid userUniqueId, Actor deletedBy, DateTimeOffset deletedAt, CancellationToken cancellationToken)
     {
         var rows = await connection.ExecuteAsync(new CommandDefinition(
@@ -119,6 +137,12 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             """,
             new { userUniqueId, deletedBy, deletedAt }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return rows > 0;
+    }
+
+    private sealed class FailedLoginRow
+    {
+        public int FailedLoginCount { get; set; }
+        public DateTimeOffset? BlockedUntil { get; set; }
     }
 
     private sealed class UserRow

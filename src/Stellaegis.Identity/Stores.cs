@@ -28,6 +28,16 @@ public interface IAuthUserStore
     Task<bool> UpdateAsync(AuthUser user, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Counts one more failed login against the account — a wrong password, a wrong second factor —, at
+    /// <paramref name="now"/>, and locks the account out until <paramref name="now"/> plus
+    /// <paramref name="lockoutDuration"/> once the count reaches <paramref name="maxAttempts"/>. The count and the
+    /// lock are one write on the row as it is, never on the row as it was read: attempts made at once all count, so
+    /// that a lockout cannot be outrun by sending them together. <see langword="null"/> when no account with that
+    /// id exists, or it is deleted.
+    /// </summary>
+    Task<FailedLogin?> RecordFailedLoginAsync(Guid userUniqueId, DateTimeOffset now, int maxAttempts, TimeSpan lockoutDuration, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Marks the account deleted, by <paramref name="deletedBy"/>, and removes its avatar in the same gesture: the
     /// account stays so that its id is never reused, the image goes since it identifies the person.
     /// <see langword="false"/> when no account with that id exists, or it is deleted already.
