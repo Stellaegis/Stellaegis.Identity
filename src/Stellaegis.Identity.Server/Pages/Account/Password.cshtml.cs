@@ -13,6 +13,8 @@ internal sealed class AccountPasswordModel(AccountService account, PasswordRules
 
     public IReadOnlyList<string> Rules => passwords.Describe();
 
+    public PasswordPolicy Policy => passwords.Policy;
+
     public sealed class InputModel
     {
         public string? CurrentPassword { get; set; }

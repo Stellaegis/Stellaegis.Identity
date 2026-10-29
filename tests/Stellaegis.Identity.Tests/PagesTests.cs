@@ -456,6 +456,27 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task Every_page_that_takes_a_new_password_shows_its_strength_meter()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        await app.CreateAccountAsync(Email, Password, Ct);
+        var browser = new Browser(app);
+
+        string? token;
+        using (var scope = app.Services.CreateScope())
+            token = await scope.ServiceProvider.GetRequiredService<PasswordResetService>().RequestResetAsync(Email, cancellationToken: Ct);
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync($"/reset-password?token={token}", Ct)).StatusCode);
+        Assert.Contains("pwd-strength", browser.Html);
+        Assert.Contains("identity.js", browser.Html);
+        Assert.Contains("data-min-length=\"8\"", browser.Html);
+
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync("/account/password", Ct)).StatusCode);
+        Assert.Contains("pwd-strength", browser.Html);
+        Assert.Contains("identity.js", browser.Html);
+    }
+
+    [Fact]
     public async Task The_code_by_email_is_offered_only_where_the_installation_allows_it()
     {
         await using var app = await PagesTestHost.StartAsync(Ct);   // the authenticator alone, unless set

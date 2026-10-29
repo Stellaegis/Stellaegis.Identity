@@ -98,6 +98,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IEventPublisher>(NullEventPublisher.Instance);
         services.TryAddSingleton<PasswordHasher>();
         services.TryAddSingleton<TotpSecretProtector>();
+        services.AddHttpClient(DefaultPasswordBlocklist.HibpClientName);
+        services.TryAddSingleton<IPasswordBlocklist, DefaultPasswordBlocklist>();   // a host that registers its own keeps it
         services.TryAddSingleton<PasswordStrengthEvaluator>();
         services.TryAddSingleton<PasswordGenerator>();
         services.TryAddSingleton<LoginOtpService>();

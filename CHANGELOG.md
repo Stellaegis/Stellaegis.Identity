@@ -69,8 +69,23 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
   call, answers `Verification.NotPending` to another requester, and a verified e-mail still answers to its code and to
   nothing else. `IEmailVerificationStore` reads, counts, marks and deletes by e-mail and purpose.
 
+- **A password is at least eight characters long, and nothing else unless the host asks for it**: `PasswordPolicy`
+  requires no kind of character unless set — `RequireUppercase`, `RequireLowercase`, `RequireDigit`,
+  `RequireSpecialChar`, each false now —, the posture of NIST SP 800-63B, revision 4, which forbids such rules: they
+  yield `Password1!`, which every list of the common ones holds. The strength is scored on the length first, six
+  points per character past the sixth up to seventy, then on what the password mixes; the meter of the pages too.
+
 ### Added
 
+- **The passwords everyone chooses are refused, in three layers**, by the `IPasswordBlocklist` the package registers
+  unless the host registers its own, `DefaultPasswordBlocklist`: the hundred thousand most used passwords, shipped
+  with the package, `PasswordBlocklist:UseEmbeddedList`; a file of the installation, `PasswordBlocklist:Path`, one
+  password per line, read again when it changes, so that an administrator adds to it without waiting for a version;
+  and Have I Been Pwned, `PasswordBlocklist:Hibp:Enabled`, off unless set, asked by the first five characters of the
+  SHA-1 — the password never leaves the host — and silent when it does not answer. Compared without regard to case.
+  Until then the port was empty: nothing was refused without a list of the host's.
+- **The strength meter on every page that takes a new password**: `/activate`, `/reset-password` and
+  `/account/password` show it as `/register` did; an account created by its administration never saw it.
 - **The methods of the second factor are the installation's to allow**, `Mfa:AllowedMethods`: the authenticator alone
   unless set, the code by e-mail where the host opens it. The pages offer the allowed ones only;
   `MfaService.EnableEmailAsync`, which answers a `Result` now, and `ConfirmSetupAsync` refuse the others,
@@ -121,18 +136,22 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 2. **A store written outside the package implements `RecordFailedLoginAsync`**, `LastIssuedAtAsync`, and the e-mail
    verifications by e-mail and purpose; the three of the package do. **A caller of `EmailVerificationService`** passes
    the purpose and the requester, and treats `Verification.Throttled` as a code sent.
-3. **A host whose people take the code by e-mail as second factor** names it, `Mfa:AllowedMethods:1 = email`: the
+3. **A host that wants kinds of characters in a password** asks for them now, `PasswordPolicy:RequireUppercase` and
+   the three others, false unless set: the passwords accepted so far stay as they are. **The common passwords are
+   refused from now on** by the list the package ships, unless the host registered an `IPasswordBlocklist` of its
+   own, which it keeps; `PasswordBlocklist:UseEmbeddedList` turns the list off.
+4. **A host whose people take the code by e-mail as second factor** names it, `Mfa:AllowedMethods:1 = email`: the
    pages offer the authenticator alone otherwise. And a decision that required `mfa` is no longer satisfied by a
    code by e-mail: such people enroll an authenticator, or the host reconsiders what it requires. A caller of
    `MfaService.EnableEmailAsync` reads a `Result`.
-4. **A host that limits the pages by a policy of its own** keeps `Pages:RateLimitingPolicy` and sets
+5. **A host that limits the pages by a policy of its own** keeps `Pages:RateLimitingPolicy` and sets
    `Pages:RateLimiting:Enabled` to false, or lets both apply. A host that set up nothing has the package's limits now,
    and enables `ForwardedHeaders` behind a proxy so that the count is the client's rather than the proxy's.
    **An `IIdentityMailer` implements `SendEmailChangeApprovalAsync`**, the approval link to the previous address,
    **`SendEmailChangedAsync`**, the notice to the previous address with its link, and **`SendAccountLockedAsync`**,
    the notice that the account is locked out.
    **A caller of `AccountService.ConfirmEmailChangeAsync`** reads a `Result<EmailChanged>`, and sends the notice.
-5. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
+6. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.
 
 ## [6.3.0] — 2026-10-28

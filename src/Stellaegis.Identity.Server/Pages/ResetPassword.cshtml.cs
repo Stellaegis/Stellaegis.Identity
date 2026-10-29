@@ -19,6 +19,8 @@ internal sealed class ResetPasswordModel(PasswordResetService reset, PasswordRul
 
     public IReadOnlyList<string> Rules => passwords.Describe();
 
+    public PasswordPolicy Policy => passwords.Policy;
+
     public sealed class InputModel
     {
         public string? NewPassword { get; set; }

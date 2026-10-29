@@ -195,6 +195,28 @@ the host runs the purge every day by its own scheduler, under `IdentityRetention
 The secrets of the second factor are protected at rest by the application — AES-256-GCM under a key of
 `Mfa:SecretKeys`, the account bound to its secret —, the same on every engine, and a code is accepted once.
 
+### Passwords
+
+A password is at least eight characters long, and nothing else unless the host asks for it: the posture of NIST SP
+800-63B, revision 4, which forbids requiring kinds of characters — they yield the passwords everyone yields,
+`Password1!`, which every list of the common ones holds — and requires a blocklist instead. Every password accepted —
+at the registration, the activation, the reset, the change — goes through `PasswordStrengthEvaluator.RefuseAsync`:
+the policy, then the `IPasswordBlocklist`. The package registers one, `DefaultPasswordBlocklist`, unless the host
+registers its own, in three layers, each enough to refuse, `Password.Blocked`, compared without regard to case:
+
+- **the list the package ships**, the hundred thousand most used passwords published by the NCSC from Have I Been
+  Pwned, brought up to date with the package; `PasswordBlocklist:UseEmbeddedList` turns it off;
+- **a file of the installation**, `PasswordBlocklist:Path`, one password per line, lines starting with `#` ignored:
+  the names of the company, its products, its town. It is read again when it changes, so that an administrator adds
+  to it without waiting for a version; it must exist when named;
+- **Have I Been Pwned**, `PasswordBlocklist:Hibp:Enabled`, off unless set: asked by the first five characters of
+  the SHA-1 of the password, the service answers the suffixes it knows under them, and the match is made here — the
+  password never leaves the host. When it does not answer in `Hibp:Timeout`, two seconds, the two other layers stand
+  and nothing is thrown. It is the one call the module makes outside the host, and only where the host opened it.
+
+The pages that take a new password show a strength meter, scored on the length first, six points per character past
+the sixth up to seventy, then on what the password mixes; the server scores the same, `PasswordStrengthEvaluator.Evaluate`.
+
 ### Options
 
 One section, `Stellaegis:Identity`, one sub-section per concern, bound by `AddStellaegisIdentity` and validated
@@ -203,7 +225,10 @@ when the host starts:
 ```text
 Stellaegis:Identity:PasswordHasher:Pepper          required; a secret of the deployment, never in the repository
 Stellaegis:Identity:PasswordHasher:Iterations      310000
-Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a password must mix; an IPasswordBlocklist the host registers refuses the common ones
+Stellaegis:Identity:PasswordPolicy:MinLength       8, and nothing else unless set: RequireUppercase, RequireLowercase, RequireDigit, RequireSpecialChar, each false
+Stellaegis:Identity:PasswordBlocklist:UseEmbeddedList  true: the hundred thousand most used passwords, shipped with the package
+Stellaegis:Identity:PasswordBlocklist:Path         none; a file of the installation, one password per line, read again when it changes
+Stellaegis:Identity:PasswordBlocklist:Hibp:Enabled false; true asks Have I Been Pwned by range, Timeout 2 seconds, silent when it does not answer
 Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes, told to the person by e-mail
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login

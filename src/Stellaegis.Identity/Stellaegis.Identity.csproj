@@ -16,4 +16,9 @@
     <InternalsVisibleTo Include="Stellaegis.Identity.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The hundred thousand most used passwords (NCSC, from Have I Been Pwned), refused unless the host says otherwise -->
+    <EmbeddedResource Include="Resources\common-passwords.txt.gz" LogicalName="Stellaegis.Identity.common-passwords.txt.gz" />
+  </ItemGroup>
+
 </Project>

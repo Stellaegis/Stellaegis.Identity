@@ -21,6 +21,8 @@ internal sealed class ActivateModel(ActivationService activation, PasswordRules 
 
     public IReadOnlyList<string> Rules => passwords.Describe();
 
+    public PasswordPolicy Policy => passwords.Policy;
+
     public sealed class InputModel
     {
         public string? NewPassword { get; set; }

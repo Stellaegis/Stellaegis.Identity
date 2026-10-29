@@ -640,9 +640,19 @@ public sealed class PasswordTests
     }
 
     [Fact]
-    public void The_policy_is_checked_and_scored_and_the_generator_meets_it()
+    public void The_policy_is_the_length_unless_a_kind_of_character_is_asked_for_and_the_generator_meets_it()
     {
-        using var host = new TestHost(o => { o.PasswordPolicy.MinLength = 12; o.PasswordPolicy.RequireSpecialChar = false; });
+        // Unless set, eight characters and nothing else: the length is scored first, the kinds mixed as a bonus.
+        using var defaults = new TestHost();
+        var scoring = defaults.Get<PasswordStrengthEvaluator>();
+        Assert.Equal(["At least 8 characters are required."], scoring.Violations("short"));
+        Assert.Empty(scoring.Violations("correcthorse"));
+        Assert.Equal(PasswordStrength.Fair, scoring.Evaluate("Passw0rd!").Strength);   // nine characters of every kind: 18 + 30
+        Assert.Equal(PasswordStrength.Strong, scoring.Evaluate("correcthorsebattery").Strength);   // nineteen of one kind: 70 + 5
+        Assert.Equal(PasswordStrength.VeryStrong, scoring.Evaluate("Correct-Horse-Battery-9").Strength);
+        Assert.Equal(100, scoring.Evaluate("Correct-Horse-Battery-9").Score);
+
+        using var host = new TestHost(o => { o.PasswordPolicy.MinLength = 12; o.PasswordPolicy.RequireUppercase = true; o.PasswordPolicy.RequireDigit = true; });
         var evaluator = host.Get<PasswordStrengthEvaluator>();
 
         var weak = evaluator.Evaluate("abc");

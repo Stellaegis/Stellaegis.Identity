@@ -24,6 +24,9 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>What a password must look like.</summary>
     public PasswordPolicy PasswordPolicy { get; set; } = new();
 
+    /// <summary>Where the passwords everyone chooses, or the breaches hold, are refused from.</summary>
+    public PasswordBlocklistOptions PasswordBlocklist { get; set; } = new();
+
     /// <summary>Lockout and timing of the login.</summary>
     public LoginPolicyOptions LoginPolicy { get; set; } = new();
 
@@ -71,6 +74,7 @@ public sealed class IdentityOptions : IValidatableOptions
     public string? FindError()
         => Prefix(nameof(PasswordHasher), PasswordHasher.FindError())
         ?? Prefix(nameof(PasswordPolicy), PasswordPolicy.FindError())
+        ?? Prefix(nameof(PasswordBlocklist), PasswordBlocklist.FindError())
         ?? Prefix(nameof(LoginPolicy), LoginPolicy.FindError())
         ?? Prefix(nameof(Mfa), Mfa.FindError())
         ?? Prefix(nameof(EmailVerification), EmailVerification.FindError())
@@ -111,26 +115,32 @@ public sealed class PasswordHasherOptions : IValidatableOptions
     }
 }
 
-/// <summary>What a password must look like.</summary>
+/// <summary>
+/// What a password must look like: at least <see cref="MinLength"/> characters, eight unless set, and nothing else
+/// unless set — the posture of NIST SP 800-63B, revision 4. Requiring kinds of characters is what it forbids: it
+/// yields the passwords everyone yields, <c>Password1!</c>, which every list of the common ones holds; what protects
+/// is the length, and the blocklist (<see cref="PasswordBlocklistOptions"/>), which every password goes through. A
+/// host that wants kinds of characters still asks for them, each by its own setting.
+/// </summary>
 public sealed class PasswordPolicy : IValidatableOptions
 {
-    /// <summary>The shortest password accepted. 8 unless set.</summary>
+    /// <summary>The shortest password accepted. 8 unless set, the floor NIST requires; 15 is what it recommends.</summary>
     public int MinLength { get; set; } = 8;
 
-    /// <summary>The longest password accepted. 128 unless set.</summary>
+    /// <summary>The longest password accepted. 128 unless set; every character counts, spaces and Unicode included.</summary>
     public int MaxLength { get; set; } = 128;
 
-    /// <summary>Whether an uppercase letter is required. Yes unless set.</summary>
-    public bool RequireUppercase { get; set; } = true;
+    /// <summary>Whether an uppercase letter is required. No unless set.</summary>
+    public bool RequireUppercase { get; set; }
 
-    /// <summary>Whether a lowercase letter is required. Yes unless set.</summary>
-    public bool RequireLowercase { get; set; } = true;
+    /// <summary>Whether a lowercase letter is required. No unless set.</summary>
+    public bool RequireLowercase { get; set; }
 
-    /// <summary>Whether a digit is required. Yes unless set.</summary>
-    public bool RequireDigit { get; set; } = true;
+    /// <summary>Whether a digit is required. No unless set.</summary>
+    public bool RequireDigit { get; set; }
 
-    /// <summary>Whether a character that is neither a letter nor a digit is required. Yes unless set.</summary>
-    public bool RequireSpecialChar { get; set; } = true;
+    /// <summary>Whether a character that is neither a letter nor a digit is required. No unless set.</summary>
+    public bool RequireSpecialChar { get; set; }
 
     /// <inheritdoc/>
     public string? FindError()

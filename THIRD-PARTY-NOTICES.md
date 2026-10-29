@@ -19,11 +19,12 @@ Its packages reference the packages below, which NuGet installs alongside them, 
 `Stellaegis.Identity.AspNetCore` and `Stellaegis.Identity.Server` use the ASP.NET Core shared framework, which the
 host already has.
 
-`Stellaegis.Identity.Server` is the one package that contains third-party code, copied as is:
+Two packages contain third-party content, copied as is:
 
 | Component | Where | License (SPDX) | Project |
 | --- | --- | --- | --- |
-| qrcode.js (`qrcode.min.js`, served by the pages to draw the QR code of an authenticator enrollment) | `wwwroot/qrcode.min.js` | MIT | <https://github.com/davidshimjs/qrcodejs> |
+| qrcode.js (`qrcode.min.js`, served by the pages to draw the QR code of an authenticator enrollment) | `Stellaegis.Identity.Server`, `wwwroot/qrcode.min.js` | MIT | <https://github.com/davidshimjs/qrcodejs> |
+| The 100 000 most used passwords, published by the UK National Cyber Security Centre from Have I Been Pwned, taken from SecLists (`Passwords/Common-Credentials/100k-most-used-passwords-NCSC.txt`), gzipped, lowercased at load: the list `DefaultPasswordBlocklist` refuses from | `Stellaegis.Identity`, `Resources/common-passwords.txt.gz` | OGL-UK-3.0 (the list), MIT (SecLists) | <https://www.ncsc.gov.uk/blog-post/passwords-passwords-everywhere>, <https://github.com/danielmiessler/SecLists> |
 
 Test-only dependencies (xUnit, the ASP.NET Core test host) and the example host are not part of any package and
 are not listed here. The PostgreSQL server that the tests and the publishing workflow use is not part of any

@@ -115,9 +115,11 @@ public sealed class PasswordStrengthResult
 }
 
 /// <summary>
-/// Checks a password against the <see cref="PasswordPolicy"/> and scores it: length up to 40 points, an
-/// uppercase letter 15, a lowercase one 10, a digit 15, a special character 20. Refuses it, by <see cref="RefuseAsync"/>,
-/// when the policy or the host's <see cref="IPasswordBlocklist"/> does.
+/// Checks a password against the <see cref="PasswordPolicy"/> and scores it, the length first: six points per
+/// character past the sixth, up to 70; then a bonus for what the password mixes, an uppercase letter 8, a lowercase
+/// one 5, a digit 7, a special character 10. Twelve characters of every kind are strong, sixteen of one kind too: the
+/// length is what costs an attacker, the kinds are what people repeat. Refuses it, by <see cref="RefuseAsync"/>,
+/// when the policy or the <see cref="IPasswordBlocklist"/> does. The meter of the pages mirrors the score.
 /// </summary>
 public sealed class PasswordStrengthEvaluator(IOptions<IdentityOptions> options, IPasswordBlocklist? blocklist = null)
 {
@@ -149,11 +151,11 @@ public sealed class PasswordStrengthEvaluator(IOptions<IdentityOptions> options,
 
     private static int ComputeScore(string password)
     {
-        var length = Math.Clamp((password.Length - 4) * 3, 0, 40);
-        var upper = password.Any(char.IsUpper) ? 15 : 0;
-        var lower = password.Any(char.IsLower) ? 10 : 0;
-        var digit = password.Any(char.IsDigit) ? 15 : 0;
-        var special = password.Any(c => !char.IsLetterOrDigit(c)) ? 20 : 0;
+        var length = Math.Clamp((password.Length - 6) * 6, 0, 70);
+        var upper = password.Any(char.IsUpper) ? 8 : 0;
+        var lower = password.Any(char.IsLower) ? 5 : 0;
+        var digit = password.Any(char.IsDigit) ? 7 : 0;
+        var special = password.Any(c => !char.IsLetterOrDigit(c)) ? 10 : 0;
         return Math.Min(length + upper + lower + digit + special, 100);
     }
 

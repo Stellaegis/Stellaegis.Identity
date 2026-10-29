@@ -4,8 +4,9 @@
 (function () {
     "use strict";
 
-    // The strength meter mirrors the scoring of the module (length up to 40, upper 15, lower 10, digit 15,
-    // special 20): weak under 25, fair under 55, strong under 80, very strong above.
+    // The strength meter mirrors the scoring of the module: the length first, six points per character past the
+    // sixth up to 70, then a bonus for what the password mixes (upper 8, lower 5, digit 7, special 10): weak under
+    // 25, fair under 55, strong under 80, very strong above. The server checks the policy and the blocklist again.
     var input = document.querySelector("input[data-min-length]");
     if (input) {
         var minLength = parseInt(input.dataset.minLength || "8", 10);
@@ -19,11 +20,11 @@
         var text = field && field.querySelector(".pwd-strength-text");
 
         var score = function (pwd) {
-            var length = Math.min(Math.max((pwd.length - 4) * 3, 0), 40);
-            var upper = /[A-Z]/.test(pwd) ? 15 : 0;
-            var lower = /[a-z]/.test(pwd) ? 10 : 0;
-            var digit = /[0-9]/.test(pwd) ? 15 : 0;
-            var special = /[^a-zA-Z0-9]/.test(pwd) ? 20 : 0;
+            var length = Math.min(Math.max((pwd.length - 6) * 6, 0), 70);
+            var upper = /[A-Z]/.test(pwd) ? 8 : 0;
+            var lower = /[a-z]/.test(pwd) ? 5 : 0;
+            var digit = /[0-9]/.test(pwd) ? 7 : 0;
+            var special = /[^a-zA-Z0-9]/.test(pwd) ? 10 : 0;
             return Math.min(length + upper + lower + digit + special, 100);
         };
         var meetsPolicy = function (pwd) {
