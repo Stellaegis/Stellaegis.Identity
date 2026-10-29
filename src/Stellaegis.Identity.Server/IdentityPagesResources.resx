@@ -550,6 +550,33 @@
   <data name="Activate.Submit" xml:space="preserve">
     <value>Activate the account</value>
   </data>
+  <data name="Account.Email.ApprovalSent" xml:space="preserve">
+    <value>A link was sent to {0}. The change applies when it is opened there, and the account keeps that address until then.</value>
+  </data>
+  <data name="ApproveEmail.Title" xml:space="preserve">
+    <value>Approve the new e-mail</value>
+  </data>
+  <data name="ApproveEmail.Heading" xml:space="preserve">
+    <value>Approve the new e-mail</value>
+  </data>
+  <data name="ApproveEmail.Help" xml:space="preserve">
+    <value>The account {0} asked to change its e-mail to {1}. Approving applies the change and closes the sessions open with the previous address.</value>
+  </data>
+  <data name="ApproveEmail.Submit" xml:space="preserve">
+    <value>Approve this change</value>
+  </data>
+  <data name="ApproveEmail.InvalidHeading" xml:space="preserve">
+    <value>Invalid link</value>
+  </data>
+  <data name="ApproveEmail.InvalidHelp" xml:space="preserve">
+    <value>This link is invalid, expired or already used. A change asked again sends a new one.</value>
+  </data>
+  <data name="ApproveEmail.DoneHeading" xml:space="preserve">
+    <value>E-mail changed</value>
+  </data>
+  <data name="ApproveEmail.DoneHelp" xml:space="preserve">
+    <value>The account now has its new e-mail. Sign in with it.</value>
+  </data>
   <data name="RevertEmail.Title" xml:space="preserve">
     <value>Restore the e-mail</value>
   </data>

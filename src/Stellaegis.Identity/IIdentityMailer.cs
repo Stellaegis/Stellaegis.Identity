@@ -3,7 +3,8 @@ namespace Stellaegis.Identity;
 /// <summary>
 /// What the accounts send by e-mail, and nothing of how: a code to verify an e-mail, a code to finish a login, a
 /// link to reset a password, a link to activate an account, a notice that an e-mail already has an account, a notice
-/// that the e-mail of an account changed, a notice that an account is locked out. The host implements it on its own
+/// that the e-mail of an account changed or a link to approve its change, a notice that an account is locked out. The
+/// host implements it on its own
 /// messaging — <c>Stellaegis.Messaging</c>, an SMTP relay, anything —, with its own templates and wording; the
 /// module never sends anything itself. Without an implementation, the pages that need one refuse to start rather
 /// than fail at the first registration.
@@ -40,6 +41,13 @@ public interface IIdentityMailer
     /// one address whoever changed it does not read.
     /// </summary>
     Task SendEmailChangedAsync(string previousEmail, string newEmail, Uri revertLink, TimeSpan lifetime, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks <paramref name="previousEmail"/> to approve the change of the e-mail of its account to
+    /// <paramref name="newEmail"/>, by <paramref name="approvalLink"/>, good for <paramref name="lifetime"/>: nothing
+    /// applies until it is opened there. Sent when the installation asks the approval of the previous address.
+    /// </summary>
+    Task SendEmailChangeApprovalAsync(string previousEmail, string newEmail, Uri approvalLink, TimeSpan lifetime, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Tells <paramref name="email"/> that its account is locked out until <paramref name="until"/>, after too many

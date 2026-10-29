@@ -456,9 +456,44 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task A_change_of_email_waits_for_the_approval_of_the_previous_address()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);   // the posture unless set
+        await app.CreateAccountAsync(Email, Password, Ct);
+        var browser = new Browser(app);
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+
+        await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["NewEmail"] = "jane.doe@acme.test", ["Password"] = Password }, Ct);
+        var code = app.Mailer().LastTo("jane.doe@acme.test")!.Code!;
+        var confirmed = await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["Code"] = code }, Ct, postPath: "/account/email?handler=Confirm");
+        Assert.Equal("/account/email", confirmed.Headers.Location!.ToString());   // still signed in: nothing applied
+        await browser.GetAsync("/account/email", Ct);
+        Assert.Contains($"A link was sent to {Email}.", browser.Html);
+        Assert.Contains($"Current e-mail: {Email}", browser.Html);
+        var approval = app.Mailer().LastTo(Email)!;
+        Assert.Equal(InMemoryIdentityMailer.EmailChangeApproval, approval.Kind);
+        Assert.Equal("jane.doe@acme.test", approval.Code);
+
+        var approvalPath = approval.Link!.PathAndQuery;
+        var token = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(approval.Link.Query)["token"].ToString();
+        await browser.GetAsync(approvalPath, Ct);
+        Assert.Contains("Approve this change", browser.Html);
+        Assert.Contains("jane.doe@acme.test", browser.Html);
+        var approved = await browser.PostFormAsync(approvalPath, new Dictionary<string, string> { ["Token"] = token }, Ct);
+        Assert.Equal("/approve-email?done=true", approved.Headers.Location!.ToString());
+        Assert.False(browser.HasCookie(IdentityCookie.CookieName));   // the session carried the previous address
+        using var scope = app.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IAuthUserStore>();
+        Assert.Null(await store.GetByEmailAsync(Email, Ct));
+        Assert.True((await store.GetByEmailAsync("jane.doe@acme.test", Ct))!.EmailVerified);
+        await browser.GetAsync(approvalPath, Ct);
+        Assert.Contains("Invalid link", browser.Html);   // spent
+    }
+
+    [Fact]
     public async Task Changing_the_email_needs_the_password_and_tells_the_previous_address()
     {
-        await using var app = await PagesTestHost.StartAsync(Ct);
+        await using var app = await PagesTestHost.StartAsync(Ct, identity: o => o.EmailChange.RequireApprovalByPrevious = false);
         await app.CreateAccountAsync(Email, Password, Ct);
         var browser = new Browser(app);
         await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);

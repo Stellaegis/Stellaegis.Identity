@@ -5,6 +5,11 @@
     Layout = "_AccountLayout";
 }
 
+@if (TempData["ApprovalSentTo"] is string approvalSentTo)
+{
+    <div class="auth-success" role="status">@T.Format("Account.Email.ApprovalSent", approvalSentTo)</div>
+}
+
 @if (Model.Pending is { } pending)
 {
     <p class="auth-help">@T.Format("Account.Email.CodeSent", pending)</p>

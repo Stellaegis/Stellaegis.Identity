@@ -550,6 +550,33 @@
   <data name="Activate.Submit" xml:space="preserve">
     <value>Activer le compte</value>
   </data>
+  <data name="Account.Email.ApprovalSent" xml:space="preserve">
+    <value>Un lien a été envoyé à {0}. Le changement s'applique quand il y est ouvert, et le compte garde cette adresse d'ici là.</value>
+  </data>
+  <data name="ApproveEmail.Title" xml:space="preserve">
+    <value>Approuver la nouvelle adresse e-mail</value>
+  </data>
+  <data name="ApproveEmail.Heading" xml:space="preserve">
+    <value>Approuver la nouvelle adresse e-mail</value>
+  </data>
+  <data name="ApproveEmail.Help" xml:space="preserve">
+    <value>Le compte {0} demande à changer son adresse e-mail pour {1}. Approuver applique le changement et ferme les sessions ouvertes avec l'ancienne adresse.</value>
+  </data>
+  <data name="ApproveEmail.Submit" xml:space="preserve">
+    <value>Approuver ce changement</value>
+  </data>
+  <data name="ApproveEmail.InvalidHeading" xml:space="preserve">
+    <value>Lien invalide</value>
+  </data>
+  <data name="ApproveEmail.InvalidHelp" xml:space="preserve">
+    <value>Ce lien est invalide, a expiré ou a déjà été utilisé. Une demande refaite en envoie un nouveau.</value>
+  </data>
+  <data name="ApproveEmail.DoneHeading" xml:space="preserve">
+    <value>Adresse e-mail changée</value>
+  </data>
+  <data name="ApproveEmail.DoneHelp" xml:space="preserve">
+    <value>Le compte a maintenant sa nouvelle adresse. Se connecter avec elle.</value>
+  </data>
   <data name="RevertEmail.Title" xml:space="preserve">
     <value>Rétablir l'adresse e-mail</value>
   </data>

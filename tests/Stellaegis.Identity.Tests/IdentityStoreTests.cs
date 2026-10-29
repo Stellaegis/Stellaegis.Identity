@@ -325,9 +325,12 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
         var reset = Issued(AccountTokens.New().Hash);
         var activation = Issued(AccountTokens.New().Hash, AccountTokenPurpose.Activation);
         var revert = Issued(AccountTokens.New().Hash, AccountTokenPurpose.EmailRevert);
+        var approval = Issued(AccountTokens.New().Hash, AccountTokenPurpose.EmailChangeApproval);
         await Tokens.CreateAsync(reset, Ct);
         await Tokens.CreateAsync(activation, Ct);
         await Tokens.CreateAsync(revert, Ct);
+        await Tokens.CreateAsync(approval, Ct);
+        Assert.Equal(AccountTokenPurpose.EmailChangeApproval, (await Tokens.GetAsync(approval.TokenHash, Ct))!.Purpose);
         await Tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.PasswordReset, _clock.Now, Ct);
         Assert.NotNull((await Tokens.GetAsync(reset.TokenHash, Ct))!.RevokedAt);
         Assert.False(await Tokens.TryConsumeAsync(reset.TokenHash, _clock.Now, Ct));

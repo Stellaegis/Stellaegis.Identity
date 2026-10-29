@@ -76,18 +76,19 @@ create index ix_users_blocked on ident.users (user_unique_id)
 
 -- ── Account tokens ───────────────────────────────────────────────────────────
 -- The tokens of the links an account receives — a password reset, an activation, the restoring of
--- the e-mail an account had before a change —, each good once, for a while. Only the SHA-256 of a
--- token is kept, in hexadecimal: the token is in the link, and whoever reads this table holds
--- nothing that works. consumed_at is set on use, atomically, and prevents a replay; revoked_at, when
--- a newer token of the same purpose replaces it — an email_revert is not replaced: the earliest
--- link restores the earliest address. delivery says how the link reached its holder: by e-mail from
--- the system, which proves the address, or by hand. email is the address of the account when the
--- token was issued: for an email_revert, the address to restore.
+-- the e-mail an account had before a change, the approval of a change by the previous address —,
+-- each good once, for a while. Only the SHA-256 of a token is kept, in hexadecimal: the token is in
+-- the link, and whoever reads this table holds nothing that works. consumed_at is set on use,
+-- atomically, and prevents a replay; revoked_at, when a newer token of the same purpose replaces it
+-- — an email_revert is not replaced: the earliest link restores the earliest address. delivery says
+-- how the link reached its holder: by e-mail from the system, which proves the address, or by hand.
+-- email is the address of the account when the token was issued; for an email_revert, the address
+-- to restore; for an email_change_approval, the address to apply.
 
 create table ident.account_tokens (
   token_hash     char(64)     not null,
   user_unique_id uuid         not null,
-  purpose        varchar(20)  not null,
+  purpose        varchar(30)  not null,
   delivery       varchar(10)  not null,
   email          varchar(320) not null,
   created_at     timestamptz  not null,
@@ -101,7 +102,7 @@ create table ident.account_tokens (
   constraint fk_account_tokens_user
     foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade,
   constraint ck_account_tokens_token_hash check (token_hash ~ '^[0-9a-f]{64}$'),
-  constraint ck_account_tokens_purpose check (purpose in ('password_reset', 'activation', 'email_revert')),
+  constraint ck_account_tokens_purpose check (purpose in ('password_reset', 'activation', 'email_revert', 'email_change_approval')),
   constraint ck_account_tokens_delivery check (delivery in ('email', 'hand'))
 );
 

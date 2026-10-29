@@ -105,6 +105,34 @@ public sealed class AccountAdministrationService(
         return Result.Success(new IssuedToken(user.Email, token));
     }
 
+    /// <summary>
+    /// Changes the e-mail of the account, by <paramref name="actor"/>: the way out for a person whose mailbox is lost,
+    /// when a change asks the approval of the previous address. The new address is not proven — the person verifies
+    /// it from their account page —, and a change of e-mail waiting for an approval is dropped.
+    /// </summary>
+    public async Task<Result> ChangeEmailAsync(Guid userUniqueId, string email, Actor actor, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(actor);
+        var normalized = Emails.Normalize(email);
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+        if (user is null)
+            return Result.Failure(IdentityErrors.AccountNotFound);
+        if (string.Equals(user.Email, normalized, StringComparison.Ordinal))
+            return Result.Failure(IdentityErrors.SameEmail);
+        if (await users.GetByEmailAsync(normalized, cancellationToken) is not null)
+            return Result.Failure(IdentityErrors.EmailTaken);
+
+        var now = clock.GetUtcNow();
+        user.Email = normalized;
+        user.EmailVerified = false;
+        user.ModifiedAt = now;
+        user.ModifiedBy = actor;
+        await users.UpdateAsync(user, cancellationToken);
+        await tokens.RevokeOutstandingAsync(userUniqueId, AccountTokenPurpose.EmailChangeApproval, now, cancellationToken);
+        logger.LogInformation("E-mail of {UserUniqueId} changed by {Actor}, not proven", userUniqueId, actor);
+        return Result.Success();
+    }
+
     /// <summary>Disables the account: it is blocked at the door from now on. Already disabled, nothing changes.</summary>
     public async Task<Result> BlockAsync(Guid userUniqueId, Actor actor, CancellationToken cancellationToken = default)
     {

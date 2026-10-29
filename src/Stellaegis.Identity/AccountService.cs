@@ -73,9 +73,11 @@ public sealed class AccountService(
     }
 
     /// <summary>
-    /// Completes the change of e-mail once <paramref name="code"/> proves the new one, and issues the token of the
-    /// link that undoes it, for the host to send to the previous address with the notice. The host then signs the
-    /// session out: it carries the previous address.
+    /// Takes the change of e-mail once <paramref name="code"/> proves the new one. When the previous address must
+    /// approve it (<see cref="EmailChangeOptions.RequireApprovalByPrevious"/>), the change waits: the token of the
+    /// approval link is issued for the host to send there, and the account keeps its address — a newer request replaces
+    /// the link. Otherwise the change applies, and the token of the link that undoes it is issued for the notice to
+    /// the previous address; the host then signs the session out, which carries the previous address.
     /// </summary>
     public async Task<Result<EmailChanged>> ConfirmEmailChangeAsync(Guid userUniqueId, string newEmail, string? code, CancellationToken cancellationToken = default)
     {
@@ -92,6 +94,13 @@ public sealed class AccountService(
 
         var now = clock.GetUtcNow();
         var previous = user.Email;
+        if (options.Value.EmailChange.RequireApprovalByPrevious)
+        {
+            var approval = await tokens.IssueAsync(user, AccountTokenPurpose.EmailChangeApproval, TokenDelivery.Email, user.AsActor(), now, options.Value.EmailChange.ApprovalLifetime, null, cancellationToken, email: normalized);
+            await emailVerification.CleanupAsync(normalized, cancellationToken);
+            logger.LogInformation("E-mail change of {UserUniqueId} waits for the approval of its previous address", userUniqueId);
+            return Result.Success(new EmailChanged(previous, normalized, null, approval));
+        }
         // Issued before the change, so that the token keeps the address to restore; kept beside the earlier ones, so
         // that a second change does not kill the link of the first — the earliest link restores the earliest address.
         var revert = await tokens.IssueAsync(user, AccountTokenPurpose.EmailRevert, TokenDelivery.Email, user.AsActor(), now, options.Value.EmailChange.RevertLifetime, null, cancellationToken, keepOutstanding: true);
@@ -102,7 +111,50 @@ public sealed class AccountService(
         await users.UpdateAsync(user, cancellationToken);
         await emailVerification.CleanupAsync(normalized, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed", userUniqueId);
-        return Result.Success(new EmailChanged(previous, normalized, revert));
+        return Result.Success(new EmailChanged(previous, normalized, revert, null));
+    }
+
+    /// <summary>
+    /// The change <paramref name="token"/> would apply — the address the account has, the one it would have —, when it
+    /// can still be used, or <see langword="null"/>: to show the page, or refuse the link. Reading it spends nothing.
+    /// </summary>
+    public async Task<EmailChangeApproved?> ValidateApprovalTokenAsync(string token, CancellationToken cancellationToken = default)
+        => await FindAsync(token, AccountTokenPurpose.EmailChangeApproval, cancellationToken) is { } stored
+            && stored.IsValidAt(clock.GetUtcNow())
+            && await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken) is { IsEnabled: true } user
+            ? new EmailChangeApproved(user.Email, stored.Email)
+            : null;
+
+    /// <summary>
+    /// Applies the change of e-mail <paramref name="token"/> was issued for, by the approval of the previous address:
+    /// the account takes the new address, proven by its code. The host then closes the session of the browser that
+    /// holds the link, if it has one: it carries the previous address.
+    /// </summary>
+    public async Task<Result<EmailChangeApproved>> ApproveEmailChangeAsync(string token, CancellationToken cancellationToken = default)
+    {
+        var stored = await FindAsync(token, AccountTokenPurpose.EmailChangeApproval, cancellationToken);
+        if (stored is null || stored.ConsumedAt is not null || stored.RevokedAt is not null)
+            return Result.Failure<EmailChangeApproved>(IdentityErrors.InvalidApprovalToken);
+        var now = clock.GetUtcNow();
+        if (stored.ExpiresAt < now)
+            return Result.Failure<EmailChangeApproved>(IdentityErrors.ApprovalTokenExpired);
+        var user = await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken);
+        if (user is null || !user.IsEnabled)
+            return Result.Failure<EmailChangeApproved>(IdentityErrors.InvalidApprovalToken);
+        // Checked again: another account may have taken the address while the approval waited.
+        if (await users.GetByEmailAsync(stored.Email, cancellationToken) is not null)
+            return Result.Failure<EmailChangeApproved>(IdentityErrors.EmailTaken);
+        if (!await tokens.TryConsumeAsync(stored.TokenHash, now, cancellationToken))
+            return Result.Failure<EmailChangeApproved>(IdentityErrors.InvalidApprovalToken);
+
+        var previous = user.Email;
+        user.Email = stored.Email;
+        user.EmailVerified = true;   // proven by the code of the request
+        user.ModifiedAt = now;
+        user.ModifiedBy = user.AsActor();
+        await users.UpdateAsync(user, cancellationToken);
+        logger.LogInformation("E-mail of {UserUniqueId} changed, approved by its previous address", user.UserUniqueId);
+        return Result.Success(new EmailChangeApproved(previous, user.Email));
     }
 
     /// <summary>
@@ -110,7 +162,7 @@ public sealed class AccountService(
     /// show the page, or refuse the link. Reading it spends nothing.
     /// </summary>
     public async Task<string?> ValidateRevertTokenAsync(string token, CancellationToken cancellationToken = default)
-        => await FindRevertAsync(token, cancellationToken) is { } stored
+        => await FindAsync(token, AccountTokenPurpose.EmailRevert, cancellationToken) is { } stored
             && stored.IsValidAt(clock.GetUtcNow())
             && await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken) is { IsEnabled: true }
             ? stored.Email
@@ -125,7 +177,7 @@ public sealed class AccountService(
     /// </summary>
     public async Task<Result<EmailReverted>> RevertEmailChangeAsync(string token, CancellationToken cancellationToken = default)
     {
-        var stored = await FindRevertAsync(token, cancellationToken);
+        var stored = await FindAsync(token, AccountTokenPurpose.EmailRevert, cancellationToken);
         if (stored is null || stored.ConsumedAt is not null || stored.RevokedAt is not null)
             return Result.Failure<EmailReverted>(IdentityErrors.InvalidRevertToken);
         var now = clock.GetUtcNow();
@@ -193,12 +245,12 @@ public sealed class AccountService(
         }
     }
 
-    private async Task<AccountToken?> FindRevertAsync(string token, CancellationToken cancellationToken)
+    private async Task<AccountToken?> FindAsync(string token, AccountTokenPurpose purpose, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(token))
             return null;
         var stored = await tokens.GetAsync(AccountTokens.Hash(token), cancellationToken);
-        return stored?.Purpose == AccountTokenPurpose.EmailRevert ? stored : null;
+        return stored?.Purpose == purpose ? stored : null;
     }
 
     /// <summary>

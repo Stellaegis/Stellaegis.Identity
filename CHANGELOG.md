@@ -44,8 +44,17 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
   `VerifyCurrentPasswordAsync` answers a `Result` — `Password.InvalidCurrent` or `Account.LockedOut` — and takes the
   address of the request, as `ChangePasswordAsync` and `DeleteAccountAsync` do; a change of password no longer ends a
   lockout, it is refused during one.
+- **A change of e-mail waits for the approval of the previous address**, `EmailChange:RequireApprovalByPrevious`, the
+  posture unless set: once the new address proved itself by its code, a link goes to the previous one,
+  `IIdentityMailer.SendEmailChangeApprovalAsync`, good for `EmailChange:ApprovalLifetime`, seven days unless set, and
+  nothing applies until it is opened there, `/approve-email`; a newer request replaces it. A lost mailbox goes through
+  an administrator, `POST identity/users/{id}/email`, `AccountAdministrationService.ChangeEmailAsync`, which sets the
+  address unproven. `AccountService.ApproveEmailChangeAsync` and `ValidateApprovalTokenAsync` carry the link;
+  `AccountTokenPurpose.EmailChangeApproval` is its purpose. A host that lets the change apply at once sets the option
+  to false, and gets the notice below.
 - **The previous address is told of a change of e-mail**, `IIdentityMailer.SendEmailChangedAsync`, once the new one
-  is confirmed, with the link that undoes it — good for `EmailChange:RevertLifetime`, seven days unless set. The link,
+  is confirmed and when the installation asks no approval, with the link that undoes it — good for
+  `EmailChange:RevertLifetime`, seven days unless set. The link,
   `/revert-email`, restores the address, removes the password, revokes the reset links and a second factor enrolled
   since the change, and sends a reset link to the restored address; the sessions close at their next reading, an
   account without a password keeping none. A second change does not kill the link of the first.
@@ -74,10 +83,12 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 ### Updating from 6.3.0
 
 1. **The schema `ident` is installed again**: `0001` is corrected in place — `ck_account_tokens_purpose` takes
-   `email_revert` —, so the installation and the verification refuse the schema of a 6.x. Drop it, then `install`.
+   `email_revert` and `email_change_approval` —, so the installation and the verification refuse the schema of a 6.x.
+   Drop it, then `install`.
 2. **A store written outside the package implements `RecordFailedLoginAsync`**; the three of the package do.
-   **An `IIdentityMailer` implements `SendEmailChangedAsync`**, the notice to the previous address with its link, and
-   **`SendAccountLockedAsync`**, the notice that the account is locked out.
+   **An `IIdentityMailer` implements `SendEmailChangeApprovalAsync`**, the approval link to the previous address,
+   **`SendEmailChangedAsync`**, the notice to the previous address with its link, and **`SendAccountLockedAsync`**,
+   the notice that the account is locked out.
    **A caller of `AccountService.ConfirmEmailChangeAsync`** reads a `Result<EmailChanged>`, and sends the notice.
 3. **A page that checked the second factor itself** — on `MfaService`, `LoginOtpService` or `RecoveryCodeService` —
    calls `LoginService.CompleteWithSecondFactorAsync` instead, so that a wrong code counts.

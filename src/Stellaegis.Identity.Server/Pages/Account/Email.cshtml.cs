@@ -156,12 +156,36 @@ internal sealed class AccountEmailModel(
             ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));
             return Page();
         }
+        var change = result.Value;
+        if (change.IsPending)
+        {
+            // Nothing applied yet: the previous address decides, by the link. The session goes on, the account unchanged.
+            if (mailer is null)
+            {
+                ModelState.AddModelError(string.Empty, texts["Account.Email.NoMailer"]);
+                return Page();
+            }
+            try
+            {
+                var approval = IdentityLinks.Of(identity.Value.Links, Request, IdentityLinks.ApproveEmailPath, change.ApprovalToken!);
+                await mailer.SendEmailChangeApprovalAsync(change.PreviousEmail, change.NewEmail, approval, identity.Value.EmailChange.ApprovalLifetime, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "The approval link of the e-mail change of {UserUniqueId} was not sent to its previous address", userId);
+                ModelState.AddModelError(string.Empty, texts["VerifyEmail.SendFailed"]);
+                return Page();
+            }
+            pending.Clear(HttpContext, PendingStates.EmailChange);
+            TempData["ApprovalSentTo"] = change.PreviousEmail;
+            return Redirect("/account/email");
+        }
         if (mailer is not null)
         {
             try
             {
-                var revert = IdentityLinks.Of(identity.Value.Links, Request, IdentityLinks.RevertEmailPath, result.Value.RevertToken);
-                await mailer.SendEmailChangedAsync(result.Value.PreviousEmail, result.Value.NewEmail, revert, identity.Value.EmailChange.RevertLifetime, cancellationToken);
+                var revert = IdentityLinks.Of(identity.Value.Links, Request, IdentityLinks.RevertEmailPath, change.RevertToken!);
+                await mailer.SendEmailChangedAsync(change.PreviousEmail, change.NewEmail, revert, identity.Value.EmailChange.RevertLifetime, cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {

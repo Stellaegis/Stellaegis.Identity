@@ -73,6 +73,12 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="RevertTokenExpired"/>: the link that restores the previous e-mail is too old.</summary>
     public const string RevertTokenExpiredCode = "EmailRevert.Expired";
 
+    /// <summary>The code of <see cref="InvalidApprovalToken"/>: the link that approves a change of e-mail is unknown, used, replaced, or for a disabled account.</summary>
+    public const string InvalidApprovalTokenCode = "EmailChange.ApprovalInvalid";
+
+    /// <summary>The code of <see cref="ApprovalTokenExpired"/>: the link that approves a change of e-mail is too old.</summary>
+    public const string ApprovalTokenExpiredCode = "EmailChange.ApprovalExpired";
+
     /// <summary>The code of <see cref="AccountAlreadyActivated"/>: the account has a password already.</summary>
     public const string AccountAlreadyActivatedCode = "Account.AlreadyActivated";
 
@@ -184,6 +190,14 @@ public static class IdentityErrors
     /// <summary>The link that restores the previous e-mail is too old.</summary>
     public static Error RevertTokenExpired { get; } =
         Error.PreconditionFailed(RevertTokenExpiredCode, "This link has expired.");
+
+    /// <summary>The link that approves a change of e-mail is unknown, used, replaced by a newer request, or for a disabled account.</summary>
+    public static Error InvalidApprovalToken { get; } =
+        Error.NotFound(InvalidApprovalTokenCode, "This link is invalid or has already been used.");
+
+    /// <summary>The link that approves a change of e-mail is too old.</summary>
+    public static Error ApprovalTokenExpired { get; } =
+        Error.PreconditionFailed(ApprovalTokenExpiredCode, "This link has expired. Ask for the change again.");
 
     /// <summary>The account has a password already: a reset, not an activation.</summary>
     public static Error AccountAlreadyActivated { get; } =

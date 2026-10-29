@@ -334,6 +334,7 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
             AccountTokenPurpose.PasswordReset => "password_reset",
             AccountTokenPurpose.Activation => "activation",
             AccountTokenPurpose.EmailRevert => "email_revert",
+            AccountTokenPurpose.EmailChangeApproval => "email_change_approval",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null),
         };
 
@@ -341,6 +342,7 @@ internal sealed class AccountTokenRepository(DbConnection connection, Func<DbTra
         {
             "activation" => AccountTokenPurpose.Activation,
             "email_revert" => AccountTokenPurpose.EmailRevert,
+            "email_change_approval" => AccountTokenPurpose.EmailChangeApproval,
             _ => AccountTokenPurpose.PasswordReset,
         };
 

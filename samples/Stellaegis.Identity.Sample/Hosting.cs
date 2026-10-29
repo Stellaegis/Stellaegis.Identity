@@ -55,6 +55,12 @@ public sealed class LoggingMailer(ILogger<LoggingMailer> logger) : IIdentityMail
         return Task.CompletedTask;
     }
 
+    public Task SendEmailChangeApprovalAsync(string previousEmail, string newEmail, Uri approvalLink, TimeSpan lifetime, CancellationToken cancellationToken = default)
+    {
+        logger.LogWarning("MAIL to {Email}: approve the change of the e-mail of your account to {NewEmail} at {Link}, valid for {Lifetime}", previousEmail, newEmail, approvalLink, lifetime);
+        return Task.CompletedTask;
+    }
+
     public Task SendAccountLockedAsync(string email, DateTimeOffset until, CancellationToken cancellationToken = default)
     {
         logger.LogWarning("MAIL to {Email}: your account is locked until {Until} after too many failed attempts", email, until);

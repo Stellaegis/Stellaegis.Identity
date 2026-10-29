@@ -33,6 +33,9 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
     /// <summary>The kind of the notice, to the previous e-mail, that the e-mail of the account changed.</summary>
     public const string EmailChanged = "email_changed";
 
+    /// <summary>The kind of the link, to the previous e-mail, that approves the change of the e-mail of the account.</summary>
+    public const string EmailChangeApproval = "email_change_approval";
+
     /// <summary>The kind of the notice that the account is locked out.</summary>
     public const string AccountLocked = "account_locked";
 
@@ -83,6 +86,13 @@ public sealed class InMemoryIdentityMailer : IIdentityMailer
     public Task SendEmailChangedAsync(string previousEmail, string newEmail, Uri revertLink, TimeSpan lifetime, CancellationToken cancellationToken = default)
     {
         _sent.Enqueue(new IdentityMail(EmailChanged, previousEmail, newEmail, revertLink));
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    public Task SendEmailChangeApprovalAsync(string previousEmail, string newEmail, Uri approvalLink, TimeSpan lifetime, CancellationToken cancellationToken = default)
+    {
+        _sent.Enqueue(new IdentityMail(EmailChangeApproval, previousEmail, newEmail, approvalLink));
         return Task.CompletedTask;
     }
 

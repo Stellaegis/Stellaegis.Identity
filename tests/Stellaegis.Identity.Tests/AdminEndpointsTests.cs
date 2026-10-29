@@ -108,6 +108,27 @@ public sealed class AdminEndpointsTests
     }
 
     [Fact]
+    public async Task The_administrator_sets_the_email_of_an_account_whose_mailbox_is_lost_unproven()
+    {
+        await using var app = await StartAsync(MapPerOperation);
+        var client = app.ClientAs("admin", Everything);
+        var id = await app.CreateAccountAsync("jane@acme.test", ct: Ct);
+        await app.CreateAccountAsync("john@acme.test", ct: Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync($"/api/admin/identity/users/{id:N}/email", new ChangeEmailRequest("not an address"), Ct)).StatusCode);
+        var taken = await client.PostAsJsonAsync($"/api/admin/identity/users/{id:N}/email", new ChangeEmailRequest("john@acme.test"), Ct);
+        Assert.Equal(HttpStatusCode.Conflict, taken.StatusCode);
+        Assert.Equal(IdentityErrors.EmailTakenCode, await taken.CodeOfAsync(Ct));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync($"/api/admin/identity/users/{Guid.NewGuid():N}/email", new ChangeEmailRequest("x@acme.test"), Ct)).StatusCode);
+
+        var moved = await client.PostAsJsonAsync($"/api/admin/identity/users/{id:N}/email", new ChangeEmailRequest("Jane.New@acme.test"), Ct);
+        Assert.Equal(HttpStatusCode.NoContent, moved.StatusCode);
+        var summary = (await client.GetFromJsonAsync<AccountSummary>($"/api/admin/identity/users/{id:N}", Ct))!;
+        Assert.Equal("jane.new@acme.test", summary.Email);
+        Assert.False(summary.EmailVerified);   // the person verifies it from their account page
+    }
+
+    [Fact]
     public async Task A_host_that_declares_the_hand_delivery_returns_the_link_once_under_its_public_address()
     {
         await using var app = await StartAsync(MapPerOperation, configure: builder => builder.Services.Configure<IdentityOptions>(options =>

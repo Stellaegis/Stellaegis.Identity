@@ -204,7 +204,9 @@ Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and K
 Stellaegis:Identity:EmailVerification:CodeLength   6 digits, for Lifetime, 15 minutes, MaxAttempts 5
 Stellaegis:Identity:PasswordReset:TokenLifetime    1 hour
 Stellaegis:Identity:Activation:TokenLifetime       7 days
-Stellaegis:Identity:EmailChange:RevertLifetime     7 days: the link that restores the e-mail an account had before a change
+Stellaegis:Identity:EmailChange:RequireApprovalByPrevious  true: a change of e-mail applies once the previous address approved it
+Stellaegis:Identity:EmailChange:ApprovalLifetime   7 days: the link by which the previous address approves the change
+Stellaegis:Identity:EmailChange:RevertLifetime     7 days: the link that restores the e-mail, when the change applied without approval
 Stellaegis:Identity:Links:PublicBaseUrl            the address of the request unless set; needed outside a request
 Stellaegis:Identity:Links:HandDelivery             false; true lets an administrator receive a link to hand over
 Stellaegis:Identity:SelfRegistration               Closed, or Open
@@ -258,13 +260,14 @@ load none: the operation each is labelled with is the whole decision, and the ho
 | Route | Operation |
 | --- | --- |
 | `GET identity/users?skip=&take=`, `POST identity/users/lookup`, `GET identity/users/{id}` | `users.read` |
-| `POST identity/users`, `POST identity/users/{id}/activation`, `/password-reset`, `/block`, `/unblock`, `/reset-failed-logins`, `/reset-mfa` | `users.write` |
+| `POST identity/users`, `POST identity/users/{id}/activation`, `/password-reset`, `/email`, `/block`, `/unblock`, `/reset-failed-logins`, `/reset-mfa` | `users.write` |
 | `DELETE identity/users/{id}` | `users.delete` |
 | `GET identity/security/blocked-users` | `security.read` |
 
 `POST identity/users` takes `{ "email", "displayName", "delivery" }` and creates the account without a password;
 `/activation` issues a new activation link to an account still waiting, `/password-reset` a reset link to an
-active one. `delivery` is `email`, the default, or `hand` when the host declares `Links:HandDelivery`: the link is
+active one; `/email` takes `{ "email" }` and sets the address of an account whose mailbox is lost, unproven until
+its person verifies it. `delivery` is `email`, the default, or `hand` when the host declares `Links:HandDelivery`: the link is
 then in the answer, shown this once. A host with neither a mailer nor the hand delivery could activate nobody, and
 `MapIdentityAdminEndpoints()` refuses it.
 
@@ -313,7 +316,7 @@ from its own `IEventPublisher`; with several, from a subscription to `Stellaegis
 ## The pages
 
 `Stellaegis.Identity.Server` is a Razor class library: `/login`, `/login/mfa`, `/login/mfa-setup`, `/register`,
-`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, `/revert-email`, `/language`, and under `/account` the overview — the
+`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, `/approve-email`, `/revert-email`, `/language`, and under `/account` the overview — the
 avatar and the profile —, the avatar itself, the password, the e-mail, the second factor and its recovery codes, the
 sign-in history, the deletion. With a session open in the browser, `/login` shows it — the avatar, the name
 and the address of its account — with "Continue", to the way back, and "Switch account", which signs it out
@@ -341,21 +344,29 @@ Content-Security-Policy, HSTS, `ForwardedHeaders` behind a proxy — is the host
 
 ### What the pages send
 
-Seven messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
+Eight messages, through `IIdentityMailer`, which the host implements on its own messaging with its own wording: a
 verification code, a login code, a password reset link, an activation link, the notice that an e-mail has an
-account already, the notice to the previous address that the e-mail of the account changed, with the link that
-undoes it, and the notice that the account is locked out after too many failed attempts — sent once, when the lockout
-starts, since the login page tells the attempt nothing of it. Without an implementation, a host whose
+account already, the link by which the previous address approves a change of e-mail, the notice to the previous
+address that the e-mail changed, with the link that undoes it, and the notice that the account is locked out after too
+many failed attempts — sent once, when the lockout starts, since the login page tells the attempt nothing of it. Without an implementation, a host whose
 self-registration is open or whose password reset is enabled refuses to start.
 
 Changing the e-mail, enabling the second factor by e-mail and enrolling an authenticator ask the password first, as
-disabling the second factor and deleting the account do: a session taken from its person opens none of them. And a
-change of e-mail is told to the previous address, with a link good for `EmailChange:RevertLifetime`, seven days
-unless set, that **restores that address, removes the password, revokes the reset links and removes a second factor
-enrolled since the change**: whoever changed the address knew the password, and does not read the address being
-left. The sessions close at their next reading — an account without a password keeps none —, and a reset link goes
-to the restored address, by which the person chooses a new password. A second change does not kill the link of the
-first: the earliest link restores the earliest address. `/revert-email` carries it.
+disabling the second factor and deleting the account do: a session taken from its person opens none of them. And the
+previous address has its say on a change of e-mail, one of two ways, chosen at the installation by
+`EmailChange:RequireApprovalByPrevious`:
+
+- **the change waits for its approval** — the posture unless set. The new address proves itself by a code, then a
+  link goes to the previous one, good for `EmailChange:ApprovalLifetime`, seven days unless set; nothing applies until
+  it is opened there, `/approve-email`, and a newer request replaces it. A session that is not the person's changes
+  nothing. A mailbox that is lost goes through an administrator, `POST identity/users/{id}/email`, which sets the new
+  address unproven: the person verifies it from their account page;
+- **the change applies, and the previous address is told**, with a link good for `EmailChange:RevertLifetime`, seven
+  days unless set, that **restores that address, removes the password, revokes the reset links and removes a second
+  factor enrolled since the change**: whoever changed the address knew the password, and does not read the address
+  being left. The sessions close at their next reading — an account without a password keeps none —, and a reset link
+  goes to the restored address, by which the person chooses a new password. A second change does not kill the link of
+  the first: the earliest link restores the earliest address. `/revert-email` carries it.
 `AddStellaegisInMemoryIdentityMailer()` keeps the messages in memory, for development and tests.
 
 ### Making the pages the host's own

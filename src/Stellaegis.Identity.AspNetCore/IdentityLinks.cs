@@ -15,6 +15,9 @@ public static class IdentityLinks
     /// <summary>The path of the page that restores the e-mail an account had before a change, <c>/revert-email</c>.</summary>
     public const string RevertEmailPath = "/revert-email";
 
+    /// <summary>The path of the page by which the previous e-mail approves a change, <c>/approve-email</c>.</summary>
+    public const string ApproveEmailPath = "/approve-email";
+
     /// <summary>
     /// The absolute link to <paramref name="path"/> carrying <paramref name="token"/>: from
     /// <see cref="LinkOptions.PublicBaseUrl"/> when it is set, from <paramref name="request"/> otherwise — which

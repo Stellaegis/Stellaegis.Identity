@@ -29,6 +29,7 @@ namespace Stellaegis.Identity.AspNetCore;
 ///   <item><c>POST identity/users</c> — create an account without a password, <c>users.write</c>; 201 with its id, and its activation link when handed over</item>
 ///   <item><c>POST identity/users/{id}/activation</c> — a new activation link for an account that waits for it, <c>users.write</c></item>
 ///   <item><c>POST identity/users/{id}/password-reset</c> — a reset link for an active account, <c>users.write</c>: the administrator never sets a password</item>
+///   <item><c>POST identity/users/{id}/email</c> — change the e-mail of an account whose mailbox is lost, not proven, <c>users.write</c></item>
 ///   <item><c>POST identity/users/{id}/block</c>, <c>/unblock</c>, <c>/reset-failed-logins</c>, <c>/reset-mfa</c> — <c>users.write</c></item>
 ///   <item><c>DELETE identity/users/{id}</c> — delete an account, <c>users.delete</c></item>
 ///   <item><c>GET identity/security/blocked-users</c> — the subjects blocked at the door, <c>security.read</c></item>
@@ -174,6 +175,18 @@ public static class IdentityAdminEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        users.MapPost("/{id:guid}/email", async (Guid id, ChangeEmailRequest? request, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
+            {
+                if (request is null || string.IsNullOrWhiteSpace(request.Email) || !new EmailAddressAttribute().IsValid(request.Email))
+                    return Result.Failure(Error.Validation("Email.Invalid", "An e-mail address is expected.")).ToHttpResult();
+                return (await accounts.ChangeEmailAsync(id, request.Email, Callers.ActorOf(http), ct)).ToHttpResult();
+            })
+            .WithMetadata(IdentityOperations.UsersWrite)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         users.MapPost("/{id:guid}/block", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
                 (await accounts.BlockAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
             .WithMetadata(IdentityOperations.UsersWrite)
@@ -285,6 +298,10 @@ public sealed record AccountCreated(Guid UserUniqueId, Uri? ActivationLink = nul
 /// <summary>How a link issued by an administrator reaches the person.</summary>
 /// <param name="Delivery"><c>email</c>, the default, or <c>hand</c>, when the host declares it.</param>
 public sealed record IssueLinkRequest(string? Delivery = null);
+
+/// <summary>The new e-mail of an account, set by an administrator: not proven until the person verifies it.</summary>
+/// <param name="Email">The address.</param>
+public sealed record ChangeEmailRequest(string? Email);
 
 /// <summary>A link issued by an administrator.</summary>
 /// <param name="Link">The link, to hand over, when it was asked by hand; shown this once. <see langword="null"/> when it was sent by e-mail.</param>

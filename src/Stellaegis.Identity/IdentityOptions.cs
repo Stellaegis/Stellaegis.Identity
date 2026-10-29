@@ -239,17 +239,37 @@ public sealed class ActivationOptions : IValidatableOptions
 }
 
 /// <summary>
-/// What a change of e-mail leaves to the previous address: a notice, with the link that restores that address, removes
-/// the password and closes every session — the one act a person can take when a session that was not theirs changed
-/// their e-mail. The link lives longer than a reset's: the person reads that mailbox when they read it.
+/// What the previous address has to say to a change of e-mail, chosen at the installation. Either the change waits for
+/// its approval — nothing applies without the link it receives, a lost mailbox goes through an administrator —, the
+/// posture unless set; or the change applies and the previous address is told, with the link that restores it, removes
+/// the password and closes every session. Both links live longer than a reset's: the person reads that mailbox when
+/// they read it.
 /// </summary>
 public sealed class EmailChangeOptions : IValidatableOptions
 {
+    /// <summary>
+    /// Whether a change of e-mail applies only once the previous address approved it by the link it received. Yes
+    /// unless set: a session that is not the person's changes nothing then. No lets the change apply at once, the
+    /// previous address told with the link that undoes it. An account whose mailbox is lost is changed by an
+    /// administrator, <c>POST identity/users/{id}/email</c>, either way.
+    /// </summary>
+    public bool RequireApprovalByPrevious { get; set; } = true;
+
+    /// <summary>How long the link that approves the change works. Seven days unless set.</summary>
+    public TimeSpan ApprovalLifetime { get; set; } = TimeSpan.FromDays(7);
+
     /// <summary>How long the link that restores the previous e-mail works. Seven days unless set.</summary>
     public TimeSpan RevertLifetime { get; set; } = TimeSpan.FromDays(7);
 
     /// <inheritdoc/>
-    public string? FindError() => RevertLifetime <= TimeSpan.Zero ? $"{nameof(RevertLifetime)} must be positive." : null;
+    public string? FindError()
+    {
+        if (ApprovalLifetime <= TimeSpan.Zero)
+            return $"{nameof(ApprovalLifetime)} must be positive.";
+        if (RevertLifetime <= TimeSpan.Zero)
+            return $"{nameof(RevertLifetime)} must be positive.";
+        return null;
+    }
 }
 
 /// <summary>How the links an account receives — a reset, an activation, the restoring of an e-mail — are written and delivered.</summary>

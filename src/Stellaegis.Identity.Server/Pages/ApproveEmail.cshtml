@@ -1,0 +1,30 @@
+@page "/approve-email"
+@model ApproveEmailModel
+@{
+    ViewData["Title"] = T["ApproveEmail.Title"];
+    Layout = "_AuthLayout";
+}
+
+@if (Model.Done)
+{
+    <h2 class="auth-h2">@T["ApproveEmail.DoneHeading"]</h2>
+    <p class="auth-help">@T["ApproveEmail.DoneHelp"]</p>
+    <div class="auth-links">
+        <a href="/login" class="auth-btn">@T["Nav.SignIn"]</a>
+    </div>
+}
+else if (Model.TokenInvalid)
+{
+    <h2 class="auth-h2">@T["ApproveEmail.InvalidHeading"]</h2>
+    <p class="auth-help">@T["ApproveEmail.InvalidHelp"]</p>
+}
+else
+{
+    <h2 class="auth-h2">@T["ApproveEmail.Heading"]</h2>
+    <p class="auth-help">@T.Format("ApproveEmail.Help", Model.Change!.PreviousEmail, Model.Change.NewEmail)</p>
+    <form class="auth-form" method="post">
+        <input type="hidden" asp-for="Token" />
+        <button class="auth-btn" type="submit">@T["ApproveEmail.Submit"]</button>
+        <partial name="_Errors" />
+    </form>
+}

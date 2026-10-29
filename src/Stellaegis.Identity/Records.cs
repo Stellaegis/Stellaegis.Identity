@@ -72,13 +72,33 @@ public enum AccountTokenPurpose
     /// its person can take when a session that was not theirs changed it. The token keeps the address to restore.
     /// </summary>
     EmailRevert,
+
+    /// <summary>
+    /// Applying a change of e-mail the new address proved by a code, from the link sent to the previous address: the
+    /// account keeps the previous address until it is used. The token keeps the address to apply.
+    /// </summary>
+    EmailChangeApproval,
 }
 
-/// <summary>A change of e-mail done: what the previous address is told, and the token of the link that undoes it.</summary>
-/// <param name="PreviousEmail">The address the account had, where the notice goes.</param>
+/// <summary>
+/// A change of e-mail the new address proved: applied, with the token of the link that undoes it for the previous
+/// address; or waiting, with the token of the link by which the previous address approves it
+/// (<see cref="EmailChangeOptions.RequireApprovalByPrevious"/>). One of the two tokens, never both.
+/// </summary>
+/// <param name="PreviousEmail">The address the account had — has still, while the change waits —, where the link goes.</param>
+/// <param name="NewEmail">The address the account has now, or will have once approved.</param>
+/// <param name="RevertToken">The token of the link that restores <paramref name="PreviousEmail"/>, in clear this once, when the change is applied.</param>
+/// <param name="ApprovalToken">The token of the link that applies the change, in clear this once, when it waits for the previous address.</param>
+public sealed record EmailChanged(string PreviousEmail, string NewEmail, string? RevertToken, string? ApprovalToken)
+{
+    /// <summary>Whether the change waits for the approval of the previous address.</summary>
+    public bool IsPending => ApprovalToken is not null;
+}
+
+/// <summary>A change of e-mail applied by the approval of the previous address.</summary>
+/// <param name="PreviousEmail">The address the account had.</param>
 /// <param name="NewEmail">The address the account has now.</param>
-/// <param name="RevertToken">The token of the link that restores <paramref name="PreviousEmail"/>, in clear this once: only its hash is kept.</param>
-public sealed record EmailChanged(string PreviousEmail, string NewEmail, string RevertToken);
+public sealed record EmailChangeApproved(string PreviousEmail, string NewEmail);
 
 /// <summary>A change of e-mail undone: the address restored, and the token of the link by which its person chooses a new password.</summary>
 /// <param name="Email">The address restored, where the reset link goes.</param>
