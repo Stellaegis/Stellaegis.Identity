@@ -199,6 +199,9 @@
   <data name="Error.Password.InvalidCurrent" xml:space="preserve">
     <value>The current password is wrong.</value>
   </data>
+  <data name="Error.Password.Blocked" xml:space="preserve">
+    <value>This password is too common to be accepted. Choose another one.</value>
+  </data>
   <data name="Error.Password.Rejected" xml:space="preserve">
     <value>The password does not meet the rules.</value>
   </data>

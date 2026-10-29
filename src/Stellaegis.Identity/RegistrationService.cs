@@ -26,9 +26,8 @@ public sealed class RegistrationService(
     /// </summary>
     public async Task<Result<Guid>> CreateAccountAsync(string email, string displayName, string password, CancellationToken cancellationToken = default)
     {
-        var violations = passwords.Violations(password);
-        if (violations.Count > 0)
-            return Result.Failure<Guid>(IdentityErrors.PasswordRejected(violations));
+        if (await passwords.RefuseAsync(password, cancellationToken) is { } refused)
+            return Result.Failure<Guid>(refused);
         return await CreateAccountFromHashAsync(email, displayName, hasher.Hash(password), cancellationToken);
     }
 

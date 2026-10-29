@@ -31,9 +31,8 @@ public sealed class AccountService(
         var confirmed = await ConfirmPasswordAsync(userUniqueId, currentPassword, ipAddress, cancellationToken);
         if (confirmed.IsFailure)
             return Result.Failure(confirmed.Error!);
-        var violations = passwords.Violations(newPassword);
-        if (violations.Count > 0)
-            return Result.Failure(IdentityErrors.PasswordRejected(violations));
+        if (await passwords.RefuseAsync(newPassword, cancellationToken) is { } refused)
+            return Result.Failure(refused);
 
         var user = confirmed.Value;
         var now = clock.GetUtcNow();

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Stellaegis.Primitives;
 
@@ -27,6 +28,33 @@ public sealed class AccountTests
         var changed = Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events));
         Assert.Equal(id, changed.UserUniqueId);
         Assert.Equal(UserPasswordChangedEvent.ChangedReason, changed.Reason);
+    }
+
+    [Fact]
+    public async Task A_password_the_host_blocklists_is_refused_wherever_a_password_is_accepted()
+    {
+        using var host = new TestHost(host: services => services.AddSingleton<IPasswordBlocklist>(new Blocklist("Common-Horse-1")));
+        var id = await host.CreateUserAsync();
+        var account = host.Get<AccountService>();
+
+        Assert.Equal(IdentityErrors.PasswordBlocked, (await account.ChangePasswordAsync(id, "Correct-Horse-9", "Common-Horse-1")).Error);
+        Assert.True((await account.ChangePasswordAsync(id, "Correct-Horse-9", "Rare-Horse-2")).IsSuccess);
+        var reset = await host.Get<PasswordResetService>().RequestResetAsync("jane@acme.test");
+        Assert.Equal(IdentityErrors.PasswordBlocked, (await host.Get<PasswordResetService>().ResetPasswordAsync(reset!, "Common-Horse-1")).Error);
+        var created = await host.Get<AccountAdministrationService>().CreateAsync("john@acme.test", "John", TokenDelivery.Email, Actor.Parse("admin"));
+        Assert.Equal(IdentityErrors.PasswordBlocked, (await host.Get<ActivationService>().ActivateAsync(created.Value.ActivationToken, "Common-Horse-1")).Error);
+        await host.Get<EmailVerificationService>().RequestVerificationAsync("new@acme.test");
+        Assert.Equal(IdentityErrors.PasswordBlocked, (await host.Get<RegistrationService>().CreateAccountAsync("new@acme.test", "New", "Common-Horse-1")).Error);
+
+        using var without = new TestHost();
+        var other = await without.CreateUserAsync();
+        Assert.True((await without.Get<AccountService>().ChangePasswordAsync(other, "Correct-Horse-9", "Common-Horse-1")).IsSuccess);
+    }
+
+    private sealed class Blocklist(params string[] blocked) : IPasswordBlocklist
+    {
+        public ValueTask<bool> IsBlockedAsync(string password, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(blocked.Contains(password, StringComparer.Ordinal));
     }
 
     [Fact]

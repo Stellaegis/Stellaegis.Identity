@@ -63,9 +63,8 @@ public sealed class PasswordResetService(
         var user = await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken);
         if (user is null || !user.IsEnabled)
             return Result.Failure(IdentityErrors.InvalidResetToken);
-        var violations = passwords.Violations(newPassword);
-        if (violations.Count > 0)
-            return Result.Failure(IdentityErrors.PasswordRejected(violations));
+        if (await passwords.RefuseAsync(newPassword, cancellationToken) is { } refused)
+            return Result.Failure(refused);
         if (!await tokens.TryConsumeAsync(stored.TokenHash, now, cancellationToken))
             return Result.Failure(IdentityErrors.InvalidResetToken);
 

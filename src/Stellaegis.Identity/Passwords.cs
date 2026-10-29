@@ -116,10 +116,26 @@ public sealed class PasswordStrengthResult
 
 /// <summary>
 /// Checks a password against the <see cref="PasswordPolicy"/> and scores it: length up to 40 points, an
-/// uppercase letter 15, a lowercase one 10, a digit 15, a special character 20.
+/// uppercase letter 15, a lowercase one 10, a digit 15, a special character 20. Refuses it, by <see cref="RefuseAsync"/>,
+/// when the policy or the host's <see cref="IPasswordBlocklist"/> does.
 /// </summary>
-public sealed class PasswordStrengthEvaluator(IOptions<IdentityOptions> options)
+public sealed class PasswordStrengthEvaluator(IOptions<IdentityOptions> options, IPasswordBlocklist? blocklist = null)
 {
+    /// <summary>
+    /// Why <paramref name="password"/> is refused — <see cref="IdentityErrors.PasswordRejected"/> by the policy,
+    /// <see cref="IdentityErrors.PasswordBlocked"/> by the blocklist —, or <see langword="null"/> when it is accepted.
+    /// The one check every acceptance of a password goes through.
+    /// </summary>
+    public async Task<Error?> RefuseAsync(string? password, CancellationToken cancellationToken = default)
+    {
+        var violations = Violations(password);
+        if (violations.Count > 0)
+            return IdentityErrors.PasswordRejected(violations);
+        if (blocklist is not null && await blocklist.IsBlockedAsync(password!, cancellationToken).ConfigureAwait(false))
+            return IdentityErrors.PasswordBlocked;
+        return null;
+    }
+
     /// <summary>Evaluates <paramref name="password"/>.</summary>
     public PasswordStrengthResult Evaluate(string? password)
     {

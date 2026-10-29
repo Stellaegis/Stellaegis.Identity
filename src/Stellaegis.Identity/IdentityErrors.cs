@@ -28,6 +28,9 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="PasswordRejected"/>: the new password does not meet the policy.</summary>
     public const string PasswordRejectedCode = "Password.Rejected";
 
+    /// <summary>The code of <see cref="PasswordBlocked"/>: the new password is on the host's blocklist — too common, or breached.</summary>
+    public const string PasswordBlockedCode = "Password.Blocked";
+
     /// <summary>The code of <see cref="EmailTaken"/>: another account has that e-mail.</summary>
     public const string EmailTakenCode = "Email.Taken";
 
@@ -121,6 +124,10 @@ public static class IdentityErrors
     /// <summary>The new password does not meet the policy; <paramref name="violations"/> say what is missing.</summary>
     public static Error PasswordRejected(IReadOnlyList<string> violations)
         => Error.Validation(PasswordRejectedCode, string.Join(' ', Guard.NotNull(violations)));
+
+    /// <summary>The new password is on the host's blocklist: too common, or already in a breach.</summary>
+    public static Error PasswordBlocked { get; } =
+        Error.Validation(PasswordBlockedCode, "This password is too common to be accepted. Choose another one.");
 
     /// <summary>Another account has that e-mail.</summary>
     public static Error EmailTaken { get; } =

@@ -54,6 +54,10 @@ authenticator by the e-mail method, or enroll an authenticator that locks the pe
 
 ### Added
 
+- **`IPasswordBlocklist`**, the port a host registers to refuse the passwords everyone chooses or the breaches hold,
+  asked wherever a password is accepted — `PasswordStrengthEvaluator.RefuseAsync`, which the registration, the
+  activation, the reset, the change and the registration page go through —, answered `Password.Blocked`. The module
+  ships no list: without one registered, nothing is refused for this.
 - **`UserPasswordChangedEvent`**, published when the password is changed by its person, reset by a link, or removed by
   the link that undoes a change of e-mail, with its reason: an issuer revokes the refresh tokens and the authorizations
   of the subject on it — what was issued on the former password is no longer the person's. Until then, a stolen

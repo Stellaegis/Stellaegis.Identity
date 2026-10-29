@@ -39,9 +39,8 @@ public sealed class ActivationService(
         var user = await users.GetByUniqueIdAsync(stored.UserUniqueId, cancellationToken);
         if (user is null || !user.IsEnabled || user.IsActivated)
             return Result.Failure(IdentityErrors.InvalidActivationToken);
-        var violations = passwords.Violations(password);
-        if (violations.Count > 0)
-            return Result.Failure(IdentityErrors.PasswordRejected(violations));
+        if (await passwords.RefuseAsync(password, cancellationToken) is { } refused)
+            return Result.Failure(refused);
         if (!await tokens.TryConsumeAsync(stored.TokenHash, now, cancellationToken))
             return Result.Failure(IdentityErrors.InvalidActivationToken);
 

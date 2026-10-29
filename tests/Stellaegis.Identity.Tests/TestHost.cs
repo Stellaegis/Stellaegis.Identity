@@ -34,12 +34,13 @@ internal sealed class TestHost : IDisposable
     private readonly ServiceProvider _provider;
     private readonly IServiceScope _scope;
 
-    public TestHost(Action<IdentityOptions>? configure = null)
+    public TestHost(Action<IdentityOptions>? configure = null, Action<IServiceCollection>? host = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<TimeProvider>(Clock);
         services.AddSingleton<IEventPublisher>(Events);
+        host?.Invoke(services);
         services.AddStellaegisIdentityInMemory(options =>
         {
             options.PasswordHasher.Pepper = Pepper;

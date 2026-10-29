@@ -196,7 +196,7 @@ when the host starts:
 ```text
 Stellaegis:Identity:PasswordHasher:Pepper          required; a secret of the deployment, never in the repository
 Stellaegis:Identity:PasswordHasher:Iterations      310000
-Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a password must mix
+Stellaegis:Identity:PasswordPolicy:MinLength       8, and the characters a password must mix; an IPasswordBlocklist the host registers refuses the common ones
 Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes, told to the person by e-mail
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login

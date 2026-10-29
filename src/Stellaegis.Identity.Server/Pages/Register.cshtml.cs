@@ -16,6 +16,7 @@ internal sealed class RegisterModel(
     EmailVerificationService verification,
     PasswordHasher hasher,
     PasswordRules passwords,
+    PasswordStrengthEvaluator acceptance,
     PendingStates pending,
     IdentityTexts texts,
     IOptions<IdentityOptions> identity,
@@ -67,6 +68,9 @@ internal sealed class RegisterModel(
             ModelState.AddModelError("Input.DisplayName", texts["Field.DisplayName.Invalid"]);
         foreach (var violation in passwords.Violations(Input.Password))
             ModelState.AddModelError("Input.Password", violation);
+        // The password is hashed at this step, so the blocklist of the host is asked here, where it is still in clear.
+        if (ModelState.IsValid && await acceptance.RefuseAsync(Input.Password, cancellationToken) is { } refused)
+            ModelState.AddModelError("Input.Password", texts.Describe(refused));
         if (!string.Equals(Input.Password, Input.ConfirmPassword, StringComparison.Ordinal))
             ModelState.AddModelError("Input.ConfirmPassword", texts["Field.ConfirmPassword.Mismatch"]);
         if (!ModelState.IsValid)

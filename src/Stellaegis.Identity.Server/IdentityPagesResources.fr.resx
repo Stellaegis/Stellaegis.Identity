@@ -199,6 +199,9 @@
   <data name="Error.Password.InvalidCurrent" xml:space="preserve">
     <value>Le mot de passe actuel est incorrect.</value>
   </data>
+  <data name="Error.Password.Blocked" xml:space="preserve">
+    <value>Ce mot de passe est trop courant pour être accepté. En choisir un autre.</value>
+  </data>
   <data name="Error.Password.Rejected" xml:space="preserve">
     <value>Le mot de passe ne respecte pas les règles.</value>
   </data>
