@@ -24,7 +24,7 @@ internal sealed class LanguageModel(PagesCulture cultures, ProfileService profil
         Response.Cookies.Append(
             CookieRequestCultureProvider.DefaultCookieName,
             CookieRequestCultureProvider.MakeCookieValue(new RequestCulture(chosen)),
-            new CookieOptions { MaxAge = Kept, IsEssential = true, HttpOnly = true, SameSite = SameSiteMode.Lax, Secure = Request.IsHttps, Path = "/" });
+            new CookieOptions { MaxAge = Kept, IsEssential = true, HttpOnly = true, SameSite = SameSiteMode.Lax, Secure = true, Path = "/" });
 
         if (this.UserId() is { } userId && await profiles.GetAsync(userId, cancellationToken) is { IsSuccess: true, Value: { } profile }
             && !string.Equals(profile.Locale, chosen.Name, StringComparison.Ordinal)

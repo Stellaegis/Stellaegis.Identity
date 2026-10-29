@@ -38,8 +38,9 @@ public static class CookieServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the cookie scheme (<see cref="IdentityCookie"/>) as the default authentication of the host, and
-    /// <see cref="CookieSignIn"/>, which the login page signs in and out with. <paramref name="configure"/> changes
-    /// what the cookie does by default — its lifetime, its path, its domain. A host that authenticates its API
+    /// <see cref="CookieSignIn"/>, which the login page signs in and out with. The cookie lasts
+    /// <see cref="SessionPolicyOptions.Lifetime"/>, renewed by each request; <paramref name="configure"/> changes
+    /// what it does by default — its path, its domain, its lifetime over the option. A host that authenticates its API
     /// otherwise — a bearer token — registers that scheme too, and chooses the default after this call.
     /// <para>
     /// The cookie is held against its account (<see cref="SessionPolicyOptions"/>): read again once its validation
@@ -56,6 +57,13 @@ public static class CookieServiceCollectionExtensions
     {
         Guard.NotNull(services);
         services.TryAddScoped<CookieSignIn>();
+        // Registered before the cookie's own configuration, so that what the host sets in configure wins over the option.
+        services.AddOptions<CookieAuthenticationOptions>(IdentityCookie.Scheme)
+            .Configure<IOptions<IdentityOptions>>((options, identity) =>
+            {
+                options.ExpireTimeSpan = identity.Value.Session.Lifetime;
+                options.SlidingExpiration = true;
+            });
         return services.AddAuthentication(IdentityCookie.Scheme)
             .AddCookie(IdentityCookie.Scheme, options =>
             {

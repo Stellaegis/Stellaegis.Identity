@@ -283,9 +283,16 @@ public sealed class LinkOptions : IValidatableOptions
     }
 }
 
-/// <summary>How a signed-in session — the cookie of the pages — is held against its account.</summary>
+/// <summary>How a signed-in session — the cookie of the pages — lasts, and is held against its account.</summary>
 public sealed class SessionPolicyOptions : IValidatableOptions
 {
+    /// <summary>
+    /// How long a session lasts without a request, after which the person signs in again: the cookie expires, and each
+    /// request within the lifetime renews it. Fourteen days unless set — the default of ASP.NET Core, written here so
+    /// that it is a decision, not an inheritance. A cookie the person did not ask to keep ends with the browser too.
+    /// </summary>
+    public TimeSpan Lifetime { get; set; } = TimeSpan.FromDays(14);
+
     /// <summary>
     /// How long a session goes without its account being read again. Once elapsed, the next request reads it: a session
     /// whose account is gone, deleted or blocked is closed, and the others carry the account as it is now. A session
@@ -295,7 +302,14 @@ public sealed class SessionPolicyOptions : IValidatableOptions
     public TimeSpan ValidationInterval { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <inheritdoc/>
-    public string? FindError() => ValidationInterval < TimeSpan.Zero ? $"{nameof(ValidationInterval)} is zero or positive." : null;
+    public string? FindError()
+    {
+        if (Lifetime <= TimeSpan.Zero)
+            return $"{nameof(Lifetime)} must be positive.";
+        if (ValidationInterval < TimeSpan.Zero)
+            return $"{nameof(ValidationInterval)} is zero or positive.";
+        return null;
+    }
 }
 
 /// <summary>
