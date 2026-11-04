@@ -131,7 +131,23 @@
 .account-topbar-sub { color: var(--si-muted); font-size: 13px; }
 .account-topbar-user { font-size: 13px; color: var(--si-muted); }
 .account-body { flex: 1; display: flex; }
-.account-sidebar { width: var(--si-sidebar-width); padding: 16px 12px; background: var(--si-surface); border-right: 1px solid var(--si-border); display: flex; flex-direction: column; gap: 14px; }
+.account-sidebar { width: var(--si-sidebar-width); padding: 16px 12px; background: var(--si-surface); border-right: 1px solid var(--si-border); display: flex; flex-direction: column; }
+/* The menu is a <details>. Above 720 px its summary is hidden and its content kept visible whatever the open
+   attribute says, through ::details-content; under 720 px the browser does what a <details> does, and the summary
+   is the button. A browser without ::details-content shows the summary at every width instead, so the menu stays
+   reachable: it opens on a click where it used to be open. */
+.account-menu { display: flex; flex-direction: column; flex: 1; }
+.account-menu::details-content { display: flex; flex-direction: column; flex: 1; }
+.account-menu-body { display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.account-menu-summary { display: none; align-items: center; gap: 12px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--si-border); border-radius: var(--si-radius); background: var(--si-bg); color: var(--si-text); cursor: pointer; list-style: none; }
+.account-menu-summary::-webkit-details-marker { display: none; }
+.account-menu-summary:focus-visible { outline: 2px solid var(--si-accent); outline-offset: 2px; }
+.account-menu-icon { width: 18px; height: 2px; flex: none; background: currentColor; box-shadow: 0 -6px 0 currentColor, 0 6px 0 currentColor; }
+.account-menu-label { font-weight: 600; }
+.account-menu-current { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--si-muted); font-size: 13px; }
+.account-menu[open] > .account-menu-summary { margin-bottom: 12px; }
+@supports not selector(::details-content) { .account-menu-summary { display: flex; } }
+@media (min-width: 721px) { .account-menu::details-content { content-visibility: visible; } }
 .account-nav-group-title { padding: 4px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--si-muted); }
 .account-nav-item { display: block; padding: 8px 10px; border-radius: var(--si-radius); color: var(--si-text); text-decoration: none; }
 .account-nav-item:hover { background: var(--si-bg); }
@@ -180,6 +196,8 @@
 
 @media (max-width: 720px) {
     .account-body { flex-direction: column; }
-    .account-sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--si-border); }
+    .account-sidebar { width: auto; padding: 10px 12px; border-right: none; border-bottom: 1px solid var(--si-border); }
+    .account-menu-summary { display: flex; }
+    .account-nav-item { padding: 10px 12px; }
     .auth-codes { columns: 1; }
 }

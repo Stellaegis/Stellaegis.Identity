@@ -69,6 +69,26 @@ public sealed class PagesTests
     }
 
     [Fact]
+    public async Task The_account_navigation_is_a_details_whose_summary_names_the_page()
+    {
+        await using var app = await PagesTestHost.StartAsync(Ct);
+        await app.CreateAccountAsync(Email, Password, Ct);
+        var browser = new Browser(app);
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = Email, ["Input.Password"] = Password }, Ct);
+
+        var page = await browser.GetAsync("/account/password", Ct);
+
+        // A native <details>, rendered closed: under 720 px the page comes first and the menu opens on a tap, without a
+        // script; above, the stylesheet hides the summary and keeps the content visible.
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Contains("<details class=\"account-menu\">", browser.Html);
+        Assert.Contains("<summary class=\"account-menu-summary\">", browser.Html);
+        Assert.Contains("<span class=\"account-menu-label\">Menu</span>", browser.Html);
+        Assert.Contains("<span class=\"account-menu-current\">", browser.Html);
+        Assert.Contains("account-nav-item active", browser.Html);
+    }
+
+    [Fact]
     public async Task The_login_page_shows_an_open_session_and_continues_it_or_switches_to_another_account()
     {
         await using var app = await PagesTestHost.StartAsync(Ct);

@@ -1,5 +1,8 @@
 @*
     The account of a signed-in person: a navigation on the side, the page in the middle, the way out at the bottom.
+    Under 720 px the navigation folds behind a button — a native <details>, no script: the page comes first, the menu
+    on a tap, and the summary names the page the person is on. Above 720 px the stylesheet hides the summary and keeps
+    the content open whatever the open attribute says (::details-content).
 *@
 @using System.Security.Claims
 @{
@@ -24,28 +27,37 @@
     </header>
     <div class="account-body">
         <nav class="account-sidebar" aria-label="@T["Account.Title"]">
-            <div class="account-nav-group">
-                <div class="account-nav-group-title">@T["Account.Nav.Profile"]</div>
-                <a href="/account" class="account-nav-item@(activeIf("/account"))">@T["Account.Nav.Overview"]</a>
-                <a href="/account/password" class="account-nav-item@(activeIf("/account/password"))">@T["Account.Nav.Password"]</a>
-                <a href="/account/email" class="account-nav-item@(activeIf("/account/email"))">@T["Account.Nav.Email"]</a>
-            </div>
-            <div class="account-nav-group">
-                <div class="account-nav-group-title">@T["Account.Nav.Security"]</div>
-                <a href="/account/security" class="account-nav-item@(activeIf("/account/security"))">@T["Account.Nav.Logins"]</a>
-                <a href="/account/mfa" class="account-nav-item@(activeIf("/account/mfa"))">@T["Account.Nav.Mfa"]</a>
-            </div>
-            <div class="account-nav-group">
-                <div class="account-nav-group-title">@T["Account.Nav.Account"]</div>
-                <a href="/account/delete" class="account-nav-item danger@(activeIf("/account/delete"))">@T["Account.Nav.Delete"]</a>
-            </div>
-            <div class="account-sidebar-footer">
-                <partial name="_LanguagePicker" />
-                <form method="post" action="/account?handler=Logout">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="account-logout-btn">@T["Account.Logout"]</button>
-                </form>
-            </div>
+            <details class="account-menu">
+                <summary class="account-menu-summary">
+                    <span class="account-menu-icon" aria-hidden="true"></span>
+                    <span class="account-menu-label">@T["Account.Nav.Menu"]</span>
+                    <span class="account-menu-current">@ViewData["Title"]</span>
+                </summary>
+                <div class="account-menu-body">
+                    <div class="account-nav-group">
+                        <div class="account-nav-group-title">@T["Account.Nav.Profile"]</div>
+                        <a href="/account" class="account-nav-item@(activeIf("/account"))">@T["Account.Nav.Overview"]</a>
+                        <a href="/account/password" class="account-nav-item@(activeIf("/account/password"))">@T["Account.Nav.Password"]</a>
+                        <a href="/account/email" class="account-nav-item@(activeIf("/account/email"))">@T["Account.Nav.Email"]</a>
+                    </div>
+                    <div class="account-nav-group">
+                        <div class="account-nav-group-title">@T["Account.Nav.Security"]</div>
+                        <a href="/account/security" class="account-nav-item@(activeIf("/account/security"))">@T["Account.Nav.Logins"]</a>
+                        <a href="/account/mfa" class="account-nav-item@(activeIf("/account/mfa"))">@T["Account.Nav.Mfa"]</a>
+                    </div>
+                    <div class="account-nav-group">
+                        <div class="account-nav-group-title">@T["Account.Nav.Account"]</div>
+                        <a href="/account/delete" class="account-nav-item danger@(activeIf("/account/delete"))">@T["Account.Nav.Delete"]</a>
+                    </div>
+                    <div class="account-sidebar-footer">
+                        <partial name="_LanguagePicker" />
+                        <form method="post" action="/account?handler=Logout">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="account-logout-btn">@T["Account.Logout"]</button>
+                        </form>
+                    </div>
+                </div>
+            </details>
         </nav>
         <main class="account-content" role="main">
             <h1 class="account-page-title">@ViewData["Title"]</h1>

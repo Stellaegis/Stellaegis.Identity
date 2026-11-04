@@ -109,6 +109,9 @@
   <data name="Account.Nav.Logins" xml:space="preserve">
     <value>Sign-in history</value>
   </data>
+  <data name="Account.Nav.Menu" xml:space="preserve">
+    <value>Menu</value>
+  </data>
   <data name="Account.Nav.Mfa" xml:space="preserve">
     <value>Two-step verification</value>
   </data>

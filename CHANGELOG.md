@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The account navigation folds behind a "Menu" button under 720 px.** On a phone the whole menu — three groups,
+  seven entries, the language picker, "Sign out" — came before the page, which started below the fold. The navigation
+  is now a native `<details>`, rendered closed, whose summary names the page the person is on; no script. Above 720 px
+  nothing changes: the stylesheet hides the summary and keeps the content open through `::details-content`, and a
+  browser without that pseudo-element shows the button at every width instead. A host that replaced
+  `_AccountLayout.cshtml` keeps its own layout. New text `Account.Nav.Menu`.
+
 ## [7.0.0] — 2026-10-29
 
 A wrong second factor is a failed login. For the ten minutes of a pending login, codes could be tried without
