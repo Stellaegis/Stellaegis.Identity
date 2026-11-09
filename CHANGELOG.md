@@ -12,6 +12,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Run the installation again**: the schema `ident` takes its script `0002`, and a host refuses to start until it
   has. The verifications pending are removed by it — their codes were in clear — and the person asks a new code.
 
+### Added
+
+- **`ILoginCodeStore`, the codes sent by e-mail during a login, in the database**: one per account, as a hash, spent by
+  one write that checks the hash and the expiry, purged once expired. The table `ident.login_codes` comes with the
+  script `0002`, on both engines, and the in-memory stores have their own.
+
 ### Changed
 
 - **A verification code is kept as its hash, never in clear**: an HMAC-SHA256 under the pepper, its e-mail and purpose

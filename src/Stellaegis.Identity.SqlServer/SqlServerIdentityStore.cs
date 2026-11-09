@@ -14,7 +14,7 @@ namespace Stellaegis.Identity.SqlServer;
 /// deletion of an account with its avatar — run in a transaction. The pool of the connections is <c>Microsoft.Data.SqlClient</c>'s, by connection string.
 /// </summary>
 internal sealed class SqlServerIdentityStore
-    : IAuthUserStore, ILoginEventStore, IAccountTokenStore, IEmailVerificationStore, IMfaStore, IAvatarStore, IRecoveryCodeStore
+    : IAuthUserStore, ILoginEventStore, IAccountTokenStore, IEmailVerificationStore, IMfaStore, IAvatarStore, IRecoveryCodeStore, ILoginCodeStore
 {
     private readonly Func<CancellationToken, Task<DbConnection>> _open;
     private readonly AdoUnitOfWorkFactory<IdentityDatabase> _units;
@@ -40,7 +40,8 @@ internal sealed class SqlServerIdentityStore
             .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository(connection, transaction))
             .Add<MfaRepository>((connection, transaction) => new MfaRepository(connection, transaction))
             .Add<AvatarRepository>((connection, transaction) => new AvatarRepository(connection, transaction))
-            .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository(connection, transaction));
+            .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository(connection, transaction))
+            .Add<LoginCodeRepository>((connection, transaction) => new LoginCodeRepository(connection, transaction));
 
         _units = new AdoUnitOfWorkFactory<IdentityDatabase>(_open, registry);
     }
@@ -364,5 +365,33 @@ internal sealed class SqlServerIdentityStore
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
         await uow.Repo<RecoveryCodeRepository>().DeleteAllAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+    }
+
+    // ── Login codes ──────────────────────────────────────────────────────────
+
+    async Task ILoginCodeStore.SetAsync(LoginCode code, CancellationToken cancellationToken)
+    {
+        Guard.NotNull(code);
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await uow.Repo<LoginCodeRepository>().UpsertAsync(code, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<bool> ILoginCodeStore.TryConsumeAsync(Guid userUniqueId, string codeHash, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        Guard.NotWhiteSpace(codeHash);
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<LoginCodeRepository>().DeleteMatchingAsync(userUniqueId, codeHash, now, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<DateTimeOffset?> ILoginCodeStore.LastIssuedAtAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<LoginCodeRepository>().FindCreatedAtAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<int> ILoginCodeStore.DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+    {
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<LoginCodeRepository>().DeleteExpiredBeforeAsync(before, cancellationToken).ConfigureAwait(false);
     }
 }

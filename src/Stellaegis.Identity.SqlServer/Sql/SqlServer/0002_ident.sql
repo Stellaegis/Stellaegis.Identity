@@ -26,3 +26,25 @@ go
 
 alter table ident.email_verifications add constraint ck_email_verifications_code_hash check (code_hash not like N'%[^0-9a-f]%');
 go
+
+-- ── Login codes ──────────────────────────────────────────────────────────────
+-- The code sent by e-mail during a login whose second step is the e-mail method, which the process
+-- kept in memory before: a code issued by one instance of the host is checked by another. One per
+-- account, replaced by the next, removed when spent; kept as an HMAC-SHA256 under the pepper, the
+-- account in the input. An expired code stays until the purge, which reads expires_at.
+
+create table ident.login_codes (
+  user_unique_id  uniqueidentifier  not null,
+  code_hash       nchar(64) collate Latin1_General_100_BIN2 not null,
+  created_at      datetimeoffset(3) not null,
+  expires_at      datetimeoffset(3) not null,
+
+  constraint pk_login_codes primary key clustered (user_unique_id),
+  constraint fk_login_codes_user
+    foreign key (user_unique_id) references ident.users (user_unique_id) on delete cascade,
+  constraint ck_login_codes_code_hash check (code_hash not like N'%[^0-9a-f]%')
+);
+go
+
+create index ix_login_codes_expires on ident.login_codes (expires_at);
+go

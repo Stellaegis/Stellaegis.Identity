@@ -88,6 +88,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IMfaStore, InMemoryMfaStore>();
         services.TryAddSingleton<IAvatarStore, InMemoryAvatarStore>();
         services.TryAddSingleton<IRecoveryCodeStore, InMemoryRecoveryCodeStore>();
+        services.TryAddSingleton<ILoginCodeStore, InMemoryLoginCodeStore>();
         return services;
     }
 

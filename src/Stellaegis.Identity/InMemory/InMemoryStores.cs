@@ -13,6 +13,7 @@ public sealed class InMemoryIdentityData
     internal ConcurrentDictionary<Guid, MfaRecord> Mfa { get; } = new();
     internal ConcurrentDictionary<Guid, AccountAvatar> Avatars { get; } = new();
     internal ConcurrentDictionary<Guid, ConcurrentDictionary<string, bool>> RecoveryCodes { get; } = new();
+    internal ConcurrentDictionary<Guid, LoginCode> LoginCodes { get; } = new();
 }
 
 internal sealed class InMemoryAuthUserStore(InMemoryIdentityData data) : IAuthUserStore
@@ -319,5 +320,35 @@ internal sealed class InMemoryRecoveryCodeStore(InMemoryIdentityData data) : IRe
     {
         data.RecoveryCodes.TryRemove(userUniqueId, out _);
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class InMemoryLoginCodeStore(InMemoryIdentityData data) : ILoginCodeStore
+{
+    public Task SetAsync(LoginCode code, CancellationToken cancellationToken = default)
+    {
+        data.LoginCodes[code.UserUniqueId] = code;
+        return Task.CompletedTask;
+    }
+
+    // The removal holds only for the code compared: a newer one set meanwhile is left in place.
+    public Task<bool> TryConsumeAsync(Guid userUniqueId, string codeHash, DateTimeOffset now, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.LoginCodes.TryGetValue(userUniqueId, out var code)
+            && code.ExpiresAt > now
+            && KeyedHashes.AreEqual(code.CodeHash, codeHash)
+            && data.LoginCodes.TryRemove(new KeyValuePair<Guid, LoginCode>(userUniqueId, code)));
+
+    public Task<DateTimeOffset?> LastIssuedAtAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
+        => Task.FromResult(data.LoginCodes.TryGetValue(userUniqueId, out var code) ? (DateTimeOffset?)code.CreatedAt : null);
+
+    public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default)
+    {
+        var removed = 0;
+        foreach (var pair in data.LoginCodes)
+        {
+            if (pair.Value.ExpiresAt < before && data.LoginCodes.TryRemove(pair))
+                removed++;
+        }
+        return Task.FromResult(removed);
     }
 }

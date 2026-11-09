@@ -60,6 +60,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IMfaStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.TryAddSingleton<IAvatarStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.TryAddSingleton<IRecoveryCodeStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
+        services.TryAddSingleton<ILoginCodeStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());
         services.AddStellaegisModuleDatabase(IdentityDatabase.Value,
             (provider, cancellationToken) => provider.GetRequiredService<PostgreSqlIdentityStore>().OpenConnectionAsync(cancellationToken));
         return services;

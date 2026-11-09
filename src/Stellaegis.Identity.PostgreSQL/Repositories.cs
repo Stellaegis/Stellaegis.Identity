@@ -686,3 +686,46 @@ internal sealed class RecoveryCodeRepository(DbConnection connection, Func<DbTra
             "select count(*) from ident.recovery_codes where user_unique_id = @userUniqueId and used_at is null",
             new { userUniqueId }, transaction(), cancellationToken: cancellationToken));
 }
+
+/// <summary>The rows of <c>ident.login_codes</c>: one per account, a hash only, removed when spent.</summary>
+internal sealed class LoginCodeRepository(DbConnection connection, Func<DbTransaction?> transaction)
+{
+    static LoginCodeRepository() => SnakeCaseTypeMap<IssuedRow>.Register();
+
+    public Task UpsertAsync(LoginCode code, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            """
+            insert into ident.login_codes (user_unique_id, code_hash, created_at, expires_at)
+            values (@UserUniqueId, @CodeHash, @CreatedAt, @ExpiresAt)
+            on conflict (user_unique_id) do update set
+                code_hash = excluded.code_hash,
+                created_at = excluded.created_at,
+                expires_at = excluded.expires_at
+            """,
+            new { code.UserUniqueId, code.CodeHash, code.CreatedAt, code.ExpiresAt }, transaction(), cancellationToken: cancellationToken));
+
+    // One statement checks the hash and the expiry and removes the row: two tries at once remove it once.
+    public async Task<bool> DeleteMatchingAsync(Guid userUniqueId, string codeHash, DateTimeOffset now, CancellationToken cancellationToken)
+        => await connection.ExecuteAsync(new CommandDefinition(
+            "delete from ident.login_codes where user_unique_id = @userUniqueId and code_hash = @codeHash and expires_at > @now",
+            new { userUniqueId, codeHash, now }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+
+    // Read as a row, not a scalar: the scalar of a timestamptz comes back from Npgsql as a DateTime.
+    public async Task<DateTimeOffset?> FindCreatedAtAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        var row = await connection.QuerySingleOrDefaultAsync<IssuedRow>(new CommandDefinition(
+            "select created_at from ident.login_codes where user_unique_id = @userUniqueId",
+            new { userUniqueId }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row?.CreatedAt;
+    }
+
+    public Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken)
+        => connection.ExecuteAsync(new CommandDefinition(
+            "delete from ident.login_codes where expires_at < @before",
+            new { before }, transaction(), cancellationToken: cancellationToken));
+
+    private sealed class IssuedRow
+    {
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+}

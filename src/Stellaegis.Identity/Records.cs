@@ -209,6 +209,28 @@ public sealed class EmailVerification
     public string? IpAddress { get; set; }
 }
 
+/// <summary>
+/// The code sent by e-mail during a login whose second step is the e-mail method: one per account, replaced by the
+/// next, spent on its first match.
+/// </summary>
+public sealed class LoginCode
+{
+    /// <summary>The account logging in.</summary>
+    public Guid UserUniqueId { get; set; }
+
+    /// <summary>
+    /// The hash of the code sent — an HMAC-SHA256 under the pepper, in lowercase hexadecimal —, never the code: what
+    /// the store holds does not give it.
+    /// </summary>
+    public string CodeHash { get; set; } = "";
+
+    /// <summary>When the code was issued.</summary>
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>After when the code no longer works.</summary>
+    public DateTimeOffset ExpiresAt { get; set; }
+}
+
 /// <summary>What a person reads and changes of their own account, as <see cref="ProfileService"/> gives it.</summary>
 public sealed record AccountProfile
 {

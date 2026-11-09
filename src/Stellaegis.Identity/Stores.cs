@@ -154,6 +154,28 @@ public interface IAvatarStore
     Task<bool> DeleteAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Where the codes sent by e-mail during a login are kept, one per account, as hashes only: shared by every instance
+/// of the host, as the rest of the accounts are, so that a code issued by one is checked by another.
+/// </summary>
+public interface ILoginCodeStore
+{
+    /// <summary>Creates or replaces the code of its account.</summary>
+    Task SetAsync(LoginCode code, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the code of the account if it has that hash and expires after <paramref name="now"/>.
+    /// <see langword="true"/> only when it did: the check and the removal are one, so a code is never spent twice.
+    /// </summary>
+    Task<bool> TryConsumeAsync(Guid userUniqueId, string codeHash, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>When the code the account holds was issued — an expired one until the purge —, or <see langword="null"/> when it holds none.</summary>
+    Task<DateTimeOffset?> LastIssuedAtAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes the codes that expired before <paramref name="before"/>, and returns how many.</summary>
+    Task<int> DeleteExpiredBeforeAsync(DateTimeOffset before, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Where the recovery codes are kept, as hashes only, which the service looks up by <see cref="MarkUsedAsync"/>.</summary>
 public interface IRecoveryCodeStore
 {
