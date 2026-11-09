@@ -179,8 +179,8 @@ public sealed class LoginService(
         }
     }
 
-    // A recovery code is recognized by its shape and tried alone: each try costs a hash per code left, which a
-    // one-time code must not pay — nor let an attacker make the server pay.
+    // A recovery code is recognized by its shape and tried alone: a one-time code is never looked up among the
+    // recovery codes, nor a recovery code checked against the authenticator.
     private async Task<IReadOnlyCollection<string>?> VerifySecondFactorAsync(Guid userUniqueId, string? code, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(code))

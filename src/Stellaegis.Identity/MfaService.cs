@@ -139,7 +139,7 @@ public sealed class LoginOtpService(TimeProvider clock)
 
 /// <summary>
 /// The recovery codes of an account: the way in when the authenticator is gone. Shown once, at generation; kept
-/// as hashes only, like passwords; each spent on its first use.
+/// as hashes only, keyed by the pepper and bound to the account; each spent on its first use.
 /// </summary>
 public sealed class RecoveryCodeService(IRecoveryCodeStore store, PasswordHasher hasher)
 {
@@ -159,7 +159,7 @@ public sealed class RecoveryCodeService(IRecoveryCodeStore store, PasswordHasher
         {
             var raw = GenerateRaw();
             codes.Add($"{raw[..5]}-{raw[5..]}");
-            hashes.Add(hasher.Hash(raw));
+            hashes.Add(Hash(userUniqueId, raw));
         }
         await store.ReplaceAllAsync(userUniqueId, hashes, cancellationToken);
         return codes;
@@ -172,23 +172,25 @@ public sealed class RecoveryCodeService(IRecoveryCodeStore store, PasswordHasher
     /// </summary>
     public static bool LooksLikeCode(string? code) => Normalize(code).Length == CodeLength;
 
-    /// <summary>Whether <paramref name="code"/> is one of the account's unused codes, in any case and with or without its dash; a match spends it.</summary>
-    public async Task<bool> TryConsumeAsync(Guid userUniqueId, string? code, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Whether <paramref name="code"/> is one of the account's unused codes, in any case and with or without its dash;
+    /// a match spends it. One hash, looked up and spent in one write of the store.
+    /// </summary>
+    public Task<bool> TryConsumeAsync(Guid userUniqueId, string? code, CancellationToken cancellationToken = default)
     {
         var normalized = Normalize(code);
-        if (normalized.Length == 0)
-            return false;
-        foreach (var hash in await store.GetUnusedHashesAsync(userUniqueId, cancellationToken))
-        {
-            if (hasher.Verify(normalized, hash))
-                return await store.MarkUsedAsync(userUniqueId, hash, cancellationToken);
-        }
-        return false;
+        return normalized.Length == 0
+            ? Task.FromResult(false)
+            : store.MarkUsedAsync(userUniqueId, Hash(userUniqueId, normalized), cancellationToken);
     }
 
     /// <summary>How many codes the account has left.</summary>
     public Task<int> CountRemainingAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
         => store.CountUnusedAsync(userUniqueId, cancellationToken);
+
+    // The account is in the hash: the same code issued to two accounts does not hash alike, and a hash copied onto another account opens nothing.
+    private string Hash(Guid userUniqueId, string normalized)
+        => hasher.KeyedHash(KeyedHashes.RecoveryCode, $"{userUniqueId:N}:{normalized}");
 
     private static string Normalize(string? code)
         => new((code ?? "").Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());

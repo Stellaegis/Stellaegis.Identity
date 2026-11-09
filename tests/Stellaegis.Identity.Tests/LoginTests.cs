@@ -451,4 +451,25 @@ public sealed class MfaTests
         Assert.False(await codes.TryConsumeAsync(id, issued[2]));
         Assert.True(await codes.TryConsumeAsync(id, fresh[0]));
     }
+
+    [Fact]
+    public async Task A_recovery_code_is_kept_as_a_hash_bound_to_its_account_and_to_the_pepper()
+    {
+        using var host = new TestHost();
+        var jane = await host.CreateUserAsync();
+        var john = await host.CreateUserAsync("john@acme.test", displayName: "John");
+        var codes = host.Get<RecoveryCodeService>();
+
+        var issued = await codes.GenerateAsync(jane);
+        var stored = await host.Get<IRecoveryCodeStore>().GetUnusedHashesAsync(jane);
+        Assert.All(stored, hash => Assert.Matches("^[0-9a-f]{64}$", hash));
+        var code = issued[0].Replace("-", "");
+        Assert.Contains(KeyedHashes.Of(TestHost.Pepper, KeyedHashes.RecoveryCode, $"{jane:N}:{code}"), stored);
+
+        // Another account, another pepper: the same code hashes otherwise.
+        Assert.False(await codes.TryConsumeAsync(john, issued[0]));
+        Assert.DoesNotContain(KeyedHashes.Of(TestHost.Pepper, KeyedHashes.RecoveryCode, $"{john:N}:{code}"), stored);
+        Assert.DoesNotContain(KeyedHashes.Of("another-pepper", KeyedHashes.RecoveryCode, $"{jane:N}:{code}"), stored);
+        Assert.True(await codes.TryConsumeAsync(jane, issued[0]));
+    }
 }

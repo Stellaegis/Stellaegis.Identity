@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **A recovery code is kept as an HMAC-SHA256 under the pepper, bound to its account**, and looked up: a try costs one
+  hash, where it cost a PBKDF2 for every code left, up to eight. A recovery code has about 50 bits: a plain SHA-256
+  would be found by trying them all, once for every account, while a keyed hash read from `ident` is worth nothing
+  without the pepper. ⚠ **The codes issued before are no longer recognized**: a person who holds some generates a new
+  set from the account pages. The store contract is unchanged; `IRecoveryCodeStore.GetUnusedHashesAsync` is no longer
+  called by the package.
+
 ### Fixed
 
 - **A verification code of ten digits draws every digit in every place.** Its bound, 10¹⁰, was cast to an `int`,

@@ -28,6 +28,9 @@ public sealed class PasswordHasher
         _dummyStoredHash = Hash(Guid.NewGuid().ToString("N"));
     }
 
+    // A short random secret — a recovery code — is hashed once, under the pepper: see KeyedHashes.
+    internal string KeyedHash(string purpose, string value) => KeyedHashes.Of(_pepper, purpose, value);
+
     /// <summary>Hashes <paramref name="password"/> with a fresh 16-byte salt.</summary>
     /// <exception cref="ArgumentException"><paramref name="password"/> is blank.</exception>
     public string Hash(string password)

@@ -154,7 +154,7 @@ public interface IAvatarStore
     Task<bool> DeleteAsync(Guid userUniqueId, CancellationToken cancellationToken = default);
 }
 
-/// <summary>Where the recovery codes are kept, as hashes only, like passwords.</summary>
+/// <summary>Where the recovery codes are kept, as hashes only, which the service looks up by <see cref="MarkUsedAsync"/>.</summary>
 public interface IRecoveryCodeStore
 {
     /// <summary>Replaces every code of the account by those hashes: a fresh set, the previous one gone, used or not.</summary>
