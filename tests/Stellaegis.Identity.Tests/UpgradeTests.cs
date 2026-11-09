@@ -39,6 +39,14 @@ public abstract class UpgradeTests
     /// <summary>Opens a connection to the database of the test under the installer.</summary>
     protected abstract Task<DbConnection> OpenAsync(string server, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Opens a connection to the database of the test as the application verifies it at startup. The installer by
+    /// default; an engine whose verification refuses the installer — PostgreSQL refuses a superuser — connects under
+    /// the role the installation grants.
+    /// </summary>
+    protected virtual Task<DbConnection> OpenApplicationAsync(string server, CancellationToken cancellationToken)
+        => OpenAsync(server, cancellationToken);
+
     /// <summary>The role of the application the installation grants.</summary>
     protected const string AppRole = "stellaegis_identity_app";
 
@@ -53,6 +61,7 @@ public abstract class UpgradeTests
         var ct = TestContext.Current.CancellationToken;
         var frame = IdentityStoreTests.Frame;
         Task<DbConnection> Open(ModuleDatabase _, CancellationToken token) => OpenAsync(server!, token);
+        Task<DbConnection> OpenApplication(ModuleDatabase _, CancellationToken token) => OpenApplicationAsync(server!, token);
 
         await CreateDatabaseAsync(server!);
         try
@@ -65,12 +74,13 @@ public abstract class UpgradeTests
                     + $"values ('{Guid.NewGuid()}', '{email}', 'Someone', {Boolean(true)}, {Boolean(false)}, {Now}, 'install', {Now}, 'install')", ct);
 
             // The application refuses a database the package is ahead of.
-            await Assert.ThrowsAsync<InvalidOperationException>(() => DatabaseLifecycle.VerifyAsync([Declaration], frame, Open, ct));
+            var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => DatabaseLifecycle.VerifyAsync([Declaration], frame, OpenApplication, ct));
+            Assert.Contains("0002_ident.sql", refused.Message);
 
             var report = await DatabaseLifecycle.InstallAsync([Declaration], frame, Open, AppRole, Actor.Job("tests"), ct);
             Assert.Equal(["identity: 0002_ident.sql", "identity: 0003_ident.sql"], report.Applied);
             Assert.Equal(["identity: 0001_ident.sql"], report.Skipped);
-            await DatabaseLifecycle.VerifyAsync([Declaration], frame, Open, ct);
+            await DatabaseLifecycle.VerifyAsync([Declaration], frame, OpenApplication, ct);
 
             // The code in clear is gone with its verification; the hash and the login codes are there.
             Assert.Equal(0, await CountAsync(server!, "select count(*) from ident.email_verifications", ct));
@@ -156,6 +166,20 @@ public sealed class PostgreSqlUpgradeTests : UpgradeTests
     protected override async Task<DbConnection> OpenAsync(string server, CancellationToken cancellationToken)
     {
         var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(server) { Database = Database, Pooling = false }.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        return connection;
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<DbConnection> OpenApplicationAsync(string server, CancellationToken cancellationToken)
+    {
+        var connection = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(server)
+        {
+            Database = Database,
+            Username = AppRole,
+            Password = AppRole,
+            Pooling = false,
+        }.ConnectionString);
         await connection.OpenAsync(cancellationToken);
         return connection;
     }
