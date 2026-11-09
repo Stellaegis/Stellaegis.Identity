@@ -37,7 +37,7 @@ public sealed class EmailVerificationService(IEmailVerificationStore store, IOpt
             Email = normalized,
             Purpose = purpose,
             RequestedBy = requestedBy,
-            Code = code,
+            CodeHash = Hash(normalized, purpose, code),
             CreatedAt = now,
             ExpiresAt = now.Add(settings.Lifetime),
             Attempts = 0,
@@ -64,7 +64,7 @@ public sealed class EmailVerificationService(IEmailVerificationStore store, IOpt
             return Result.Failure(IdentityErrors.VerificationCodeExpired);
         if (verification.Attempts >= options.Value.EmailVerification.MaxAttempts)
             return Result.Failure(IdentityErrors.TooManyVerificationAttempts);
-        if (!string.Equals(verification.Code, code?.Trim(), StringComparison.Ordinal))
+        if (!KeyedHashes.AreEqual(verification.CodeHash, Hash(normalized, purpose, code?.Trim() ?? string.Empty)))
         {
             await store.IncrementAttemptsAsync(normalized, purpose, cancellationToken);
             return Result.Failure(IdentityErrors.InvalidVerificationCode);
@@ -93,6 +93,11 @@ public sealed class EmailVerificationService(IEmailVerificationStore store, IOpt
         if (purpose == EmailVerificationPurpose.Registration ? requestedBy is not null : requestedBy is null)
             throw new ArgumentException($"A {purpose} verification {(requestedBy is null ? "names the account that asks for it" : "is asked by nobody")}.", nameof(requestedBy));
     }
+
+    // The store keeps the code's hash under the pepper, its e-mail and purpose in the input: a row read from ident
+    // gives no code, and a hash copied onto another e-mail or purpose matches nothing.
+    private string Hash(string normalizedEmail, EmailVerificationPurpose purpose, string code)
+        => KeyedHashes.Of(options.Value.PasswordHasher.Pepper, KeyedHashes.EmailVerificationCode, $"{purpose}:{normalizedEmail}:{code}");
 
     // Digit by digit: a bound of 10^length would not fit an int at ten digits.
     private static string GenerateCode(int length)

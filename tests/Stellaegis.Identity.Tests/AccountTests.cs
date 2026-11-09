@@ -374,6 +374,22 @@ public sealed class EmailVerificationTests
     }
 
     [Fact]
+    public async Task A_code_is_kept_as_a_hash_bound_to_its_email_its_purpose_and_the_pepper()
+    {
+        using var host = new TestHost();
+        var verification = host.Get<EmailVerificationService>();
+
+        var code = (await verification.RequestVerificationAsync("Jane@Acme.test", Registration, null)).Value;
+        var stored = (await host.Get<IEmailVerificationStore>().GetAsync("jane@acme.test", Registration))!.CodeHash;
+        Assert.Matches("^[0-9a-f]{64}$", stored);
+        Assert.Equal(KeyedHashes.Of(TestHost.Pepper, KeyedHashes.EmailVerificationCode, $"Registration:jane@acme.test:{code}"), stored);
+        Assert.NotEqual(stored, KeyedHashes.Of(TestHost.Pepper, KeyedHashes.EmailVerificationCode, $"EmailChange:jane@acme.test:{code}"));
+        Assert.NotEqual(stored, KeyedHashes.Of(TestHost.Pepper, KeyedHashes.EmailVerificationCode, $"Registration:john@acme.test:{code}"));
+        Assert.NotEqual(stored, KeyedHashes.Of("another-pepper", KeyedHashes.EmailVerificationCode, $"Registration:jane@acme.test:{code}"));
+        Assert.True((await verification.VerifyCodeAsync("jane@acme.test", Registration, null, code)).IsSuccess);
+    }
+
+    [Fact]
     public async Task A_code_verifies_the_email_within_its_attempts_and_its_lifetime()
     {
         using var host = new TestHost(o => { o.EmailVerification.MaxAttempts = 2; o.EmailVerification.CodeLength = 8; });

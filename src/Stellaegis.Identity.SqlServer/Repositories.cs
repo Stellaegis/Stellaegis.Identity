@@ -412,22 +412,22 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
         => connection.ExecuteAsync(new CommandDefinition(
             """
             begin try
-                update ident.email_verifications set requested_by = @RequestedBy, code = @Code, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email and purpose = @Purpose;
+                update ident.email_verifications set requested_by = @RequestedBy, code_hash = @CodeHash, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email and purpose = @Purpose;
                 if @@rowcount = 0
-                    insert into ident.email_verifications (email, purpose, requested_by, code, created_at, expires_at, attempts, is_verified, ip_address) values (@Email, @Purpose, @RequestedBy, @Code, @CreatedAt, @ExpiresAt, @Attempts, @IsVerified, @IpAddress);
+                    insert into ident.email_verifications (email, purpose, requested_by, code_hash, created_at, expires_at, attempts, is_verified, ip_address) values (@Email, @Purpose, @RequestedBy, @CodeHash, @CreatedAt, @ExpiresAt, @Attempts, @IsVerified, @IpAddress);
             end try
             begin catch
                 if error_number() not in (2601, 2627) throw;
-                update ident.email_verifications set requested_by = @RequestedBy, code = @Code, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email and purpose = @Purpose;
+                update ident.email_verifications set requested_by = @RequestedBy, code_hash = @CodeHash, created_at = @CreatedAt, expires_at = @ExpiresAt, attempts = @Attempts, is_verified = @IsVerified, ip_address = @IpAddress where email = @Email and purpose = @Purpose;
             end catch
             """,
-            new { verification.Email, Purpose = VerificationRow.PurposeOf(verification.Purpose), verification.RequestedBy, verification.Code, verification.CreatedAt, verification.ExpiresAt, verification.Attempts, verification.IsVerified, verification.IpAddress },
+            new { verification.Email, Purpose = VerificationRow.PurposeOf(verification.Purpose), verification.RequestedBy, verification.CodeHash, verification.CreatedAt, verification.ExpiresAt, verification.Attempts, verification.IsVerified, verification.IpAddress },
             transaction(), cancellationToken: cancellationToken));
 
     public async Task<EmailVerification?> FindAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         var row = await connection.QuerySingleOrDefaultAsync<VerificationRow>(new CommandDefinition(
-            "select email, purpose, requested_by, code, created_at, expires_at, attempts, is_verified, ip_address from ident.email_verifications where email = @email and purpose = @purpose",
+            "select email, purpose, requested_by, code_hash, created_at, expires_at, attempts, is_verified, ip_address from ident.email_verifications where email = @email and purpose = @purpose",
             new { email, purpose = VerificationRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return row?.ToVerification();
     }
@@ -452,7 +452,7 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
         public string Email { get; set; } = "";
         public string Purpose { get; set; } = "";
         public Guid? RequestedBy { get; set; }
-        public string Code { get; set; } = "";
+        public string CodeHash { get; set; } = "";
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
         public int Attempts { get; set; }
@@ -479,7 +479,7 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
             Email = Email,
             Purpose = PurposeOf(Purpose),
             RequestedBy = RequestedBy,
-            Code = Code,
+            CodeHash = CodeHash,
             CreatedAt = CreatedAt,
             ExpiresAt = ExpiresAt,
             Attempts = Attempts,

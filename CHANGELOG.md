@@ -7,7 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Upgrading
+
+- **Run the installation again**: the schema `ident` takes its script `0002`, and a host refuses to start until it
+  has. The verifications pending are removed by it — their codes were in clear — and the person asks a new code.
+
 ### Changed
+
+- **A verification code is kept as its hash, never in clear**: an HMAC-SHA256 under the pepper, its e-mail and purpose
+  in the input, compared in constant time. `EmailVerification.Code` is renamed `CodeHash`, and the column
+  `ident.email_verifications.code` `code_hash`, 64 lowercase hexadecimal digits under a check, on both engines. A host
+  that implements `IEmailVerificationStore` stores `CodeHash` as it is given.
 
 - **A recovery code is kept as an HMAC-SHA256 under the pepper, bound to its account**, and looked up: a try costs one
   hash, where it cost a PBKDF2 for every code left, up to eight. A recovery code has about 50 bits: a plain SHA-256

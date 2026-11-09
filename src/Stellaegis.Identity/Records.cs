@@ -187,8 +187,11 @@ public sealed class EmailVerification
     /// <summary>The account that asked for it; <see langword="null"/> for a registration, which has none yet.</summary>
     public Guid? RequestedBy { get; set; }
 
-    /// <summary>The code sent to the e-mail.</summary>
-    public string Code { get; set; } = "";
+    /// <summary>
+    /// The hash of the code sent to the e-mail — an HMAC-SHA256 under the pepper, in lowercase hexadecimal —, never
+    /// the code: what the store holds does not give it.
+    /// </summary>
+    public string CodeHash { get; set; } = "";
 
     /// <summary>When the code was issued.</summary>
     public DateTimeOffset CreatedAt { get; set; }

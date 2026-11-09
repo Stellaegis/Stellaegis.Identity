@@ -411,24 +411,24 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
     public Task UpsertAsync(EmailVerification verification, CancellationToken cancellationToken)
         => connection.ExecuteAsync(new CommandDefinition(
             """
-            insert into ident.email_verifications (email, purpose, requested_by, code, created_at, expires_at, attempts, is_verified, ip_address)
-            values (@Email, @Purpose, @RequestedBy, @Code, @CreatedAt, @ExpiresAt, @Attempts, @IsVerified, @IpAddress)
+            insert into ident.email_verifications (email, purpose, requested_by, code_hash, created_at, expires_at, attempts, is_verified, ip_address)
+            values (@Email, @Purpose, @RequestedBy, @CodeHash, @CreatedAt, @ExpiresAt, @Attempts, @IsVerified, @IpAddress)
             on conflict (email, purpose) do update set
                 requested_by = excluded.requested_by,
-                code = excluded.code,
+                code_hash = excluded.code_hash,
                 created_at = excluded.created_at,
                 expires_at = excluded.expires_at,
                 attempts = excluded.attempts,
                 is_verified = excluded.is_verified,
                 ip_address = excluded.ip_address
             """,
-            new { verification.Email, Purpose = VerificationRow.PurposeOf(verification.Purpose), verification.RequestedBy, verification.Code, verification.CreatedAt, verification.ExpiresAt, verification.Attempts, verification.IsVerified, verification.IpAddress },
+            new { verification.Email, Purpose = VerificationRow.PurposeOf(verification.Purpose), verification.RequestedBy, verification.CodeHash, verification.CreatedAt, verification.ExpiresAt, verification.Attempts, verification.IsVerified, verification.IpAddress },
             transaction(), cancellationToken: cancellationToken));
 
     public async Task<EmailVerification?> FindAsync(string email, EmailVerificationPurpose purpose, CancellationToken cancellationToken)
     {
         var row = await connection.QuerySingleOrDefaultAsync<VerificationRow>(new CommandDefinition(
-            "select email, purpose, requested_by, code, created_at, expires_at, attempts, is_verified, ip_address from ident.email_verifications where email = @email and purpose = @purpose",
+            "select email, purpose, requested_by, code_hash, created_at, expires_at, attempts, is_verified, ip_address from ident.email_verifications where email = @email and purpose = @purpose",
             new { email, purpose = VerificationRow.PurposeOf(purpose) }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false);
         return row?.ToVerification();
     }
@@ -453,7 +453,7 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
         public string Email { get; set; } = "";
         public string Purpose { get; set; } = "";
         public Guid? RequestedBy { get; set; }
-        public string Code { get; set; } = "";
+        public string CodeHash { get; set; } = "";
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
         public int Attempts { get; set; }
@@ -480,7 +480,7 @@ internal sealed class EmailVerificationRepository(DbConnection connection, Func<
             Email = Email,
             Purpose = PurposeOf(Purpose),
             RequestedBy = RequestedBy,
-            Code = Code,
+            CodeHash = CodeHash,
             CreatedAt = CreatedAt,
             ExpiresAt = ExpiresAt,
             Attempts = Attempts,
