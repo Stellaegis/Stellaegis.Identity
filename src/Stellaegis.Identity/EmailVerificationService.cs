@@ -94,6 +94,7 @@ public sealed class EmailVerificationService(IEmailVerificationStore store, IOpt
             throw new ArgumentException($"A {purpose} verification {(requestedBy is null ? "names the account that asks for it" : "is asked by nobody")}.", nameof(requestedBy));
     }
 
+    // Digit by digit: a bound of 10^length would not fit an int at ten digits.
     private static string GenerateCode(int length)
-        => RandomNumberGenerator.GetInt32(0, (int)Math.Pow(10, length)).ToString().PadLeft(length, '0');
+        => RandomNumberGenerator.GetString("0123456789", length);
 }

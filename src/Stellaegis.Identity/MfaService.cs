@@ -115,7 +115,7 @@ public sealed class LoginOtpService(TimeProvider clock)
     /// <summary>Generates a six-digit code for the account, replacing any previous one, and returns it for the e-mail.</summary>
     public string Generate(Guid userUniqueId)
     {
-        var code = RandomNumberGenerator.GetInt32(100_000, 1_000_000).ToString();
+        var code = RandomNumberGenerator.GetString("0123456789", 6);
         _codes[userUniqueId] = (code, clock.GetUtcNow().Add(Lifetime));
         return code;
     }
@@ -193,11 +193,5 @@ public sealed class RecoveryCodeService(IRecoveryCodeStore store, PasswordHasher
     private static string Normalize(string? code)
         => new((code ?? "").Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
-    private static string GenerateRaw()
-    {
-        Span<char> chars = stackalloc char[CodeLength];
-        for (var i = 0; i < CodeLength; i++)
-            chars[i] = Alphabet[RandomNumberGenerator.GetInt32(Alphabet.Length)];
-        return new string(chars);
-    }
+    private static string GenerateRaw() => RandomNumberGenerator.GetString(Alphabet, CodeLength);
 }

@@ -359,6 +359,21 @@ public sealed class EmailVerificationTests
     private const EmailVerificationPurpose Registration = EmailVerificationPurpose.Registration;
 
     [Fact]
+    public async Task A_code_of_ten_digits_draws_every_digit_in_every_place()
+    {
+        using var host = new TestHost(o => o.EmailVerification.CodeLength = 10);
+        var verification = host.Get<EmailVerificationService>();
+
+        var codes = new List<string>();
+        for (var i = 0; i < 200; i++)
+            codes.Add((await verification.RequestVerificationAsync($"jane{i}@acme.test", Registration, null)).Value);
+
+        Assert.All(codes, code => Assert.Matches("^[0-9]{10}$", code));
+        // A bound of 10^10 cast to an int saturates at 2 147 483 647: no code would start with 3 or more.
+        Assert.Contains(codes, code => code[0] >= '3');
+    }
+
+    [Fact]
     public async Task A_code_verifies_the_email_within_its_attempts_and_its_lifetime()
     {
         using var host = new TestHost(o => { o.EmailVerification.MaxAttempts = 2; o.EmailVerification.CodeLength = 8; });

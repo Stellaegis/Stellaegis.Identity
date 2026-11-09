@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A verification code of ten digits draws every digit in every place.** Its bound, 10¹⁰, was cast to an `int`,
+  which saturates at 2 147 483 647 since .NET 9: no code of `EmailVerification:CodeLength = 10` started with 3 or
+  more, about 31 bits instead of 33. Codes are now drawn digit by digit, as the login codes by e-mail and the recovery
+  codes are.
+
 ## [7.0.1] — 2026-11-04
 
 ### Fixed
