@@ -384,10 +384,28 @@ A block applies without waiting for the next reading when the host connects its 
 `BlockedAccounts.Block(userUniqueId)`; on `UserUnblocked`, `Unblock`. In a single process, the example does it
 from its own `IEventPublisher`; with several, from a subscription to `Stellaegis.Backplane`.
 
+## Invitations
+
+An invitation lives in the host's rights system — `Stellaegis.Registry` issues it, bound to an address, and applies
+what it carries at its acceptance. Identity opens it through a port the host bridges in a few lines,
+`IInvitationAcceptance`: `FindAsync(token)` tells the address invited, and whether the link came by e-mail from the
+system, without spending the token; `AcceptAsync(token, subject, emailVerified)` has the rights system check
+everything again and apply it. Identity creates an account on an invitation only by asking that port, and without it
+`/invitation` is not there: an invitation is a gesture of the composition, visible.
+
+`/invitation?token=…` names nothing the invitation carries — neither the compartment, nor who invited, nor the roles
+— and sends no referrer. Signed in under the address invited, the person accepts; signed in under another, the page
+says the invitation is that address's only; an account holds the address, the person signs in to it and comes
+back; none does, the person chooses a name and a password, the account is created at the address invited — its own
+creator, whatever `SelfRegistration` says —, the invitation is accepted, and the person signs in. A link that came
+by e-mail proves the address, on the account created as on one that accepts; a link handed over proves nothing,
+and an account whose address is unproven does not accept. If the invitation no longer holds between the creation and
+the acceptance, the account stays, granted nothing. `InvitationService` carries the same for a host's own pages.
+
 ## The pages
 
 `Stellaegis.Identity.Server` is a Razor class library: `/login`, `/login/mfa`, `/login/mfa-setup`, `/register`,
-`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, `/approve-email`, `/revert-email`, `/language`, and under `/account` the overview — the
+`/verify-email`, `/forgot-password`, `/reset-password`, `/activate`, `/approve-email`, `/revert-email`, `/invitation`, `/language`, and under `/account` the overview — the
 avatar and the profile —, the avatar itself, the password, the e-mail, the second factor and its recovery codes, the
 sign-in history, the deletion. With a session open in the browser, `/login` shows it — the avatar, the name
 and the address of its account — with "Continue", to the way back, and "Switch account", which signs it out

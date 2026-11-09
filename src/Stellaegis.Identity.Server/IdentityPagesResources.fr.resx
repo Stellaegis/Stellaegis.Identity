@@ -715,4 +715,49 @@
   <data name="Account.Avatar.GravatarMissing" xml:space="preserve">
     <value>Aucun Gravatar pour cette adresse.</value>
   </data>
+  <data name="Invitation.Title" xml:space="preserve">
+    <value>Invitation</value>
+  </data>
+  <data name="Invitation.Heading" xml:space="preserve">
+    <value>Une invitation</value>
+  </data>
+  <data name="Invitation.InvalidHeading" xml:space="preserve">
+    <value>Invitation invalide</value>
+  </data>
+  <data name="Invitation.InvalidHelp" xml:space="preserve">
+    <value>Ce lien d'invitation est invalide, a expiré, a été révoqué ou a déjà servi.</value>
+  </data>
+  <data name="Invitation.AcceptHelp" xml:space="preserve">
+    <value>L'invitation s'adresse au compte connecté. L'accepter donne les accès qu'elle porte.</value>
+  </data>
+  <data name="Invitation.Accept" xml:space="preserve">
+    <value>Accepter l'invitation</value>
+  </data>
+  <data name="Invitation.OtherAccountHelp" xml:space="preserve">
+    <value>Cette invitation s'adresse à une autre adresse que celle du compte connecté : seul le compte de cette adresse l'accepte.</value>
+  </data>
+  <data name="Invitation.SignInHelp" xml:space="preserve">
+    <value>Un compte existe pour l'adresse invitée : la connexion à ce compte vient d'abord, puis l'acceptation.</value>
+  </data>
+  <data name="Invitation.CreateHelp" xml:space="preserve">
+    <value>Aucun compte n'existe encore pour l'adresse invitée : choisir un nom et un mot de passe le crée, sous cette adresse.</value>
+  </data>
+  <data name="Invitation.Create" xml:space="preserve">
+    <value>Créer le compte et accepter</value>
+  </data>
+  <data name="Invitation.Accepted" xml:space="preserve">
+    <value>L'invitation est acceptée.</value>
+  </data>
+  <data name="Invitation.CreatedAndAccepted" xml:space="preserve">
+    <value>Le compte est créé et l'invitation acceptée. La connexion l'ouvre désormais.</value>
+  </data>
+  <data name="Invitation.CreatedNotAccepted" xml:space="preserve">
+    <value>Le compte est créé, mais l'invitation ne vaut plus : elle a pu être révoquée ou modifiée entre-temps.</value>
+  </data>
+  <data name="Error.Invitation.Invalid" xml:space="preserve">
+    <value>Ce lien d'invitation est invalide, a expiré, a été révoqué ou a déjà servi.</value>
+  </data>
+  <data name="Error.Invitation.OtherAddress" xml:space="preserve">
+    <value>Cette invitation s'adresse à une autre adresse : seul le compte de cette adresse l'accepte.</value>
+  </data>
 </root>

@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Invitations, through the port `IInvitationAcceptance`** that the host bridges to its rights system —
+  `Stellaegis.Registry`: the page `/invitation` and `InvitationService`. Signed in under the address invited, the
+  person accepts; with no account at that address, the person creates it there, its own creator whatever
+  `SelfRegistration` says, then accepts. The page names nothing the invitation carries and sends no referrer; a link
+  that came by e-mail proves the address. Without the port, the page is not there. New texts `Invitation.*`, errors
+  `Invitation.Invalid` and `Invitation.OtherAddress`.
+
 ### Changed
 
 - **The operations name the gestures, and `users.write` is gone.** `users.create` creates an account and sends its

@@ -67,6 +67,12 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="HandDeliveryUnapprovable"/>: nobody can approve a reset link handed over in this host.</summary>
     public const string HandDeliveryUnapprovableCode = "Delivery.NoApprover";
 
+    /// <summary>The code of <see cref="InvitationInvalid"/>: the invitation is unknown, spent, revoked or lapsed — or the host takes none.</summary>
+    public const string InvitationInvalidCode = "Invitation.Invalid";
+
+    /// <summary>The code of <see cref="InvitationOtherAddress"/>: the account is not the one of the address invited.</summary>
+    public const string InvitationOtherAddressCode = "Invitation.OtherAddress";
+
     /// <summary>The code of <see cref="OwnAccount"/>: an administration route was called on the caller's own account.</summary>
     public const string OwnAccountCode = "Account.OwnAccount";
 
@@ -194,6 +200,14 @@ public static class IdentityErrors
     /// </summary>
     public static Error VerificationThrottled { get; } =
         Error.Conflict(VerificationThrottledCode, "A code was sent to this e-mail address a moment ago, and still works.");
+
+    /// <summary>The invitation is unknown, spent, revoked or lapsed — or the host takes none.</summary>
+    public static Error InvitationInvalid { get; } =
+        Error.NotFound(InvitationInvalidCode, "This invitation is invalid, lapsed, revoked or already used.");
+
+    /// <summary>An invitation is bound to its address: it is accepted under the account of that address only.</summary>
+    public static Error InvitationOtherAddress { get; } =
+        Error.Forbidden(InvitationOtherAddressCode, "This invitation is for another address: only the account of that address accepts it.");
 
     /// <summary>
     /// A reset link handed over for an active account gives its holder the account: it waits for the approval of a

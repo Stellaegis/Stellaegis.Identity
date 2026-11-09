@@ -116,6 +116,7 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<MfaService>();
         services.TryAddScoped<RecoveryCodeService>();
         services.TryAddScoped<LoginCodeService>();
+        services.TryAddScoped<InvitationService>();
         return services;
     }
 }

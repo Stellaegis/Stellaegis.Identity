@@ -715,4 +715,49 @@
   <data name="Account.Avatar.GravatarMissing" xml:space="preserve">
     <value>No Gravatar for this address.</value>
   </data>
+  <data name="Invitation.Title" xml:space="preserve">
+    <value>Invitation</value>
+  </data>
+  <data name="Invitation.Heading" xml:space="preserve">
+    <value>An invitation</value>
+  </data>
+  <data name="Invitation.InvalidHeading" xml:space="preserve">
+    <value>Invalid invitation</value>
+  </data>
+  <data name="Invitation.InvalidHelp" xml:space="preserve">
+    <value>This invitation link is invalid, lapsed, revoked or already used.</value>
+  </data>
+  <data name="Invitation.AcceptHelp" xml:space="preserve">
+    <value>The invitation is for the account signed in. Accepting it gives the access it carries.</value>
+  </data>
+  <data name="Invitation.Accept" xml:space="preserve">
+    <value>Accept the invitation</value>
+  </data>
+  <data name="Invitation.OtherAccountHelp" xml:space="preserve">
+    <value>This invitation is for another address than the one of the account signed in: only the account of that address accepts it.</value>
+  </data>
+  <data name="Invitation.SignInHelp" xml:space="preserve">
+    <value>An account exists for the invited address: signing in to it comes first, then the acceptance.</value>
+  </data>
+  <data name="Invitation.CreateHelp" xml:space="preserve">
+    <value>No account exists for the invited address yet: choosing a name and a password creates it, under that address.</value>
+  </data>
+  <data name="Invitation.Create" xml:space="preserve">
+    <value>Create the account and accept</value>
+  </data>
+  <data name="Invitation.Accepted" xml:space="preserve">
+    <value>The invitation is accepted.</value>
+  </data>
+  <data name="Invitation.CreatedAndAccepted" xml:space="preserve">
+    <value>The account is created and the invitation accepted. Signing in now opens it.</value>
+  </data>
+  <data name="Invitation.CreatedNotAccepted" xml:space="preserve">
+    <value>The account is created, but the invitation no longer holds: it may have been revoked or changed meanwhile.</value>
+  </data>
+  <data name="Error.Invitation.Invalid" xml:space="preserve">
+    <value>This invitation link is invalid, lapsed, revoked or already used.</value>
+  </data>
+  <data name="Error.Invitation.OtherAddress" xml:space="preserve">
+    <value>This invitation is for another address: only the account of that address accepts it.</value>
+  </data>
 </root>

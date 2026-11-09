@@ -22,9 +22,11 @@ internal static class PagesTestHost
         Action<IdentityOptions>? identity = null,
         bool mailer = true,
         bool hostPagesFirst = false,
-        Action<WebApplication>? beforePages = null)
+        Action<WebApplication>? beforePages = null,
+        Action<IServiceCollection>? services = null)
     {
         var builder = WebTestHost.Builder();
+        services?.Invoke(builder.Services);
         if (identity is not null)
             builder.Services.Configure(identity);
         if (hostPagesFirst)
