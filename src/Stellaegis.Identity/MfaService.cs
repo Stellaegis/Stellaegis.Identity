@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using OtpNet;
@@ -103,38 +102,49 @@ public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, I
 }
 
 /// <summary>
-/// The one-time codes sent by e-mail during a login whose second factor is the e-mail method: kept in memory for
-/// ten minutes, spent on the first match. A singleton of the process; a restart loses them, which only costs a
-/// new code.
+/// The one-time codes sent by e-mail during a login whose second step is the e-mail method — which proves the
+/// mailbox, not a second factor (<see cref="AuthenticationMethods.PasswordAndEmailCode"/>) —: six digits, working for
+/// <see cref="LoginCodeOptions.Lifetime"/>, spent on the first match. Kept by <see cref="ILoginCodeStore"/>, as a hash
+/// under the pepper bound to the account, so that every instance of the host checks a code any of them issued.
 /// </summary>
-public sealed class LoginOtpService(TimeProvider clock)
+public sealed class LoginCodeService(ILoginCodeStore store, IOptions<IdentityOptions> options, TimeProvider clock)
 {
-    private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(10);
-    private readonly ConcurrentDictionary<Guid, (string Code, DateTimeOffset Expires)> _codes = new();
+    /// <summary>How long a code works, as the e-mail says it.</summary>
+    public TimeSpan Lifetime => options.Value.LoginCode.Lifetime;
 
-    /// <summary>Generates a six-digit code for the account, replacing any previous one, and returns it for the e-mail.</summary>
-    public string Generate(Guid userUniqueId)
+    /// <summary>
+    /// Generates a code for the account, replacing any previous one, and returns it for the e-mail. Asked again within
+    /// <see cref="LoginCodeOptions.MinimumInterval"/> of the last one, nothing is issued:
+    /// <see cref="IdentityErrors.LoginCodeThrottled"/>, which a page keeps to itself.
+    /// </summary>
+    public async Task<Result<string>> GenerateAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
     {
+        var settings = options.Value.LoginCode;
+        var now = clock.GetUtcNow();
+        if (settings.MinimumInterval > TimeSpan.Zero
+            && await store.LastIssuedAtAsync(userUniqueId, cancellationToken) is { } last
+            && last + settings.MinimumInterval > now)
+            return Result.Failure<string>(IdentityErrors.LoginCodeThrottled);
+
         var code = RandomNumberGenerator.GetString("0123456789", 6);
-        _codes[userUniqueId] = (code, clock.GetUtcNow().Add(Lifetime));
-        return code;
+        await store.SetAsync(new LoginCode
+        {
+            UserUniqueId = userUniqueId,
+            CodeHash = Hash(userUniqueId, code),
+            CreatedAt = now,
+            ExpiresAt = now + settings.Lifetime,
+        }, cancellationToken);
+        return Result.Success(code);
     }
 
-    /// <summary>Whether <paramref name="submittedCode"/> is the account's current code; a match spends it.</summary>
-    public bool Validate(Guid userUniqueId, string? submittedCode)
-    {
-        if (string.IsNullOrWhiteSpace(submittedCode) || !_codes.TryGetValue(userUniqueId, out var entry))
-            return false;
-        if (entry.Expires < clock.GetUtcNow())
-        {
-            _codes.TryRemove(userUniqueId, out _);
-            return false;
-        }
-        if (!string.Equals(entry.Code, submittedCode.Trim(), StringComparison.Ordinal))
-            return false;
-        _codes.TryRemove(userUniqueId, out _);
-        return true;
-    }
+    /// <summary>Whether <paramref name="submittedCode"/> is the account's current code, not expired; a match spends it.</summary>
+    public async Task<bool> ValidateAsync(Guid userUniqueId, string? submittedCode, CancellationToken cancellationToken = default)
+        => !string.IsNullOrWhiteSpace(submittedCode)
+        && await store.TryConsumeAsync(userUniqueId, Hash(userUniqueId, submittedCode.Trim()), clock.GetUtcNow(), cancellationToken);
+
+    // The account is in the hash: a hash copied onto another account opens nothing.
+    private string Hash(Guid userUniqueId, string code)
+        => KeyedHashes.Of(options.Value.PasswordHasher.Pepper, KeyedHashes.LoginCode, $"{userUniqueId:N}:{code}");
 }
 
 /// <summary>

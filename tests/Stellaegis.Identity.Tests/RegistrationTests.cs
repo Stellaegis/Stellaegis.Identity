@@ -113,7 +113,7 @@ public sealed class ServiceRegistrationTests
         Assert.NotNull(host.Get<EmailVerificationService>());
         Assert.NotNull(host.Get<MfaService>());
         Assert.NotNull(host.Get<RecoveryCodeService>());
-        Assert.NotNull(host.Get<LoginOtpService>());
+        Assert.NotNull(host.Get<LoginCodeService>());
         Assert.NotNull(host.Get<PasswordGenerator>());
         Assert.NotNull(host.Get<IBlockedUsersSource>());
     }

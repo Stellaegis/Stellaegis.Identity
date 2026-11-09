@@ -58,6 +58,9 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="VerificationThrottled"/>: a code went to that e-mail a moment ago, and no new one is issued yet.</summary>
     public const string VerificationThrottledCode = "Verification.Throttled";
 
+    /// <summary>The code of <see cref="LoginCodeThrottled"/>: a login code went to that account a moment ago, and no new one is issued yet.</summary>
+    public const string LoginCodeThrottledCode = "LoginCode.Throttled";
+
     /// <summary>The code of <see cref="MfaMethodNotAllowed"/>: the installation does not allow that second factor.</summary>
     public const string MfaMethodNotAllowedCode = "Mfa.MethodNotAllowed";
 
@@ -179,6 +182,13 @@ public static class IdentityErrors
     /// </summary>
     public static Error VerificationThrottled { get; } =
         Error.Conflict(VerificationThrottledCode, "A code was sent to this e-mail address a moment ago, and still works.");
+
+    /// <summary>
+    /// A login code went to that account less than <see cref="LoginCodeOptions.MinimumInterval"/> ago, and no new one
+    /// is issued: the one sent still works. A page says nothing of it, and goes on as if a code had been sent.
+    /// </summary>
+    public static Error LoginCodeThrottled { get; } =
+        Error.Conflict(LoginCodeThrottledCode, "A login code was sent to this account a moment ago, and still works.");
 
     /// <summary>The reset link is unknown, consumed, or for a disabled account.</summary>
     public static Error InvalidResetToken { get; } =

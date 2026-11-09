@@ -4,11 +4,12 @@ using Stellaegis.Primitives;
 
 namespace Stellaegis.Identity;
 
-/// <summary>What a purge removed: the attempts of the trace, the tokens, the verifications.</summary>
+/// <summary>What a purge removed: the attempts of the trace, the tokens, the verifications, the login codes.</summary>
 /// <param name="LoginEvents">The login attempts older than the retention.</param>
 /// <param name="Tokens">The account tokens expired longer than the retention.</param>
 /// <param name="Verifications">The e-mail verifications expired longer than the retention.</param>
-public sealed record RetentionReport(int LoginEvents, int Tokens, int Verifications);
+/// <param name="LoginCodes">The login codes expired longer than the retention.</param>
+public sealed record RetentionReport(int LoginEvents, int Tokens, int Verifications, int LoginCodes);
 
 /// <summary>
 /// Removes what identifies a person once it no longer serves, by the durations of
@@ -21,6 +22,7 @@ public sealed class IdentityRetentionService(
     ILoginEventStore loginEvents,
     IAccountTokenStore tokens,
     IEmailVerificationStore verifications,
+    ILoginCodeStore loginCodes,
     IOptions<IdentityOptions> options,
     TimeProvider clock,
     ILogger<IdentityRetentionService> logger)
@@ -37,10 +39,11 @@ public sealed class IdentityRetentionService(
         var report = new RetentionReport(
             await loginEvents.DeleteBeforeAsync(now - retention.LoginEvents, cancellationToken),
             await tokens.DeleteExpiredBeforeAsync(now - retention.Expired, cancellationToken),
-            await verifications.DeleteExpiredBeforeAsync(now - retention.Expired, cancellationToken));
+            await verifications.DeleteExpiredBeforeAsync(now - retention.Expired, cancellationToken),
+            await loginCodes.DeleteExpiredBeforeAsync(now - retention.Expired, cancellationToken));
         logger.LogInformation(
-            "Identity purge by {Actor}: {LoginEvents} login attempts, {Tokens} tokens, {Verifications} verifications",
-            actor, report.LoginEvents, report.Tokens, report.Verifications);
+            "Identity purge by {Actor}: {LoginEvents} login attempts, {Tokens} tokens, {Verifications} verifications, {LoginCodes} login codes",
+            actor, report.LoginEvents, report.Tokens, report.Verifications, report.LoginCodes);
         return report;
     }
 }

@@ -51,6 +51,7 @@ internal sealed class TestHost : IDisposable
             // Codes and links asked again at once: the intervals are tested where they are set.
             options.EmailVerification.MinimumInterval = TimeSpan.Zero;
             options.PasswordReset.MinimumInterval = TimeSpan.Zero;
+            options.LoginCode.MinimumInterval = TimeSpan.Zero;
             configure?.Invoke(options);
         });
         services.AddStellaegisLocalBlockedUsersSource();

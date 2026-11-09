@@ -120,7 +120,7 @@ a code the caller recognizes — `Credentials.Invalid`, `Account.LockedOut`, `Ac
 | `ProfileService` | Reads and changes what a person chose of their own profile: the name of the account, the language, the time zone, the avatar |
 | `PasswordResetService` | Issues a reset link sent by e-mail to a proven address, and spends its token once |
 | `EmailVerificationService` | Issues and checks the one-time code that proves an e-mail is read, for one purpose — a registration, a change of e-mail, the current address of an account — and to its requester only: a registration pending on an address is not touched by an account asking for the same, and a code proves nothing to who did not ask for it |
-| `MfaService`, `LoginOtpService` | Enrolls an authenticator app (TOTP) or the e-mail as second factor, checks a code |
+| `MfaService`, `LoginCodeService` | Enrolls an authenticator app (TOTP) or the e-mail as second step, checks a code; the codes by e-mail are kept by `ILoginCodeStore`, as every instance of the host reads them |
 | `RecoveryCodeService` | Issues the recovery codes of a second factor, hashed, and consumes one |
 | `AccountAdministrationService` | What an administrator does: create an account without a password and issue its activation link, issue a reset link, block, unblock, delete, reset the failed logins or the second factor; each write names its actor. An administrator never knows a password |
 | `IdentityRetentionService` | Removes what identifies a person once it no longer serves: the trace of the logins, the expired tokens and verifications |
@@ -232,10 +232,12 @@ Stellaegis:Identity:PasswordBlocklist:Hibp:Enabled false; true asks Have I Been 
 Stellaegis:Identity:LoginPolicy:MaxFailedAttempts  5 wrong passwords or second factors, then a lockout of LockoutDuration, 15 minutes, told to the person by e-mail
 Stellaegis:Identity:LoginPolicy:MinResponseTime    300 ms: a login answers no faster, whatever the outcome
 Stellaegis:Identity:Mfa:RequireForAllUsers         false; true forces the enrollment at the first login
-Stellaegis:Identity:Mfa:AllowedMethods             totp alone; email where the host opens the code by e-mail
+Stellaegis:Identity:Mfa:AllowedMethods             totp alone; email where the host opens the code by e-mail, which proves the mailbox and no second factor (NIST SP 800-63B rev. 4, 3.1.3.1)
 Stellaegis:Identity:Mfa:SecretKeys                 required; ActiveKeySlot and Keys:<slot>, secrets of the deployment
 Stellaegis:Identity:EmailVerification:CodeLength   6 digits, for Lifetime, 15 minutes, MaxAttempts 5
 Stellaegis:Identity:EmailVerification:MinimumInterval  1 minute between two codes to one address; asked sooner, nothing is sent and the pages say the same
+Stellaegis:Identity:LoginCode:Lifetime             10 minutes: the code sent by e-mail at a login whose second step is the e-mail method
+Stellaegis:Identity:LoginCode:MinimumInterval      1 minute between two codes to one account; asked sooner, nothing is sent and the page goes on
 Stellaegis:Identity:PasswordReset:TokenLifetime    1 hour
 Stellaegis:Identity:PasswordReset:MinimumInterval  1 minute between two links to one account; asked sooner, nothing is sent and the page says the same
 Stellaegis:Identity:Activation:TokenLifetime       7 days

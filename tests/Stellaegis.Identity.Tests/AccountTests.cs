@@ -718,15 +718,16 @@ public sealed class RetentionTests
         var login = host.Get<LoginService>();
         await login.AuthenticateAsync("jane@acme.test", "wrong", ipAddress: "10.0.0.1");
         await host.Get<EmailVerificationService>().RequestVerificationAsync("other@acme.test", EmailVerificationPurpose.Registration, null);
+        await host.Get<LoginCodeService>().GenerateAsync(id);
         var purge = host.Get<IdentityRetentionService>();
 
         // Nothing is due yet.
-        Assert.Equal(new RetentionReport(0, 0, 0), await purge.PurgeAsync(IdentityRetentionService.Job));
+        Assert.Equal(new RetentionReport(0, 0, 0, 0), await purge.PurgeAsync(IdentityRetentionService.Job));
 
-        // Past the retention of the expired, the token and the verification go; the trace stays.
+        // Past the retention of the expired, the token, the verification and the login code go; the trace stays.
         host.Clock.Advance(TimeSpan.FromDays(40));
         var fresh = await host.Get<PasswordResetService>().RequestResetAsync("jane@acme.test");
-        Assert.Equal(new RetentionReport(0, 1, 1), await purge.PurgeAsync(IdentityRetentionService.Job));
+        Assert.Equal(new RetentionReport(0, 1, 1, 1), await purge.PurgeAsync(IdentityRetentionService.Job));
         Assert.True(await host.Get<PasswordResetService>().ValidateTokenAsync(fresh!));   // a token still usable stays
 
         // Past 180 days, the attempt goes; the recent one stays.

@@ -5,17 +5,19 @@ namespace Stellaegis.Identity;
 
 /// <summary>
 /// The hashes of the short random secrets an account is given — the recovery codes, the codes sent to verify an
-/// e-mail —: an HMAC-SHA256 under a key
-/// derived from the pepper of the host by HKDF, one key per purpose, in lowercase hexadecimal. A recovery code has
-/// about 50 bits: a plain SHA-256 of it is found by trying them all, once for every account since nothing salts it,
-/// while a PBKDF2 per code left made every try cost the server what a password costs. Keyed, a hash read from
-/// <c>ident</c> is worth nothing without the pepper, and a try costs one HMAC; being deterministic, it is looked up
-/// rather than compared.
+/// e-mail or during a login —: an HMAC-SHA256 under a key derived from the pepper of the host by HKDF, one key per
+/// purpose, in lowercase hexadecimal. A recovery code has about 50 bits, a code by e-mail 20 to 33: a plain SHA-256
+/// of one is found by trying them all, once for every account since nothing salts it, while a PBKDF2 per code left
+/// made every try cost the server what a password costs. Keyed, a hash read from <c>ident</c> is worth nothing
+/// without the pepper, and a try costs one HMAC; being deterministic, it is looked up rather than compared.
 /// </summary>
 internal static class KeyedHashes
 {
     /// <summary>The purpose of the hashes of recovery codes.</summary>
     public const string RecoveryCode = "Stellaegis.Identity.RecoveryCode";
+
+    /// <summary>The purpose of the hashes of the codes sent by e-mail during a login.</summary>
+    public const string LoginCode = "Stellaegis.Identity.LoginCode";
 
     /// <summary>The purpose of the hashes of the codes sent to verify an e-mail.</summary>
     public const string EmailVerificationCode = "Stellaegis.Identity.EmailVerificationCode";

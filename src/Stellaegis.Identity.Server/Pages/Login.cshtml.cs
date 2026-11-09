@@ -13,7 +13,7 @@ namespace Stellaegis.Identity.Server.Pages;
 internal sealed class LoginModel(
     LoginService login,
     MfaService mfa,
-    LoginOtpService loginCodes,
+    LoginCodeService loginCodes,
     CookieSignIn signIn,
     PendingStates pending,
     IdentityTexts texts,
@@ -22,7 +22,6 @@ internal sealed class LoginModel(
     ILogger<LoginModel> logger,
     IIdentityMailer? mailer = null) : PageModel, INamesAnEmail
 {
-    private static readonly TimeSpan LoginCodeLifetime = TimeSpan.FromMinutes(10);
 
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -92,7 +91,9 @@ internal sealed class LoginModel(
                         ModelState.AddModelError(string.Empty, texts["Login.CodeNotSent"]);
                         return Page();
                     }
-                    await mailer.SendLoginCodeAsync(result.Email, loginCodes.Generate(result.UserUniqueId), LoginCodeLifetime, cancellationToken);
+                    // Asked again too soon, no code is sent, and the page goes on: the one sent still works.
+                    if ((await loginCodes.GenerateAsync(result.UserUniqueId, cancellationToken)) is { IsSuccess: true } issued)
+                        await mailer.SendLoginCodeAsync(result.Email, issued.Value, loginCodes.Lifetime, cancellationToken);
                 }
                 pending.Write(HttpContext, PendingStates.Mfa, result.UserUniqueId.ToString("N"), ReturnUrl ?? "", method);
                 return Redirect("/login/mfa");

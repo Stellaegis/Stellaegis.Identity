@@ -204,7 +204,7 @@ public sealed class LoginTests
         Assert.Equal(3, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
 
         await host.Get<MfaService>().EnableEmailAsync(id);
-        var sent = host.Get<LoginOtpService>().Generate(id);
+        var sent = (await host.Get<LoginCodeService>().GenerateAsync(id)).Value;
         Assert.Equal(LoginStep.Failed, (await login.CompleteWithSecondFactorAsync(id, "000000")).Step);
         var byEmail = await login.CompleteWithSecondFactorAsync(id, sent);
         Assert.True(byEmail.Succeeded);
@@ -212,7 +212,7 @@ public sealed class LoginTests
         Assert.Equal(0, (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.FailedLoginCount);
 
         await host.Get<AccountAdministrationService>().BlockAsync(id, Actor.Parse("admin"));
-        var blocked = await login.CompleteWithSecondFactorAsync(id, host.Get<LoginOtpService>().Generate(id));
+        var blocked = await login.CompleteWithSecondFactorAsync(id, (await host.Get<LoginCodeService>().GenerateAsync(id)).Value);
         Assert.Equal(LoginStep.Failed, blocked.Step);
         Assert.Equal(IdentityErrors.AccountBlocked, blocked.Error);
     }
@@ -257,21 +257,43 @@ public sealed class LoginTests
     }
 
     [Fact]
-    public void The_email_one_time_code_is_spent_on_its_first_match_and_dies_after_ten_minutes()
+    public async Task The_login_code_is_spent_on_its_first_match_answers_its_account_only_and_dies_after_its_lifetime()
     {
-        var clock = new TestClock();
-        var otp = new LoginOtpService(clock);
-        var id = Guid.NewGuid();
+        using var host = new TestHost();
+        var jane = await host.CreateUserAsync();
+        var john = await host.CreateUserAsync("john@acme.test", displayName: "John");
+        var codes = host.Get<LoginCodeService>();
+        Assert.Equal(TimeSpan.FromMinutes(10), codes.Lifetime);
 
-        var code = otp.Generate(id);
-        Assert.Equal(6, code.Length);
-        Assert.False(otp.Validate(id, "000000"));
-        Assert.True(otp.Validate(id, $" {code} "));
-        Assert.False(otp.Validate(id, code));
+        var code = (await codes.GenerateAsync(jane)).Value;
+        Assert.Matches("^[0-9]{6}$", code);
+        Assert.False(await codes.ValidateAsync(john, code));
+        Assert.False(await codes.ValidateAsync(jane, code == "000000" ? "111111" : "000000"));
+        Assert.True(await codes.ValidateAsync(jane, $" {code} "));
+        Assert.False(await codes.ValidateAsync(jane, code));   // spent
 
-        code = otp.Generate(id);
-        clock.Advance(TimeSpan.FromMinutes(11));
-        Assert.False(otp.Validate(id, code));
+        // Kept as a hash bound to its account, under the pepper: what the store holds does not give the code.
+        code = (await codes.GenerateAsync(jane)).Value;
+        Assert.Equal(KeyedHashes.Of(TestHost.Pepper, KeyedHashes.LoginCode, $"{jane:N}:{code}"), host.Get<Stellaegis.Identity.InMemory.InMemoryIdentityData>().LoginCodes[jane].CodeHash);
+        host.Clock.Advance(TimeSpan.FromMinutes(10));
+        Assert.False(await codes.ValidateAsync(jane, code));   // dead at its expiry
+    }
+
+    [Fact]
+    public async Task A_login_code_asked_again_within_its_minimum_interval_issues_nothing_and_the_first_still_works()
+    {
+        using var host = new TestHost(o => o.LoginCode.MinimumInterval = TimeSpan.FromMinutes(1));
+        var id = await host.CreateUserAsync();
+        var codes = host.Get<LoginCodeService>();
+
+        var first = (await codes.GenerateAsync(id)).Value;
+        Assert.Equal(IdentityErrors.LoginCodeThrottled, (await codes.GenerateAsync(id)).Error);
+        host.Clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.Equal(IdentityErrors.LoginCodeThrottled, (await codes.GenerateAsync(id)).Error);
+        Assert.True(await codes.ValidateAsync(id, first));
+
+        // Spent, the code no longer holds the interval: the next login sends one.
+        Assert.True((await codes.GenerateAsync(id)).IsSuccess);
     }
 
     [Fact]
@@ -418,7 +440,7 @@ public sealed class MfaTests
         Assert.Equal(MfaMethod.Email, await mfa.GetMethodAsync(id));
         var login = host.Get<LoginService>();
         Assert.Equal(LoginStep.RequiresMfa, (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
-        var byEmail = await login.CompleteWithSecondFactorAsync(id, host.Get<LoginOtpService>().Generate(id));
+        var byEmail = await login.CompleteWithSecondFactorAsync(id, (await host.Get<LoginCodeService>().GenerateAsync(id)).Value);
         Assert.True(byEmail.Succeeded);
         Assert.Equal(["pwd", "otp"], byEmail.Principal!.FindAll("amr").Select(c => c.Value));
 

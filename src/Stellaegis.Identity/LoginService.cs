@@ -17,7 +17,7 @@ public sealed class LoginService(
     IAuthUserStore users,
     FailedLoginCounter failures,
     MfaService mfa,
-    LoginOtpService loginCodes,
+    LoginCodeService loginCodes,
     RecoveryCodeService recoveryCodes,
     PasswordHasher hasher,
     IOptions<IdentityOptions> options,
@@ -189,7 +189,7 @@ public sealed class LoginService(
             return await recoveryCodes.TryConsumeAsync(userUniqueId, code, cancellationToken) ? AuthenticationMethods.PasswordAndRecoveryCode : null;
         // A code by e-mail proves the mailbox, which a reset link proves as well: not a second factor.
         if (await mfa.GetMethodAsync(userUniqueId, cancellationToken) == MfaMethod.Email)
-            return loginCodes.Validate(userUniqueId, code) ? AuthenticationMethods.PasswordAndEmailCode : null;
+            return await loginCodes.ValidateAsync(userUniqueId, code, cancellationToken) ? AuthenticationMethods.PasswordAndEmailCode : null;
         return await mfa.ValidateCodeAsync(userUniqueId, code, cancellationToken) ? AuthenticationMethods.PasswordAndCode : null;
     }
 

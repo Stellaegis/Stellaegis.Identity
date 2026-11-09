@@ -103,7 +103,6 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IPasswordBlocklist, DefaultPasswordBlocklist>();   // a host that registers its own keeps it
         services.TryAddSingleton<PasswordStrengthEvaluator>();
         services.TryAddSingleton<PasswordGenerator>();
-        services.TryAddSingleton<LoginOtpService>();
         services.TryAddScoped<FailedLoginCounter>();
         services.TryAddScoped<LoginService>();
         services.TryAddScoped<RegistrationService>();
@@ -116,6 +115,7 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<EmailVerificationService>();
         services.TryAddScoped<MfaService>();
         services.TryAddScoped<RecoveryCodeService>();
+        services.TryAddScoped<LoginCodeService>();
         return services;
     }
 }

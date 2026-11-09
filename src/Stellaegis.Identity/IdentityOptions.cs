@@ -36,6 +36,9 @@ public sealed class IdentityOptions : IValidatableOptions
     /// <summary>The codes sent to verify an e-mail.</summary>
     public EmailVerificationOptions EmailVerification { get; set; } = new();
 
+    /// <summary>The codes sent by e-mail during a login whose second step is the e-mail method.</summary>
+    public LoginCodeOptions LoginCode { get; set; } = new();
+
     /// <summary>The links sent to reset a password.</summary>
     public PasswordResetOptions PasswordReset { get; set; } = new();
 
@@ -78,6 +81,7 @@ public sealed class IdentityOptions : IValidatableOptions
         ?? Prefix(nameof(LoginPolicy), LoginPolicy.FindError())
         ?? Prefix(nameof(Mfa), Mfa.FindError())
         ?? Prefix(nameof(EmailVerification), EmailVerification.FindError())
+        ?? Prefix(nameof(LoginCode), LoginCode.FindError())
         ?? Prefix(nameof(PasswordReset), PasswordReset.FindError())
         ?? Prefix(nameof(Activation), Activation.FindError())
         ?? Prefix(nameof(EmailChange), EmailChange.FindError())
@@ -257,6 +261,30 @@ public sealed class EmailVerificationOptions : IValidatableOptions
             return $"{nameof(Lifetime)} must be positive.";
         if (MaxAttempts < 1)
             return $"{nameof(MaxAttempts)} must be at least 1.";
+        if (MinimumInterval < TimeSpan.Zero)
+            return $"{nameof(MinimumInterval)} cannot be negative.";
+        return null;
+    }
+}
+
+/// <summary>The codes sent by e-mail during a login whose second step is the e-mail method (<see cref="LoginCodeService"/>).</summary>
+public sealed class LoginCodeOptions : IValidatableOptions
+{
+    /// <summary>How long a code works. Ten minutes unless set.</summary>
+    public TimeSpan Lifetime { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// The least time between two codes to one account. One minute unless set; zero for none. A login inside it issues
+    /// nothing, <c>LoginCode.Throttled</c>, and the page goes on as if a code had been sent: the one sent still works.
+    /// Against a mailbox flooded by whoever holds the password.
+    /// </summary>
+    public TimeSpan MinimumInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <inheritdoc/>
+    public string? FindError()
+    {
+        if (Lifetime <= TimeSpan.Zero)
+            return $"{nameof(Lifetime)} must be positive.";
         if (MinimumInterval < TimeSpan.Zero)
             return $"{nameof(MinimumInterval)} cannot be negative.";
         return null;

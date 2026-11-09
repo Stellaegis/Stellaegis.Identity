@@ -20,6 +20,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The codes sent by e-mail at a login are kept by `ILoginCodeStore`, not in the memory of the process**: a code
+  issued by one instance of the host is checked by another, and a restart loses none. `LoginOtpService` is renamed
+  `LoginCodeService`, scoped, its methods `GenerateAsync` and `ValidateAsync`; a code is an HMAC-SHA256 under the
+  pepper, the account in the input. New options `LoginCode:Lifetime`, ten minutes as before, and
+  `LoginCode:MinimumInterval`, a minute: a login asked again sooner sends no code — `LoginCode.Throttled` —, and the
+  page goes on, the code sent still working. `RetentionReport` counts the login codes purged, `LoginCodes`. The
+  method stays closed unless the installation opens it, `Mfa:AllowedMethods`: NIST SP 800-63B rev. 4 refuses e-mail as
+  an out-of-band authenticator, and the session says `pwd, otp`, without `mfa`.
 - **A verification code is kept as its hash, never in clear**: an HMAC-SHA256 under the pepper, its e-mail and purpose
   in the input, compared in constant time. `EmailVerification.Code` is renamed `CodeHash`, and the column
   `ident.email_verifications.code` `code_hash`, 64 lowercase hexadecimal digits under a check, on both engines. A host
