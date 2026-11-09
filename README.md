@@ -466,6 +466,23 @@ the e-mail — hashed when typed, never in clear in the cookie —, and the time
 account at its creation. A wrong code on `/login/mfa` is a
 failed login: it counts toward the lockout of the account, and the lockout ends the pending login.
 
+## Several instances of a host
+
+A host may run as many instances as it needs, started and stopped by an orchestrator: none of them knows it is
+alone, so nothing that must hold relies on it. What each state does when the instances are several:
+
+| State | Where it lives | With several instances |
+| --- | --- | --- |
+| The accounts, the lockout, the tokens of the links, the e-mail verifications, the login codes by e-mail, the recovery codes, the last authenticator step accepted | the database | held: an instance checks what another issued, and the counts and intervals are the same for all |
+| The session cookie and what waits between two pages | the data protection of the host | held **only if the host shares its key ring** among the instances — a volume, a database, a vault. Without it, a cookie written by one instance is unreadable by another: the person is signed out, a pending login or registration fails |
+| The rate limiting of the pages | the memory of each instance, by design | each instance counts alone, and the limits hold per instance — N instances let through N times as much. It is a first layer, best effort: the lockout of an account and the intervals between two codes or links are in the database, and hold whatever the number of instances |
+| The blocked accounts, on a resource server | the memory of each instance, read from the source | an account blocked on one side is refused everywhere within `Admission:ReconcileInterval`, two minutes unless set, and at once where the events of the host reach |
+| An open session against its account | the cookie, read again against the database | a disabled or deleted account closes its sessions within `Session:ValidationInterval`, five minutes unless set |
+
+A state kept in memory is acceptable only where its loss between instances degrades gracefully, never where it
+fails a person or opens a gap: the login codes by e-mail were kept so until 7.0.1, and moved to the database in 8.0.0
+for that reason.
+
 ## Tests
 
 ```powershell

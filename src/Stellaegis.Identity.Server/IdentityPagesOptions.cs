@@ -157,7 +157,9 @@ public sealed class IdentityPagesOptions : IValidatableOptions
 /// the form names when it names one — the one the person signs in as, registers with, asks a code or a link for.
 /// Over either limit the page answers 429 with the seconds to wait, and nothing is tried. Behind a proxy, the
 /// address of the client is the proxy's unless the host enables <c>ForwardedHeaders</c>: every client then shares
-/// one count, and the e-mail is what still tells the targets apart.
+/// one count, and the e-mail is what still tells the targets apart. The counts live in the memory of each instance
+/// of the host: with several instances, each limits alone. A first layer, best effort — the lockout of an account and
+/// the intervals between two codes or links are in the database, and hold whatever the number of instances.
 /// </summary>
 public sealed class PagesRateLimitingOptions : IValidatableOptions
 {
