@@ -5,12 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [8.0.0] — 2026-11-09
 
-### Upgrading
-
-- **Run the installation again**: the schema `ident` takes its script `0002`, and a host refuses to start until it
-  has. The verifications pending are removed by it — their codes were in clear — and the person asks a new code.
+The short codes are kept as hashes, and the codes of a login by e-mail in the database. A code sent to verify an
+e-mail was stored in clear; a code sent at a login lived in the memory of the process, refused by every other
+instance of the host and lost at a restart; a recovery code cost a PBKDF2 for every code left at each try. Each is
+now an HMAC-SHA256 under the pepper, bound to what it serves, looked up in the database. And a verification code of
+ten digits never started with 3 or more.
 
 ### Added
 
@@ -32,7 +33,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in the input, compared in constant time. `EmailVerification.Code` is renamed `CodeHash`, and the column
   `ident.email_verifications.code` `code_hash`, 64 lowercase hexadecimal digits under a check, on both engines. A host
   that implements `IEmailVerificationStore` stores `CodeHash` as it is given.
-
 - **A recovery code is kept as an HMAC-SHA256 under the pepper, bound to its account**, and looked up: a try costs one
   hash, where it cost a PBKDF2 for every code left, up to eight. A recovery code has about 50 bits: a plain SHA-256
   would be found by trying them all, once for every account, while a keyed hash read from `ident` is worth nothing
@@ -46,6 +46,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   which saturates at 2 147 483 647 since .NET 9: no code of `EmailVerification:CodeLength = 10` started with 3 or
   more, about 31 bits instead of 33. Codes are now drawn digit by digit, as the login codes by e-mail and the recovery
   codes are.
+
+### Updating from 7.0.1
+
+1. **Run the installation again**: the schema `ident` takes its script `0002`, without being dropped — the codes of
+   the verifications become their hashes, and `ident.login_codes` appears —, and a host refuses to start until it
+   has. The verifications pending are removed by it, their codes being in clear: the person asks a new code.
+2. **The recovery codes issued before are no longer recognized**: whoever holds some generates a new set.
+3. **A caller of `LoginOtpService`** calls `LoginCodeService`, `GenerateAsync` and `ValidateAsync`, and treats
+   `LoginCode.Throttled` as a code sent. **A store written outside the package** implements `ILoginCodeStore`, and
+   `EmailVerification.CodeHash` in place of `Code`; the three of the package do. **A reader of `RetentionReport`**
+   finds `LoginCodes` beside the others.
 
 ## [7.0.1] — 2026-11-04
 
