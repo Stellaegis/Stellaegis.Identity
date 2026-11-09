@@ -59,7 +59,8 @@ app.UseAuthorization();
 
 app.MapStellaegisIdentityPages();                                           // /login, /register, /account/…
 app.MapGroup("/api/admin").MapIdentityAdminEndpoints()
-   .RequireAuthorizationPerOperation(operation => operation.ToString());   // "users.read", "users.write", …
+   .RequireAuthorizationPerOperation(operation => operation.ToString())    // "users.read", "users.block", …
+   .AllowAnyResource();   // or a handler on Subject that decides on the account: see "The administration routes"
 
 app.Run();
 ```
@@ -291,15 +292,29 @@ reading, and only when the account holds; an `EventsType` replaces these events,
 
 `MapIdentityAdminEndpoints()` maps the administration of the accounts, relative to the group it is called on,
 under `identity`. The module has no compartment: its routes read no request context, and the actor of a write
-is read from the principal the host authenticated. An account is nobody's resource, so the routes declare they
-load none: the operation each is labelled with is the whole decision, and the host declares who may call it.
+is read from the principal the host authenticated. Each route is labelled with an operation that names its gesture,
+by what it does to the person it reaches, and the host declares who may call it.
 
-| Route | Operation |
-| --- | --- |
-| `GET identity/users?skip=&take=`, `POST identity/users/lookup`, `GET identity/users/{id}` | `users.read` |
-| `POST identity/users`, `POST identity/users/{id}/activation`, `/password-reset`, `/email`, `/block`, `/unblock`, `/reset-failed-logins`, `/reset-mfa` | `users.write` |
-| `DELETE identity/users/{id}` | `users.delete` |
-| `GET identity/security/blocked-users` | `security.read` |
+| Route | Operation | Decided on the account |
+| --- | --- | --- |
+| `GET identity/users?skip=&take=`, `POST identity/users/lookup`, `GET identity/users/{id}` | `users.read` | no |
+| `POST identity/users` | `users.create` | no: the person does not exist yet |
+| `POST identity/users/{id}/activation` | `users.create` | yes |
+| `POST identity/users/{id}/block`, `/unblock` | `users.block` | yes |
+| `POST identity/users/{id}/reset-failed-logins`, `/reset-mfa`, `/password-reset`, `/email` | `users.recover` | yes |
+| `DELETE identity/users/{id}` | `users.delete` | yes |
+| `GET identity/security/blocked-users` | `security.read` | no |
+
+**A gesture on an account is decided on that account.** Who may block a colleague is not thereby free to block an
+administrator, remove their second factor or reset their password: holding the operation would otherwise be holding
+every account, the administrator's included. So a route that acts on an account that exists loads the person, a
+`Subject` of `Stellaegis.Primitives`, and asks the resource-based authorization about it, the route's operation as
+the requirement. The host answers with a handler on `OperationRequirement` and `Subject` — its rights system, which
+knows what each person holds; `Stellaegis.Registry` provides one —, or declares that its administrators reach every
+account, `AllowAnyResource()` on the group: a host whose administrators are a list in its configuration, as the
+example's. With neither, the host does not start; a refusal is answered as an absence, 404 `Account.NotFound`. And
+no route acts on the caller's own account, whatever the host decides: 403 `Account.OwnAccount` — a person changes
+their account from its pages, which ask what proves them.
 
 `POST identity/users` takes `{ "email", "displayName", "delivery" }` and creates the account without a password;
 `/activation` issues a new activation link to an account still waiting, `/password-reset` a reset link to an
@@ -308,7 +323,7 @@ its person verifies it. `delivery` is `email`, the default, or `hand` when the h
 then in the answer, shown this once. A host with neither a mailer nor the hand delivery could activate nobody, and
 `MapIdentityAdminEndpoints()` refuses it.
 
-The module declares these four operations, `IdentityOperations.All`, so that the startup check of Primitives
+The module declares these six operations, `IdentityOperations.All`, so that the startup check of Primitives
 refuses a route labelled with one the module does not declare, and so that a host harvests its catalogue from the
 declarations. `AddStellaegisIdentityAdministration()` registers that startup check: a module without compartments
 registers it from its own registration, since no request context does.

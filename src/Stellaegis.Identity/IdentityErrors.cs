@@ -58,6 +58,9 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="VerificationThrottled"/>: a code went to that e-mail a moment ago, and no new one is issued yet.</summary>
     public const string VerificationThrottledCode = "Verification.Throttled";
 
+    /// <summary>The code of <see cref="OwnAccount"/>: an administration route was called on the caller's own account.</summary>
+    public const string OwnAccountCode = "Account.OwnAccount";
+
     /// <summary>The code of <see cref="LoginCodeThrottled"/>: a login code went to that account a moment ago, and no new one is issued yet.</summary>
     public const string LoginCodeThrottledCode = "LoginCode.Throttled";
 
@@ -182,6 +185,13 @@ public static class IdentityErrors
     /// </summary>
     public static Error VerificationThrottled { get; } =
         Error.Conflict(VerificationThrottledCode, "A code was sent to this e-mail address a moment ago, and still works.");
+
+    /// <summary>
+    /// An administration route acts on accounts of others, never on the caller's own: a person changes their account
+    /// from its pages, which ask what proves them — their password, their second factor.
+    /// </summary>
+    public static Error OwnAccount { get; } =
+        Error.Forbidden(OwnAccountCode, "This account is yours: change it from your account pages, not from the administration.");
 
     /// <summary>
     /// A login code went to that account less than <see cref="LoginCodeOptions.MinimumInterval"/> ago, and no new one

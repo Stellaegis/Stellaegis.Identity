@@ -70,9 +70,13 @@ app.UseAuthorization();
 
 app.MapStellaegisIdentityPages();
 app.MapIdentityAccountEndpoints();   // what a signed-in person calls on their own account
+// The administrators of Sample:Administrators reach every account: the opening is declared. A host with a rights
+// system that knows what each person holds — Stellaegis.Registry — decides on the account instead, and an
+// administrator then never reaches an account above them.
 app.MapGroup("/api/admin")
     .MapIdentityAdminEndpoints()
-    .RequireAuthorizationPerOperation(operation => operation.ToString());
+    .RequireAuthorizationPerOperation(operation => operation.ToString())
+    .AllowAnyResource();
 
 app.Run();
 return 0;

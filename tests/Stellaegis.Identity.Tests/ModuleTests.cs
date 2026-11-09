@@ -15,7 +15,7 @@ public sealed class ModuleTests
         Assert.Equal("identity", IdentityModule.Name);
         Assert.Equal(ModuleCompartments.None, IdentityModule.Declaration.Compartments);
         Assert.False(IdentityModule.Declaration.AcceptsSharedSpace);
-        Assert.Equal(["users.read", "users.write", "users.delete", "security.read"], IdentityModule.Declaration.Operations.Select(o => o.Identity));
+        Assert.Equal(["users.read", "users.create", "users.block", "users.recover", "users.delete", "security.read"], IdentityModule.Declaration.Operations.Select(o => o.Identity));
         Assert.Equal(IdentityModule.Declaration.Operations, IdentityOperations.All);
     }
 }

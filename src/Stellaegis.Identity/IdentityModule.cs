@@ -21,17 +21,30 @@ public sealed class IdentityModule : IStellaegisModule
     /// person's, not the application's to grant.
     /// </summary>
     public static ModuleDeclaration Declaration { get; } = ModuleDeclaration.WithoutCompartments<IdentityModule>()
-        .WithOperations(IdentityOperations.UsersRead, IdentityOperations.UsersWrite, IdentityOperations.UsersDelete, IdentityOperations.SecurityRead);
+        .WithOperations(IdentityOperations.All.ToArray());
 }
 
-/// <summary>The operations of the accounts module, which its administration routes are labelled with.</summary>
+/// <summary>
+/// The operations of the accounts module, which its administration routes are labelled with: each names a gesture,
+/// by what it does to the person it reaches — never a verb of the wire. A gesture on an account that exists is
+/// decided on that account too: its route loads the person as a <see cref="Subject"/> and asks about it.
+/// </summary>
 public static class IdentityOperations
 {
     /// <summary>Listing and reading accounts, <c>users.read</c>.</summary>
     public static readonly Operation UsersRead = new("users", "read", OperationKind.Read);
 
-    /// <summary>Creating an account, blocking or unblocking it, resetting its failed logins, its second factor or its password, <c>users.write</c>.</summary>
-    public static readonly Operation UsersWrite = new("users", "write", OperationKind.Write);
+    /// <summary>Creating an account without a password, and sending its activation link again while it waits, <c>users.create</c>: the person has nothing yet.</summary>
+    public static readonly Operation UsersCreate = new("users", "create", OperationKind.Write);
+
+    /// <summary>Blocking an account and unblocking it, <c>users.block</c>: every access of the person goes, or comes back.</summary>
+    public static readonly Operation UsersBlock = new("users", "block", OperationKind.Write);
+
+    /// <summary>
+    /// Helping a person back into their account, <c>users.recover</c>: lifting the lockout, removing the second
+    /// factor, issuing a reset link, setting the e-mail of a lost mailbox — what touches the means of signing in.
+    /// </summary>
+    public static readonly Operation UsersRecover = new("users", "recover", OperationKind.Write);
 
     /// <summary>Deleting an account, <c>users.delete</c>.</summary>
     public static readonly Operation UsersDelete = new("users", "delete", OperationKind.Delete);
@@ -40,7 +53,7 @@ public static class IdentityOperations
     public static readonly Operation SecurityRead = new("security", "read", OperationKind.Read);
 
     /// <summary>Every operation of the module.</summary>
-    public static IReadOnlyList<Operation> All { get; } = [UsersRead, UsersWrite, UsersDelete, SecurityRead];
+    public static IReadOnlyList<Operation> All { get; } = [UsersRead, UsersCreate, UsersBlock, UsersRecover, UsersDelete, SecurityRead];
 }
 
 /// <summary>Registers the accounts module itself, whatever stores hold the accounts.</summary>

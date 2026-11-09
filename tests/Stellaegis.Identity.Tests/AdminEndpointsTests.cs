@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -31,7 +32,12 @@ public sealed class AdminEndpointsTests
         return app;
     }
 
+    // A host whose administrators reach every account: the opening is declared.
     private static void MapPerOperation(WebApplication app)
+        => app.MapGroup("/api/admin").MapIdentityAdminEndpoints().RequireAuthorizationPerOperation(operation => operation.ToString()).AllowAnyResource();
+
+    // A host whose rights system decides on the person: the gestures on an account are asked about it.
+    private static void MapDecidedOnTheAccount(WebApplication app)
         => app.MapGroup("/api/admin").MapIdentityAdminEndpoints().RequireAuthorizationPerOperation(operation => operation.ToString());
 
     [Fact]
@@ -185,6 +191,74 @@ public sealed class AdminEndpointsTests
     }
 
     [Fact]
+    public async Task Each_gesture_has_its_operation()
+    {
+        await using var app = await StartAsync(MapPerOperation);
+        var jane = await app.CreateAccountAsync("jane@acme.test");
+        var creator = app.ClientAs("creator", "users.create");
+        var blocker = app.ClientAs("blocker", "users.block");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await creator.PostAsync($"/api/admin/identity/users/{jane:N}/block", null, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await blocker.PostAsync($"/api/admin/identity/users/{jane:N}/reset-mfa", null, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await blocker.PostAsJsonAsync("/api/admin/identity/users", new CreateAccountRequest("john@acme.test", "John"), Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await blocker.PostAsync($"/api/admin/identity/users/{jane:N}/block", null, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await creator.PostAsJsonAsync("/api/admin/identity/users", new CreateAccountRequest("john@acme.test", "John"), Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task No_administration_route_acts_on_the_callers_own_account()
+    {
+        await using var app = await StartAsync(MapPerOperation);
+        var jane = await app.CreateAccountAsync("jane@acme.test");
+        var herself = app.ClientAs(jane.ToString("N"), Everything);
+
+        foreach (var gesture in new[] { "block", "reset-mfa", "reset-failed-logins", "password-reset" })
+        {
+            var refused = await herself.PostAsync($"/api/admin/identity/users/{jane:N}/{gesture}", null, Ct);
+            Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+            Assert.Equal(IdentityErrors.OwnAccountCode, await refused.CodeOfAsync(Ct));
+        }
+        Assert.Equal(HttpStatusCode.Forbidden, (await herself.DeleteAsync($"/api/admin/identity/users/{jane:N}", Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await herself.GetAsync($"/api/admin/identity/users/{jane:N}", Ct)).StatusCode);   // reading takes nothing
+        Assert.Equal(HttpStatusCode.NoContent, (await app.ClientAs("admin", Everything).PostAsync($"/api/admin/identity/users/{jane:N}/block", null, Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_gesture_on_an_account_is_decided_on_that_account()
+    {
+        await using var app = await StartAsync(MapDecidedOnTheAccount,
+            configure: builder => builder.Services.AddSingleton<ProtectedAccounts>().AddSingleton<IAuthorizationHandler, ProtectedAccountsRule>());
+        var jane = await app.CreateAccountAsync("jane@acme.test");
+        var fred = await app.CreateAccountAsync("fred@acme.test");
+        app.Services.GetRequiredService<ProtectedAccounts>().Subjects.Add(fred.ToString("N"));
+        var manager = app.ClientAs("manager", Everything);
+
+        foreach (var gesture in new[] { "block", "unblock", "reset-mfa", "reset-failed-logins", "password-reset", "activation" })
+        {
+            var refused = await manager.PostAsync($"/api/admin/identity/users/{fred:N}/{gesture}", null, Ct);
+            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);   // refused as an absence
+            Assert.Equal(IdentityErrors.AccountNotFoundCode, await refused.CodeOfAsync(Ct));
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.PostAsJsonAsync($"/api/admin/identity/users/{fred:N}/email", new ChangeEmailRequest("mine@acme.test"), Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.DeleteAsync($"/api/admin/identity/users/{fred:N}", Ct)).StatusCode);
+        Assert.True((await app.Services.GetRequiredService<IAuthUserStore>().GetByUniqueIdAsync(fred, Ct))!.IsEnabled);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PostAsync($"/api/admin/identity/users/{jane:N}/block", null, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await manager.GetAsync($"/api/admin/identity/users/{fred:N}", Ct)).StatusCode);   // reading is out of the hook
+        Assert.Equal(HttpStatusCode.Created, (await manager.PostAsJsonAsync("/api/admin/identity/users", new CreateAccountRequest("john@acme.test", "John"), Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Without_a_decider_nor_a_declared_opening_the_gestures_on_accounts_fail_the_startup()
+    {
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => StartAsync(MapDecidedOnTheAccount));
+
+        Assert.Contains("users.block", exception.Message);
+        Assert.Contains("AllowAnyResource()", exception.Message);
+        Assert.DoesNotContain("users.read", exception.Message);
+    }
+
+    [Fact]
     public async Task Routes_left_without_authorization_fail_the_startup()
     {
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -203,5 +277,22 @@ public sealed class AdminEndpointsTests
         var exception = Assert.Throws<InvalidOperationException>(() => app.MapGroup("/api/admin").MapIdentityAdminEndpoints());
 
         Assert.Contains("AddStellaegisStartupCheck", exception.Message);
+    }
+}
+
+/// <summary>The accounts a test's rights system protects from every administrator.</summary>
+internal sealed class ProtectedAccounts
+{
+    public HashSet<string> Subjects { get; } = [];
+}
+
+/// <summary>A rights system that decides on the person: it lets every gesture through but on the protected accounts.</summary>
+internal sealed class ProtectedAccountsRule(ProtectedAccounts accounts) : AuthorizationHandler<OperationRequirement, Subject>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, OperationRequirement requirement, Subject resource)
+    {
+        if (!accounts.Subjects.Contains(resource.Value))
+            context.Succeed(requirement);
+        return Task.CompletedTask;
     }
 }

@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The operations name the gestures, and `users.write` is gone.** `users.create` creates an account and sends its
+  activation again; `users.block` blocks and unblocks; `users.recover` lifts the lockout, removes the second factor,
+  issues a reset link, sets the e-mail of a lost mailbox. `users.write` said nothing of what it granted — taking the
+  account of an administrator among it. `users.read`, `users.delete` and `security.read` stay.
+- **A gesture on an account is decided on that account.** The routes that act on an account that exists load the
+  person as a `Subject` of `Stellaegis.Primitives` 5.5.0 and ask the resource-based authorization about it: the host
+  answers with a handler on `OperationRequirement` and `Subject`, or declares `AllowAnyResource()` on the group. With
+  neither, the host does not start; a refusal answers 404 `Account.NotFound`.
+- **No administration route acts on the caller's own account**: 403 `Account.OwnAccount`.
+
 ## [8.0.0] — 2026-11-09
 
 The short codes are kept as hashes, and the codes of a login by e-mail in the database. A code sent to verify an

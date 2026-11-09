@@ -27,7 +27,7 @@ public sealed class ClientTests
         var app = builder.Build();
         app.UseAuthentication();
         app.UseAuthorization();
-        app.MapGroup("/api/admin").MapIdentityAdminEndpoints().RequireAuthorizationPerOperation(operation => operation.ToString());
+        app.MapGroup("/api/admin").MapIdentityAdminEndpoints().RequireAuthorizationPerOperation(operation => operation.ToString()).AllowAnyResource();
         await app.StartAsync(Ct);
         return app;
     }

@@ -17,21 +17,27 @@ namespace Stellaegis.Identity.AspNetCore;
 /// <remarks>
 /// <para>
 /// The module has no compartments: its routes read no request context, and the actor of a write is read from the
-/// principal the host authenticated. An account is nobody's resource — no compartment, no owner —, so the routes
-/// declare they load none: the operation each is labelled with is the whole decision, and the host declares who
-/// may call it, by operation or on the group. The startup check of <c>Stellaegis.Primitives.AspNetCore</c> refuses
-/// a route left without authorization.
+/// principal the host authenticated. Each route is labelled with an operation that names its gesture, and the host
+/// declares who may call it, by operation or on the group. A gesture on an account that exists is decided on that
+/// account too: its route loads the person as a <c>Subject</c> and asks the resource-based authorization about it,
+/// so that who may block a colleague is not thereby free to block an administrator. The host answers with a handler
+/// on <c>OperationRequirement</c> and <c>Subject</c> — its rights system, which knows what each person holds —, or
+/// declares <c>AllowAnyResource()</c>, a visible gesture: without either, every such gesture is refused, as an
+/// absence. And no route acts on the caller's own account, whatever the host decides: 403 with the code
+/// <c>Account.OwnAccount</c> — the person changes their account from its pages. The startup check of
+/// <c>Stellaegis.Primitives.AspNetCore</c> refuses a route left without authorization.
 /// </para>
 /// <list type="bullet">
 ///   <item><c>GET identity/users?skip=&amp;take=</c> — a page of the accounts, <c>users.read</c></item>
 ///   <item><c>POST identity/users/lookup</c> — the accounts with those ids, <c>users.read</c></item>
 ///   <item><c>GET identity/users/{id}</c> — one account, <c>users.read</c>; 404 with the code <c>Account.NotFound</c></item>
-///   <item><c>POST identity/users</c> — create an account without a password, <c>users.write</c>; 201 with its id, and its activation link when handed over</item>
-///   <item><c>POST identity/users/{id}/activation</c> — a new activation link for an account that waits for it, <c>users.write</c></item>
-///   <item><c>POST identity/users/{id}/password-reset</c> — a reset link for an active account, <c>users.write</c>: the administrator never sets a password</item>
-///   <item><c>POST identity/users/{id}/email</c> — change the e-mail of an account whose mailbox is lost, not proven, <c>users.write</c></item>
-///   <item><c>POST identity/users/{id}/block</c>, <c>/unblock</c>, <c>/reset-failed-logins</c>, <c>/reset-mfa</c> — <c>users.write</c></item>
-///   <item><c>DELETE identity/users/{id}</c> — delete an account, <c>users.delete</c></item>
+///   <item><c>POST identity/users</c> — create an account without a password, <c>users.create</c>; 201 with its id, and its activation link when handed over</item>
+///   <item><c>POST identity/users/{id}/activation</c> — a new activation link for an account that waits for it, <c>users.create</c>, on that account</item>
+///   <item><c>POST identity/users/{id}/block</c>, <c>/unblock</c> — <c>users.block</c>, on that account</item>
+///   <item><c>POST identity/users/{id}/reset-failed-logins</c>, <c>/reset-mfa</c> — <c>users.recover</c>, on that account</item>
+///   <item><c>POST identity/users/{id}/password-reset</c> — a reset link for an active account, <c>users.recover</c>, on that account: the administrator never sets a password</item>
+///   <item><c>POST identity/users/{id}/email</c> — change the e-mail of an account whose mailbox is lost, not proven, <c>users.recover</c>, on that account</item>
+///   <item><c>DELETE identity/users/{id}</c> — delete an account, <c>users.delete</c>, on that account</item>
 ///   <item><c>GET identity/security/blocked-users</c> — the subjects blocked at the door, <c>security.read</c></item>
 /// </list>
 /// <para>
@@ -51,6 +57,8 @@ namespace Stellaegis.Identity.AspNetCore;
 /// app.UseAuthentication();
 /// app.UseAuthorization();
 /// app.MapGroup("/api/admin").MapIdentityAdminEndpoints().RequireAuthorizationPerOperation(op => op.ToString());
+/// // the gestures on an account are decided on it: a handler on OperationRequirement and Subject — Registry's —,
+/// // or, for a host whose administrators may reach every account, .AllowAnyResource()
 /// </code>
 /// </example>
 public static class IdentityAdminEndpoints
@@ -78,7 +86,6 @@ public static class IdentityAdminEndpoints
         Guard.NotNull(endpoints);
         var group = endpoints.MapGroup("identity")
             .BelongsTo<IdentityModule>()
-            .LoadsNoResource()
             .AddErrorTranslation();
 
         var hasMailer = endpoints.ServiceProvider.GetService<IServiceProviderIsService>()?.IsService(typeof(IIdentityMailer)) ?? false;
@@ -100,6 +107,7 @@ public static class IdentityAdminEndpoints
                 return Results.Ok(new AccountPage(await SummariesAsync(page, mfa, ct), count));
             })
             .WithMetadata(IdentityOperations.UsersRead)
+            .LoadsNoResource()
             .Produces<AccountPage>(StatusCodes.Status200OK);
 
         users.MapPost("/lookup", async (LookupAccountsRequest request, IAuthUserStore store, IMfaStore mfa, CancellationToken ct) =>
@@ -109,6 +117,7 @@ public static class IdentityAdminEndpoints
                 return Results.Ok(new AccountList(await SummariesAsync(found, mfa, ct)));
             })
             .WithMetadata(IdentityOperations.UsersRead)
+            .LoadsNoResource()
             .Produces<AccountList>(StatusCodes.Status200OK);
 
         users.MapGet("/{id:guid}", async (Guid id, IAuthUserStore store, IMfaStore mfa, CancellationToken ct) =>
@@ -119,6 +128,7 @@ public static class IdentityAdminEndpoints
                     : Results.Ok(await SummaryAsync(user, mfa, ct));
             })
             .WithMetadata(IdentityOperations.UsersRead)
+            .LoadsNoResource()   // reading takes nothing from the person; who reads accounts is the host's grant
             .Produces<AccountSummary>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -135,7 +145,8 @@ public static class IdentityAdminEndpoints
                 var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ActivatePath, created.Value.Email, created.Value.ActivationToken, options.Value.Activation.TokenLifetime, ct);
                 return Results.Created((string?)null, new AccountCreated(created.Value.UserUniqueId, link));
             })
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersCreate)
+            .LoadsNoResource()   // the person does not exist yet
             .Produces<AccountCreated>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -152,7 +163,8 @@ public static class IdentityAdminEndpoints
                 var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ActivatePath, issued.Value.Email, issued.Value.Token, options.Value.Activation.TokenLifetime, ct);
                 return Results.Ok(new IssuedLink(link));
             })
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersCreate)
+            .ActsOnAccount()
             .Produces<IssuedLink>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -169,7 +181,8 @@ public static class IdentityAdminEndpoints
                 var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ResetPasswordPath, issued.Value.Email, issued.Value.Token, options.Value.PasswordReset.TokenLifetime, ct);
                 return Results.Ok(new IssuedLink(link));
             })
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersRecover)
+            .ActsOnAccount()
             .Produces<IssuedLink>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -181,7 +194,8 @@ public static class IdentityAdminEndpoints
                     return Result.Failure(Error.Validation("Email.Invalid", "An e-mail address is expected.")).ToHttpResult();
                 return (await accounts.ChangeEmailAsync(id, request.Email, Callers.ActorOf(http), ct)).ToHttpResult();
             })
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersRecover)
+            .ActsOnAccount()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -189,37 +203,43 @@ public static class IdentityAdminEndpoints
 
         users.MapPost("/{id:guid}/block", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
                 (await accounts.BlockAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersBlock)
+            .ActsOnAccount()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         users.MapPost("/{id:guid}/unblock", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
                 (await accounts.UnblockAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersBlock)
+            .ActsOnAccount()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         users.MapPost("/{id:guid}/reset-failed-logins", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
                 (await accounts.ResetFailedLoginsAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersRecover)
+            .ActsOnAccount()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         users.MapPost("/{id:guid}/reset-mfa", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
                 (await accounts.ResetMfaAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
-            .WithMetadata(IdentityOperations.UsersWrite)
+            .WithMetadata(IdentityOperations.UsersRecover)
+            .ActsOnAccount()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         users.MapDelete("/{id:guid}", async (Guid id, HttpContext http, AccountAdministrationService accounts, CancellationToken ct) =>
                 (await accounts.DeleteAsync(id, Callers.ActorOf(http), ct)).ToHttpResult())
             .WithMetadata(IdentityOperations.UsersDelete)
+            .ActsOnAccount()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/security/blocked-users", async (IBlockedUsersSource blocked, CancellationToken ct) =>
                 Results.Ok(await blocked.GetBlockedSubjectsAsync(ct)))
             .WithMetadata(IdentityOperations.SecurityRead)
+            .LoadsNoResource()
             .Produces<IReadOnlyCollection<string>>(StatusCodes.Status200OK);
 
         return group;
