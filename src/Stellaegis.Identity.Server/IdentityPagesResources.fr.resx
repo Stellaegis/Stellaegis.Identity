@@ -754,6 +754,12 @@
   <data name="Invitation.CreatedNotAccepted" xml:space="preserve">
     <value>Le compte est créé, mais l'invitation ne vaut plus : elle a pu être révoquée ou modifiée entre-temps.</value>
   </data>
+  <data name="Invitation.CreatedAddressUnproven" xml:space="preserve">
+    <value>Le compte est créé. L'invitation tient toujours, mais un lien remis en main propre ne prouve pas l'adresse : après connexion, la vérifier depuis la page Adresse e-mail du compte, puis rouvrir le lien de l'invitation pour l'accepter.</value>
+  </data>
+  <data name="Invitation.ProveAddressFirst" xml:space="preserve">
+    <value>L'adresse de ce compte n'est pas encore prouvée, et un lien remis en main propre ne la prouve pas : la vérifier depuis la page Adresse e-mail du compte, puis rouvrir ce lien.</value>
+  </data>
   <data name="Error.Invitation.Invalid" xml:space="preserve">
     <value>Ce lien d'invitation est invalide, a expiré, a été révoqué ou a déjà servi.</value>
   </data>

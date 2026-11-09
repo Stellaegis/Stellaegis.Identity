@@ -754,6 +754,12 @@
   <data name="Invitation.CreatedNotAccepted" xml:space="preserve">
     <value>The account is created, but the invitation no longer holds: it may have been revoked or changed meanwhile.</value>
   </data>
+  <data name="Invitation.CreatedAddressUnproven" xml:space="preserve">
+    <value>The account is created. The invitation still holds, but a link handed over does not prove the address: once signed in, verify the address from the e-mail page of the account, then open the invitation link again to accept it.</value>
+  </data>
+  <data name="Invitation.ProveAddressFirst" xml:space="preserve">
+    <value>The address of this account is not proven yet, and a link handed over does not prove it: verify the address from the e-mail page of the account, then open this link again.</value>
+  </data>
   <data name="Error.Invitation.Invalid" xml:space="preserve">
     <value>This invitation link is invalid, lapsed, revoked or already used.</value>
   </data>

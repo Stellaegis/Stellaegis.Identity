@@ -399,7 +399,8 @@ says the invitation is that address's only; an account holds the address, the pe
 back; none does, the person chooses a name and a password, the account is created at the address invited — its own
 creator, whatever `SelfRegistration` says —, the invitation is accepted, and the person signs in. A link that came
 by e-mail proves the address, on the account created as on one that accepts; a link handed over proves nothing,
-and an account whose address is unproven does not accept. If the invitation no longer holds between the creation and
+and an account whose address is unproven does not accept yet: the page tells its person to verify the address from
+the account, then open the same link again, which still holds. If the invitation no longer holds between the creation and
 the acceptance, the account stays, granted nothing. `InvitationService` carries the same for a host's own pages.
 
 ## The pages

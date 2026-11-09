@@ -148,6 +148,43 @@ public sealed class InvitationTests
     }
 
     [Fact]
+    public async Task A_person_who_creates_the_account_from_a_link_handed_over_proves_the_address_then_accepts()
+    {
+        var invitations = new TestInvitations();
+        await using var app = await StartPagesAsync(invitations);
+        var browser = new Browser(app);
+        var token = invitations.Invite("jane@acme.test", sentByEmail: false);
+        Dictionary<string, string> Accept(string _) => new() { ["Token"] = token };
+
+        // The account is created; a link handed over proves nothing, so the invitation waits — and the page says so,
+        // not that it no longer holds.
+        var created = await browser.PostFormAsync($"/invitation?token={token}", _ => new Dictionary<string, string>
+        {
+            ["Token"] = token, ["Input.DisplayName"] = "Jane", ["Input.Password"] = "Correct-Horse-9", ["Input.ConfirmPassword"] = "Correct-Horse-9",
+        }, Ct, postPath: "/invitation?handler=Create");
+        Assert.Equal("/login", created.Headers.Location!.ToString());
+        Assert.Empty(invitations.Accepted);
+        await browser.GetAsync("/login", Ct);
+        Assert.Contains("The invitation still holds", browser.Html);
+        Assert.DoesNotContain("no longer holds", browser.Html);
+
+        // Signed in, the link opened again before the address is proven says what to do.
+        await browser.PostFormAsync("/login", new Dictionary<string, string> { ["Input.Email"] = "jane@acme.test", ["Input.Password"] = "Correct-Horse-9" }, Ct);
+        await browser.PostFormAsync($"/invitation?token={token}", Accept, Ct, postPath: "/invitation?handler=Accept");
+        Assert.Contains("is not proven yet", browser.Html);
+        Assert.Empty(invitations.Accepted);
+
+        // The address proven from the account, the same link accepts.
+        await browser.PostFormAsync("/account/email", new Dictionary<string, string>(), Ct, postPath: "/account/email?handler=Verify");
+        var mail = app.Mailer().LastTo("jane@acme.test")!;
+        await browser.PostFormAsync("/account/email", new Dictionary<string, string> { ["Code"] = mail.Code! }, Ct, postPath: "/account/email?handler=Confirm");
+        var done = await browser.PostFormAsync($"/invitation?token={token}", Accept, Ct, postPath: "/invitation?handler=Accept");
+        Assert.Equal("/account", done.Headers.Location!.ToString());
+        var accepted = Assert.Single(invitations.Accepted);
+        Assert.True(accepted.EmailVerified);
+    }
+
+    [Fact]
     public async Task A_person_with_an_account_signs_in_then_accepts_and_another_account_does_not()
     {
         var invitations = new TestInvitations();

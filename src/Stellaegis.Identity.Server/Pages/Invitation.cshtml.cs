@@ -75,7 +75,7 @@ internal sealed class InvitationModel(InvitationService invitations, PasswordRul
         if (accepted.IsFailure)
         {
             Current = await StepAsync(cancellationToken);
-            ModelState.AddModelError(string.Empty, texts.Describe(accepted.Error!));
+            ModelState.AddModelError(string.Empty, IsAddressUnproven(accepted) ? texts["Invitation.ProveAddressFirst"] : texts.Describe(accepted.Error!));
             return Page();
         }
         TempData["Notice"] = "Invitation.Accepted";
@@ -103,11 +103,21 @@ internal sealed class InvitationModel(InvitationService invitations, PasswordRul
             ModelState.AddModelError(string.Empty, texts.Describe(created.Error!));
             return Page();
         }
-        // The account exists; the invitation is accepted for it, or no longer holds — the account then stays, granted nothing.
+        // The account exists; the invitation is accepted for it, or waits for its address to be proven — a link handed
+        // over proves nothing —, or no longer holds: the account then stays, granted nothing.
         var accepted = await invitations.AcceptAsync(Token, created.Value, cancellationToken);
-        TempData["Notice"] = accepted.IsSuccess ? "Invitation.CreatedAndAccepted" : "Invitation.CreatedNotAccepted";
+        TempData["Notice"] = accepted.IsSuccess ? "Invitation.CreatedAndAccepted"
+            : IsAddressUnproven(accepted) ? "Invitation.CreatedAddressUnproven"
+            : "Invitation.CreatedNotAccepted";
         return Redirect(IdentityCookie.LoginPath);
     }
+
+    /// <summary>
+    /// Whether the acceptance waits for the address of the account to be proven: the invitation still holds, and its
+    /// link opened again accepts it once the address is verified from the account.
+    /// </summary>
+    private static bool IsAddressUnproven(Primitives.Result accepted)
+        => accepted.Error?.Code == IdentityErrors.EmailNotVerifiedCode;
 
     private async Task<Step> StepAsync(CancellationToken cancellationToken)
     {
