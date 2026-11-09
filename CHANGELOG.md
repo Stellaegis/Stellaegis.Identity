@@ -5,7 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [9.0.0] — 2026-11-09
+
+Who may administer the accounts no longer reaches every account. The administration routes were decided on their
+operation alone, `users.write`: holding it was holding every account, the administrator's included — blocking it,
+removing its second factor, taking it by a reset link handed over. A gesture on an account is now decided on that
+account, by the host's rights system; no administration route acts on the caller's own account; a reset link of an
+active account is handed over only once a second person approved it; a session closes when what proves its person
+changes; and the operations name their gestures. Invitations come with it, through a port the host bridges.
 
 ### Added
 
@@ -41,6 +48,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the session against the stamp; `RefreshAfterOwnChangeAsync` lets the session that made the change go on, and the
   account pages call it. `IAuthUserStore.RenewSecurityStampAsync` writes the stamp alone, `UpdateAsync` never does;
   `AuthUser.SecurityStamp`; `MfaService` takes `IAuthUserStore`; `LoginService.RenewPrincipalAfterOwnChangeAsync`.
+
+### Updating from 8.0.0
+
+1. **Run the installation again**: the schema `ident` takes its script `0003`, the security stamp, without being
+   dropped, and a host refuses to start until it has. **Every person signs in once more** after the upgrade: the
+   sessions opened before carry no stamp, and close at their next reading.
+2. **The operations changed**: `users.write` is gone, for `users.create`, `users.block` and `users.recover`. A host
+   that grants by operation grants the new ones; the catalogue of a rights system that records the declarations —
+   `Stellaegis.Registry` 7 — retires the old one.
+3. **Decide the gestures on an account**, or the host does not start: register a handler on `OperationRequirement`
+   and `Subject` — `AddStellaegisRegistryAdministration()` of `Stellaegis.Registry` 7 does —, or declare
+   `AllowAnyResource()` on the group of `MapIdentityAdminEndpoints()` when the administrators reach every account.
+4. **A reset link handed over for an active account** needs an `IHandDeliveryApprovals`: without it, such a link is
+   refused and the reset goes by e-mail. The route answers 202 with an approval first.
+5. **Invitations** open when the host registers an `IInvitationAcceptance`, bridged to its rights system.
+6. **A caller of the code**: `MfaService` takes `IAuthUserStore`; `AccountAdministrationService.IssuePasswordResetAsync`
+   takes the approval; a store written outside the package implements `IAuthUserStore.RenewSecurityStampAsync`, and writes
+   `AuthUser.SecurityStamp` at the creation only. A page of the host's that changes the password, the second factor or
+   the e-mail of the person signed in calls `CookieSignIn.RefreshAfterOwnChangeAsync` after it.
 
 ## [8.0.0] — 2026-11-09
 
