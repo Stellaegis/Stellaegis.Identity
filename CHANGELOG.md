@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.1] — 2026-11-09
+
+On `Stellaegis.Primitives` 5.6.0, whose startup refuses a host it used to let through badly assembled; and an
+invitation handed over no longer reads as lapsed.
+
+### Fixed
+
+- **An invitation handed over waits for the address, it does not lapse.** A person who created the account from an
+  invitation whose link was handed over was told the invitation no longer held: the acceptance refuses an address
+  not proven, and the page read every refusal as a lapse. The invitation still holds; the page now tells to verify
+  the address from the account, then open the same link again — which, opened before that, says the same. New texts
+  `Invitation.CreatedAddressUnproven` and `Invitation.ProveAddressFirst`.
+
+### Changed
+
+- **`Stellaegis.Primitives` 5.6.0 and Microsoft.Extensions 10.0.14.** Nothing changes in this package's code; a host
+  meets what the startup of Primitives 5.6.0 now refuses — on PostgreSQL, the application connecting as a
+  superuser, a `BYPASSRLS` role or the owner of the schema; a route of a module that declares no authorization;
+  admissions registered without `UseStellaegisActorAdmission()` — listed with their way out in the CHANGELOG of
+  Primitives, § *Updating from 5.5.0*.
+
+### Updating from 9.0.0
+
+Take the version. A host that starts on Primitives 5.6.0 needs nothing more from this package; one that does not
+meets the list above, each item with its way out.
+
 ## [9.0.0] — 2026-11-09
 
 Who may administer the accounts no longer reaches every account. The administration routes were decided on their
