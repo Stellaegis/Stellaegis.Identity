@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Stellaegis.Identity.AspNetCore;
 
 namespace Stellaegis.Identity.Server.Pages;
 
 /// <summary>The person changes their password, the current one confirmed.</summary>
 [Authorize]
-internal sealed class AccountPasswordModel(AccountService account, PasswordRules passwords, IdentityTexts texts) : PageModel
+internal sealed class AccountPasswordModel(AccountService account, PasswordRules passwords, CookieSignIn signIn, IdentityTexts texts) : PageModel
 {
     [BindProperty]
     public InputModel Input { get; set; } = new();
@@ -47,6 +48,7 @@ internal sealed class AccountPasswordModel(AccountService account, PasswordRules
             ModelState.AddModelError(string.Empty, texts.Describe(result.Error!));
             return Page();
         }
+        await signIn.RefreshAfterOwnChangeAsync(HttpContext, cancellationToken);   // this session goes on, the others close
         TempData["Notice"] = "Account.Password.Changed";
         return Redirect("/account/password");
     }

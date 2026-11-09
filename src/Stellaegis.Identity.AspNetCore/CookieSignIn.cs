@@ -88,7 +88,8 @@ public static class CookieServiceCollectionExtensions
 /// <summary>
 /// Holds a session against its account, the mechanism of the security stamp validator of ASP.NET Core Identity: once
 /// <see cref="SessionPolicyOptions.ValidationInterval"/> elapsed since its last reading, the account is read again.
-/// A session whose account is gone — a database installed again under the same keys —, deleted or blocked is closed;
+/// A session whose account is gone — a database installed again under the same keys —, deleted or blocked, or whose
+/// security stamp changed since — a new password, a change of the second factor or of the e-mail — is closed;
 /// the others carry the account as it is now, with how and when the person proved who they are, and the cookie is
 /// issued again with the time of the reading. A cookie without that time is dated by its issue.
 /// </summary>
@@ -172,6 +173,28 @@ public sealed class CookieSignIn(LoginService login)
         if (!current.Succeeded)
             return Result.Failure(IdentityErrors.AccountBlocked);
         var principal = await login.RenewPrincipalAsync(current.Principal, IdentityCookie.Scheme, cancellationToken);
+        if (principal is null)
+        {
+            await SignOutAsync(httpContext);
+            return Result.Failure(IdentityErrors.AccountBlocked);
+        }
+        await httpContext.SignInAsync(IdentityCookie.Scheme, principal, current.Properties);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Signs the signed-in person in again after they changed, in this request and having proved their password, what
+    /// renews the security stamp — their password, their second factor, their e-mail: this session takes the new stamp
+    /// and goes on, while the account's other sessions close at their next reading. A page calls it right after such a
+    /// change and never otherwise: <see cref="RefreshAsync"/> holds a session against the stamp, and closes it.
+    /// </summary>
+    public async Task<Result> RefreshAfterOwnChangeAsync(HttpContext httpContext, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(httpContext);
+        var current = await httpContext.AuthenticateAsync(IdentityCookie.Scheme);
+        if (!current.Succeeded)
+            return Result.Failure(IdentityErrors.AccountBlocked);
+        var principal = await login.RenewPrincipalAfterOwnChangeAsync(current.Principal, IdentityCookie.Scheme, cancellationToken);
         if (principal is null)
         {
             await SignOutAsync(httpContext);

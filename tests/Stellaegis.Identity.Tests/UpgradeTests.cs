@@ -9,8 +9,8 @@ using SqlServerDatabase = Stellaegis.Identity.SqlServer.IdentityDatabase;
 namespace Stellaegis.Identity.Tests;
 
 /// <summary>
-/// A database installed by Identity 7 — the script 0001 alone — takes the script 0002 by running the installation
-/// again, as an installer upgrading does, and refuses the application until it has. Each engine in a database of its
+/// A database installed by Identity 7 — the script 0001 alone — takes the scripts 0002 and 0003 by running the
+/// installation again, as an installer upgrading does, and refuses the application until it has. Each engine in a database of its
 /// own, created and dropped by the test, so that the schema the store tests share is never touched.
 /// </summary>
 public abstract class UpgradeTests
@@ -26,6 +26,9 @@ public abstract class UpgradeTests
 
     /// <summary>The expression of the current time in the SQL of the engine.</summary>
     protected abstract string Now { get; }
+
+    /// <summary>The literal of a boolean in the SQL of the engine.</summary>
+    protected abstract string Boolean(bool value);
 
     /// <summary>Creates the database of the test on the server, dropping one left by an earlier run.</summary>
     protected abstract Task CreateDatabaseAsync(string server);
@@ -43,7 +46,7 @@ public abstract class UpgradeTests
     protected const string Database = "stellaegis_identity_upgrade_tests";
 
     [Fact]
-    public async Task A_database_of_Identity_7_takes_the_script_0002_by_installing_again()
+    public async Task A_database_of_Identity_7_takes_the_scripts_0002_and_0003_by_installing_again()
     {
         var server = Environment.GetEnvironmentVariable(Variable);
         Assert.SkipWhen(string.IsNullOrWhiteSpace(server), $"{Variable} is not set.");
@@ -56,12 +59,16 @@ public abstract class UpgradeTests
         {
             await DatabaseLifecycle.InstallAsync([Version7], frame, Open, AppRole, Actor.Job("tests"), ct);
             await ExecuteAsync(server!, $"insert into ident.email_verifications (email, purpose, code, created_at, expires_at) values ('jane@acme.test', 'registration', '123456', {Now}, {Now})", ct);
+            foreach (var email in new[] { "jane@acme.test", "john@acme.test" })
+                await ExecuteAsync(server!,
+                    "insert into ident.users (user_unique_id, email, display_name, is_enabled, email_verified, created_at, created_by, modified_at, modified_by) "
+                    + $"values ('{Guid.NewGuid()}', '{email}', 'Someone', {Boolean(true)}, {Boolean(false)}, {Now}, 'install', {Now}, 'install')", ct);
 
             // The application refuses a database the package is ahead of.
             await Assert.ThrowsAsync<InvalidOperationException>(() => DatabaseLifecycle.VerifyAsync([Declaration], frame, Open, ct));
 
             var report = await DatabaseLifecycle.InstallAsync([Declaration], frame, Open, AppRole, Actor.Job("tests"), ct);
-            Assert.Equal(["identity: 0002_ident.sql"], report.Applied);
+            Assert.Equal(["identity: 0002_ident.sql", "identity: 0003_ident.sql"], report.Applied);
             Assert.Equal(["identity: 0001_ident.sql"], report.Skipped);
             await DatabaseLifecycle.VerifyAsync([Declaration], frame, Open, ct);
 
@@ -70,6 +77,9 @@ public abstract class UpgradeTests
             Assert.Equal(1, await CountAsync(server!, "select count(*) from information_schema.columns where table_schema = 'ident' and table_name = 'email_verifications' and column_name = 'code_hash'", ct));
             Assert.Equal(0, await CountAsync(server!, "select count(*) from information_schema.columns where table_schema = 'ident' and table_name = 'email_verifications' and column_name = 'code'", ct));
             Assert.Equal(4, await CountAsync(server!, "select count(*) from information_schema.columns where table_schema = 'ident' and table_name = 'login_codes'", ct));
+
+            // Every account present has a stamp of its own.
+            Assert.Equal(2, await CountAsync(server!, "select count(distinct security_stamp) from ident.users", ct));
         }
         finally
         {
@@ -123,6 +133,9 @@ public sealed class PostgreSqlUpgradeTests : UpgradeTests
     protected override string Now => "now()";
 
     /// <inheritdoc/>
+    protected override string Boolean(bool value) => value ? "true" : "false";
+
+    /// <inheritdoc/>
     protected override async Task CreateDatabaseAsync(string server)
     {
         await RunAsync(new NpgsqlConnection(server), $"drop database if exists \"{Database}\" with (force)");
@@ -163,6 +176,9 @@ public sealed class SqlServerUpgradeTests : UpgradeTests
 
     /// <inheritdoc/>
     protected override string Now => "sysdatetimeoffset()";
+
+    /// <inheritdoc/>
+    protected override string Boolean(bool value) => value ? "1" : "0";
 
     /// <inheritdoc/>
     protected override async Task CreateDatabaseAsync(string server)

@@ -24,6 +24,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   grants, `IssuePasswordResetAsync(…, approval)` spends it. The route answers 202 with `HandDeliveryPending` first, then
   the link when called again with `IssueLinkRequest.Approval`. Without the port, a reset link is never handed over,
   403 `Delivery.NoApprover`; an activation link still is.
+- **A session is held against the security stamp of its account.** `ident.users.security_stamp`, by the script
+  `0003`, changes with whatever must close the other sessions — the password changed, reset or removed, the account
+  blocked, the second factor enrolled, changed, disabled or reset, the e-mail changed —, and a session whose stamp is
+  not the account's is closed at its next reading, `Session:ValidationInterval`. A session signed in before Identity 9
+  carries none and is closed: every person signs in once more after the upgrade. `CookieSignIn.RefreshAsync` holds
+  the session against the stamp; `RefreshAfterOwnChangeAsync` lets the session that made the change go on, and the
+  account pages call it. `IAuthUserStore.RenewSecurityStampAsync` writes the stamp alone, `UpdateAsync` never does;
+  `AuthUser.SecurityStamp`; `MfaService` takes `IAuthUserStore`; `LoginService.RenewPrincipalAfterOwnChangeAsync`.
 
 ## [8.0.0] — 2026-11-09
 

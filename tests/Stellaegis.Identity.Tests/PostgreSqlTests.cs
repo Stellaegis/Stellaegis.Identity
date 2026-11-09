@@ -35,7 +35,7 @@ public sealed class PostgreSqlStoreTests(PostgreSqlFixture database) : IdentityS
     public void The_declaration_runs_on_PostgreSql_with_its_own_scripts()
     {
         Assert.Equal(DatabaseEngine.PostgreSql, IdentityDatabase.Value.Engine);
-        Assert.Equal(["0001_ident.sql", "0002_ident.sql"], IdentityDatabase.Value.Scripts.Select(script => script.FileName));
+        Assert.Equal(["0001_ident.sql", "0002_ident.sql", "0003_ident.sql"], IdentityDatabase.Value.Scripts.Select(script => script.FileName));
     }
 }
 

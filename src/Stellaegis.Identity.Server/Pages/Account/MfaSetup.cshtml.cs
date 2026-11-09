@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Stellaegis.Identity.AspNetCore;
 using Microsoft.Extensions.Options;
 using Stellaegis.Primitives;
 
@@ -11,7 +12,7 @@ namespace Stellaegis.Identity.Server.Pages;
 /// taken session would lock its owner out —; the recovery codes follow, shown once.
 /// </summary>
 [Authorize]
-internal sealed class AccountMfaSetupModel(MfaService mfa, AccountService account, RecoveryCodeService recoveryCodes, IdentityTexts texts, IOptions<IdentityPagesOptions> pages) : PageModel
+internal sealed class AccountMfaSetupModel(MfaService mfa, AccountService account, RecoveryCodeService recoveryCodes, CookieSignIn signIn, IdentityTexts texts, IOptions<IdentityPagesOptions> pages) : PageModel
 {
     internal const string CodesTempDataKey = "RecoveryCodes";
 
@@ -62,6 +63,7 @@ internal sealed class AccountMfaSetupModel(MfaService mfa, AccountService accoun
             return Page();
         }
 
+        await signIn.RefreshAfterOwnChangeAsync(HttpContext, cancellationToken);   // this session goes on, the others close
         var codes = await recoveryCodes.GenerateAsync(userId, cancellationToken);
         TempData[CodesTempDataKey] = string.Join(' ', codes);
         TempData["Notice"] = "Account.Mfa.AppEnabled";

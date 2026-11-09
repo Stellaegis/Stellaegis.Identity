@@ -173,6 +173,7 @@ public sealed class AccountAdministrationService(
         user.ModifiedAt = now;
         user.ModifiedBy = actor;
         await users.UpdateAsync(user, cancellationToken);
+        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
         await tokens.RevokeOutstandingAsync(userUniqueId, AccountTokenPurpose.EmailChangeApproval, now, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed by {Actor}, not proven", userUniqueId, actor);
         return Result.Success();
@@ -192,6 +193,7 @@ public sealed class AccountAdministrationService(
             user.ModifiedAt = now;
             user.ModifiedBy = actor;
             await users.UpdateAsync(user, cancellationToken);
+            await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
             await events.PublishAsync(new UserBlockedEvent { OccurredAt = now, UserUniqueId = userUniqueId, Reason = DisabledReason }, cancellationToken);
             logger.LogInformation("Account {UserUniqueId} blocked by {Actor}", userUniqueId, actor);
         }
@@ -255,6 +257,7 @@ public sealed class AccountAdministrationService(
             return Result.Failure(IdentityErrors.AccountNotFound);
         await mfa.DisableAsync(userUniqueId, cancellationToken);
         await recoveryCodes.DeleteAllAsync(userUniqueId, cancellationToken);
+        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
         logger.LogInformation("Second factor of {UserUniqueId} reset by {Actor}", userUniqueId, actor);
         return Result.Success();
     }

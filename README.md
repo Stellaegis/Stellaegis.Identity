@@ -288,6 +288,17 @@ browser across a database installed again under the same keys, for instance. Zer
 request. An `OnValidatePrincipal` the host sets in `AddStellaegisIdentityCookie(options => …)` runs after that
 reading, and only when the account holds; an `EventsType` replaces these events, the validation with them.
 
+**A session also carries the security stamp of its account**, `SecurityStamps`, and is held against it at that
+reading. The stamp changes with whatever must close the other sessions: the password changed, reset or removed, the
+account blocked, the second factor enrolled, changed, disabled or reset by an administrator, the e-mail changed. A
+session whose stamp is not the account's — or that carries none, signed in before Identity 9 — is closed like one
+whose account is gone. `CookieSignIn.RefreshAsync` holds the session against the stamp too; the session that has just
+made such a change itself, the person having proved their password, goes on by `RefreshAfterOwnChangeAsync`, which
+takes the new stamp — the account pages call it, and a host's own page calls it right after such a change and never
+otherwise. The stores write the stamp at the creation and replace it alone, `IAuthUserStore.RenewSecurityStampAsync`:
+an update of the account never writes it, so that one written from an account read a moment before cannot bring an
+old stamp back.
+
 ## The administration routes
 
 `MapIdentityAdminEndpoints()` maps the administration of the accounts, relative to the group it is called on,

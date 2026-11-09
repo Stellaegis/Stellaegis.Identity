@@ -58,6 +58,14 @@ public sealed class CookieTests
             return Results.NoContent();
         });
         app.MapGet("/me", (HttpContext http) => Results.Text(http.User.FindFirst("sub")!.Value)).RequireAuthorization();
+        // A change of the person's own password, as the account page makes it: this session goes on.
+        app.MapPost("/password", async (Credentials credentials, AccountService accounts, CookieSignIn signIn, HttpContext http, CancellationToken ct) =>
+        {
+            var id = Guid.Parse(http.User.FindFirst("sub")!.Value);
+            var changed = await accounts.ChangePasswordAsync(id, "Correct-Horse-9", credentials.Password, cancellationToken: ct);
+            return changed.IsFailure ? changed.ToHttpResult() : (await signIn.RefreshAfterOwnChangeAsync(http, ct)).ToHttpResult();
+        }).RequireAuthorization();
+        app.MapPost("/refresh", async (CookieSignIn signIn, HttpContext http, CancellationToken ct) => (await signIn.RefreshAsync(http, ct)).ToHttpResult());
         app.MapGet("/amr", (HttpContext http) => Results.Text(string.Join(' ', http.User.FindAll(AuthenticationMethods.ClaimType).Select(c => c.Value)))).RequireAuthorization();
         app.MapGet("/name", (HttpContext http) => Results.Text(http.User.FindFirst("name")!.Value)).RequireAuthorization();
         app.MapGet("/auth-time", (HttpContext http) => Results.Text(http.User.FindFirst(AuthenticationTime.ClaimType)!.Value)).RequireAuthorization();
@@ -151,6 +159,30 @@ public sealed class CookieTests
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.StartsWith("http://localhost/login?return_url=", response.Headers.Location!.ToString());
         Assert.StartsWith($"{IdentityCookie.CookieName}=;", Assert.Single(response.Headers.GetValues("Set-Cookie")));
+    }
+
+    [Fact]
+    public async Task A_new_password_closes_the_other_sessions_and_keeps_the_one_that_changed_it()
+    {
+        await using var app = await StartAsync(validationInterval: TimeSpan.Zero);
+        await app.CreateAccountAsync("jane@acme.test", ct: Ct);
+        var client = app.GetTestClient();
+        var here = await SignInAsync(client);
+        var elsewhere = await SignInAsync(client);
+
+        using var change = new HttpRequestMessage(HttpMethod.Post, "/password") { Content = JsonContent.Create(new Credentials("jane@acme.test", "New-Horse-10")) };
+        change.Headers.Add("Cookie", here);
+        var changed = await client.SendAsync(change, Ct);
+        Assert.Equal(HttpStatusCode.NoContent, changed.StatusCode);
+        var renewed = changed.Headers.GetValues("Set-Cookie").Single().Split(';')[0];
+
+        Assert.Equal(HttpStatusCode.OK, (await GetAsync(client, "/me", renewed)).StatusCode);
+        AssertClosed(await GetAsync(client, "/me", elsewhere));
+
+        // A refresh of the other session does not take the new stamp: it closes.
+        using var refresh = new HttpRequestMessage(HttpMethod.Post, "/refresh");
+        refresh.Headers.Add("Cookie", elsewhere);
+        Assert.NotEqual(HttpStatusCode.NoContent, (await client.SendAsync(refresh, Ct)).StatusCode);
     }
 
     [Fact]

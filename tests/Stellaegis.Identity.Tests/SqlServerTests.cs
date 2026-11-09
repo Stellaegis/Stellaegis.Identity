@@ -56,7 +56,7 @@ public sealed class SqlServerStoreTests(SqlServerFixture database) : IdentitySto
     public void The_declaration_runs_on_SqlServer_with_its_own_scripts()
     {
         Assert.Equal(DatabaseEngine.SqlServer, IdentityDatabase.Value.Engine);
-        Assert.Equal(["0001_ident.sql", "0002_ident.sql"], IdentityDatabase.Value.Scripts.Select(script => script.FileName));
+        Assert.Equal(["0001_ident.sql", "0002_ident.sql", "0003_ident.sql"], IdentityDatabase.Value.Scripts.Select(script => script.FileName));
         Assert.Contains("collate Latin1_General_100_BIN2", IdentityDatabase.Value.Scripts[0].Sql);
     }
 }

@@ -28,6 +28,12 @@ public interface IAuthUserStore
     Task<bool> UpdateAsync(AuthUser user, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Replaces the security stamp of the account, which <see cref="UpdateAsync"/> never writes: its sessions signed
+    /// in before close at their next reading. <see langword="false"/> when the account does not exist or is deleted.
+    /// </summary>
+    Task<bool> RenewSecurityStampAsync(Guid userUniqueId, string securityStamp, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Counts one more failed login against the account — a wrong password, a wrong second factor —, at
     /// <paramref name="now"/>, and locks the account out until <paramref name="now"/> plus
     /// <paramref name="lockoutDuration"/> once the count reaches <paramref name="maxAttempts"/>. The count and the

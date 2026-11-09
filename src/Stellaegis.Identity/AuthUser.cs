@@ -75,6 +75,13 @@ public sealed class AuthUser
     /// <summary>When the person last signed in, or <see langword="null"/> if they never did.</summary>
     public DateTimeOffset? LastLogin { get; set; }
 
+    /// <summary>
+    /// The security stamp (<see cref="SecurityStamps"/>), a fresh one for an account being created. Written by
+    /// <see cref="IAuthUserStore.CreateAsync"/> and <see cref="IAuthUserStore.RenewSecurityStampAsync"/> only, never by
+    /// an update: an update written from an account read a moment before would bring an old stamp back.
+    /// </summary>
+    public string SecurityStamp { get; set; } = SecurityStamps.New();
+
     /// <summary>Whether the account was deleted. A deleted account stays, so that its identity is never reused, and is blocked at the door.</summary>
     public bool IsDeleted { get; set; }
 

@@ -457,6 +457,26 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
     }
 
     [Fact]
+    public async Task The_security_stamp_is_written_at_creation_renewed_alone_and_never_by_an_update()
+    {
+        var user = NewUser();
+        await Users.CreateAsync(user, Ct);
+        var read = (await Users.GetByUniqueIdAsync(user.UserUniqueId, Ct))!;
+        Assert.Equal(user.SecurityStamp, read.SecurityStamp);
+
+        var renewed = SecurityStamps.New();
+        Assert.True(await Users.RenewSecurityStampAsync(user.UserUniqueId, renewed, Ct));
+        read.DisplayName = "Jane Doe";   // read before the renewal: its stamp is the old one
+        Assert.True(await Users.UpdateAsync(read, Ct));
+        var after = (await Users.GetByUniqueIdAsync(user.UserUniqueId, Ct))!;
+        Assert.Equal("Jane Doe", after.DisplayName);
+        Assert.Equal(renewed, after.SecurityStamp);
+
+        Assert.False(await Users.RenewSecurityStampAsync(Guid.NewGuid(), SecurityStamps.New(), Ct));
+        await AssertRefusedAsync(() => Users.RenewSecurityStampAsync(user.UserUniqueId, "NOT-A-STAMP-NOT-A-STAMP-NOT-A-ST", Ct), Refusal.Check);
+    }
+
+    [Fact]
     public async Task Upserts_racing_on_the_same_key_leave_one_row()
     {
         var email = $"{Guid.NewGuid():N}@acme.test";

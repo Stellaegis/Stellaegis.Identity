@@ -43,6 +43,7 @@ public sealed class AccountService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
         await events.PublishAsync(new UserPasswordChangedEvent { OccurredAt = now, UserUniqueId = userUniqueId, Reason = UserPasswordChangedEvent.ChangedReason }, cancellationToken);
         logger.LogInformation("Password of {UserUniqueId} changed", userUniqueId);
         return Result.Success();
@@ -108,6 +109,7 @@ public sealed class AccountService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await SecurityStamps.RenewAsync(users, user.UserUniqueId, cancellationToken);
         await emailVerification.CleanupAsync(normalized, EmailVerificationPurpose.EmailChange, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed", userUniqueId);
         return Result.Success(new EmailChanged(previous, normalized, revert, null));
@@ -152,6 +154,7 @@ public sealed class AccountService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await SecurityStamps.RenewAsync(users, user.UserUniqueId, cancellationToken);
         logger.LogInformation("E-mail of {UserUniqueId} changed, approved by its previous address", user.UserUniqueId);
         return Result.Success(new EmailChangeApproved(previous, user.Email));
     }
@@ -199,6 +202,7 @@ public sealed class AccountService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await SecurityStamps.RenewAsync(users, user.UserUniqueId, cancellationToken);
         await tokens.RevokeOutstandingAsync(user.UserUniqueId, AccountTokenPurpose.EmailRevert, now, cancellationToken);
         if (await mfa.GetAsync(user.UserUniqueId, cancellationToken) is { IsEnabled: true, EnabledAt: { } enabledAt } && enabledAt >= stored.CreatedAt)
         {

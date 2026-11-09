@@ -86,6 +86,7 @@ public sealed class PasswordResetService(
         user.ModifiedAt = now;
         user.ModifiedBy = user.AsActor();
         await users.UpdateAsync(user, cancellationToken);
+        await SecurityStamps.RenewAsync(users, user.UserUniqueId, cancellationToken);
         await events.PublishAsync(new UserPasswordChangedEvent { OccurredAt = now, UserUniqueId = user.UserUniqueId, Reason = UserPasswordChangedEvent.ResetReason }, cancellationToken);
         logger.LogInformation("Password of {UserUniqueId} reset", user.UserUniqueId);
         return Result.Success();

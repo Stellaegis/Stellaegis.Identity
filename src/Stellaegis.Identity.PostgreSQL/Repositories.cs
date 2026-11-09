@@ -10,7 +10,8 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
 {
     private const string Columns =
         "user_unique_id, email, display_name, password_hash, is_enabled, email_verified, locale, time_zone, failed_login_count, " +
-        "failed_login_last, blocked_until, created_at, created_by, modified_at, modified_by, last_login, is_deleted, deleted_at, deleted_by";
+        "failed_login_last, blocked_until, created_at, created_by, modified_at, modified_by, last_login, is_deleted, deleted_at, deleted_by, " +
+        "security_stamp";
 
     static UserRepository()
     {
@@ -76,14 +77,20 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
                 user_unique_id, email, display_name, password_hash, is_enabled, email_verified, locale, time_zone,
                 failed_login_count, failed_login_last, blocked_until,
                 created_at, created_by, modified_at, modified_by, last_login,
-                is_deleted, deleted_at, deleted_by)
+                is_deleted, deleted_at, deleted_by, security_stamp)
             values (
                 @UserUniqueId, @Email, @DisplayName, @PasswordHash, @IsEnabled, @EmailVerified, @Locale, @TimeZone,
                 @FailedLoginCount, @FailedLoginLast, @BlockedUntil,
                 @CreatedAt, @CreatedBy, @ModifiedAt, @ModifiedBy, @LastLogin,
-                @IsDeleted, @DeletedAt, @DeletedBy)
+                @IsDeleted, @DeletedAt, @DeletedBy, @SecurityStamp)
             """,
             UserRow.From(user), transaction(), cancellationToken: cancellationToken));
+
+    // The stamp alone, which the update of the account never writes.
+    public async Task<bool> RenewSecurityStampAsync(Guid userUniqueId, string securityStamp, CancellationToken cancellationToken)
+        => await connection.ExecuteAsync(new CommandDefinition(
+            "update ident.users set security_stamp = @securityStamp where user_unique_id = @userUniqueId and is_deleted = false",
+            new { userUniqueId, securityStamp }, transaction(), cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
 
     public async Task<bool> UpdateAsync(AuthUser user, CancellationToken cancellationToken)
     {
@@ -169,6 +176,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
         public bool IsDeleted { get; set; }
         public DateTimeOffset? DeletedAt { get; set; }
         public Actor? DeletedBy { get; set; }
+        public string SecurityStamp { get; set; } = "";
 
         public static UserRow From(AuthUser user) => new()
         {
@@ -191,6 +199,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             IsDeleted = user.IsDeleted,
             DeletedAt = user.DeletedAt,
             DeletedBy = user.DeletedBy,
+            SecurityStamp = user.SecurityStamp,
         };
 
         public AuthUser ToUser() => new()
@@ -214,6 +223,7 @@ internal sealed class UserRepository(DbConnection connection, Func<DbTransaction
             IsDeleted = IsDeleted,
             DeletedAt = DeletedAt,
             DeletedBy = DeletedBy,
+            SecurityStamp = SecurityStamp,
         };
     }
 }

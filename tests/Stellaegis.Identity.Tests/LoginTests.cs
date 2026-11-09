@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.Extensions.DependencyInjection;
 using OtpNet;
 using Stellaegis.Primitives;
 
@@ -321,7 +322,9 @@ public sealed class LoginTests
         using var host = new TestHost();
         var id = await host.CreateUserAsync();
         var login = host.Get<LoginService>();
-        var older = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id.ToString("N")), new Claim(AuthenticationMethods.ClaimType, AuthenticationMethods.Password)], "test"));
+        var stamp = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.SecurityStamp;
+        var older = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", id.ToString("N")), new Claim(AuthenticationMethods.ClaimType, AuthenticationMethods.Password), new Claim(SecurityStamps.ClaimType, stamp)], "test"));
 
         var renewed = await login.RenewPrincipalAsync(older);
         Assert.NotNull(renewed);
@@ -330,6 +333,91 @@ public sealed class LoginTests
         Assert.Null(await login.RenewPrincipalAsync(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", id.ToString("N"))], "test"))));
         await host.Get<AccountAdministrationService>().DeleteAsync(id, Actor.Parse("admin"));
         Assert.Null(await login.RenewPrincipalAsync(older));
+    }
+}
+
+/// <summary>The security stamp: what closes the other sessions of an account.</summary>
+public sealed class SecurityStampTests
+{
+    private static readonly Actor Admin = Actor.Parse("admin");
+
+    [Fact]
+    public async Task A_session_is_held_against_the_stamp_and_only_its_own_change_lets_it_go_on()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var login = host.Get<LoginService>();
+        var here = (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Principal!;
+        var elsewhere = (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Principal!;
+        Assert.Equal((await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!.SecurityStamp, here.FindFirst(SecurityStamps.ClaimType)!.Value);
+        Assert.NotNull(await login.RenewPrincipalAsync(elsewhere));
+
+        Assert.True((await host.Get<AccountService>().ChangePasswordAsync(id, "Correct-Horse-9", "New-Horse-10")).IsSuccess);
+
+        Assert.Null(await login.RenewPrincipalAsync(elsewhere));   // closed
+        Assert.Null(await login.RenewPrincipalAsync(here));        // a plain renewal never takes the new stamp
+        var goesOn = await login.RenewPrincipalAfterOwnChangeAsync(here);
+        Assert.NotNull(goesOn);
+        Assert.NotNull(await login.RenewPrincipalAsync(goesOn));
+    }
+
+    [Fact]
+    public async Task A_session_signed_in_before_the_stamp_existed_is_closed()
+    {
+        using var host = new TestHost();
+        var id = await host.CreateUserAsync();
+        var session = (await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Principal!;
+        var identity = (ClaimsIdentity)session.Identity!;
+        identity.RemoveClaim(identity.FindFirst(SecurityStamps.ClaimType));
+
+        Assert.Null(await host.Get<LoginService>().RenewPrincipalAsync(session));
+    }
+
+    [Fact]
+    public async Task Whatever_must_close_the_other_sessions_renews_the_stamp_and_nothing_else_does()
+    {
+        var approvals = new TestHandDeliveryApprovals();
+        using var host = new TestHost(o => o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email], services => services.AddSingleton<IHandDeliveryApprovals>(approvals));
+        var id = await host.CreateUserAsync();
+        var users = host.Get<IAuthUserStore>();
+        var stamps = new List<string> { (await users.GetByUniqueIdAsync(id))!.SecurityStamp };
+        async Task AssertRenewedAsync(string what)
+        {
+            var now = (await users.GetByUniqueIdAsync(id))!.SecurityStamp;
+            Assert.True(!stamps.Contains(now), $"{what} did not renew the stamp");
+            stamps.Add(now);
+        }
+        async Task AssertKeptAsync(string what)
+            => Assert.True((await users.GetByUniqueIdAsync(id))!.SecurityStamp == stamps[^1], $"{what} renewed the stamp");
+
+        await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "Correct-Horse-9");
+        await host.Get<ProfileService>().UpdateAsync(id, "Jane Doe", null, null);
+        await AssertKeptAsync("a login and a profile change");
+
+        await host.Get<AccountService>().ChangePasswordAsync(id, "Correct-Horse-9", "New-Horse-10");
+        await AssertRenewedAsync("a password change");
+        await host.Get<MfaService>().EnableEmailAsync(id);
+        await AssertRenewedAsync("the second factor by e-mail");
+        await host.Get<MfaService>().DisableAsync(id);
+        await AssertRenewedAsync("the second factor disabled");
+        var mfa = host.Get<MfaService>();
+        var secret = await mfa.BeginSetupAsync(id);
+        Assert.True((await mfa.ConfirmSetupAsync(id, new OtpNet.Totp(OtpNet.Base32Encoding.ToBytes(secret)).ComputeTotp(host.Clock.Now.UtcDateTime))).IsSuccess);
+        await AssertRenewedAsync("an authenticator enrolled");
+
+        var administration = host.Get<AccountAdministrationService>();
+        await administration.ResetMfaAsync(id, Admin);
+        await AssertRenewedAsync("the second factor reset by an administrator");
+        await administration.ChangeEmailAsync(id, "jane.doe@acme.test", Admin);
+        await AssertRenewedAsync("the e-mail set by an administrator");
+        var approval = (await administration.RequestHandDeliveryAsync(id, Admin)).Value;
+        approvals.Approve(approval, Actor.Parse("second"));
+        var reset = (await administration.IssuePasswordResetAsync(id, TokenDelivery.Hand, Admin, approval)).Value;
+        await AssertKeptAsync("a reset link issued");
+        await host.Get<PasswordResetService>().ResetPasswordAsync(reset.Token, "Third-Horse-11");
+        await AssertRenewedAsync("a password reset");
+        await administration.BlockAsync(id, Admin);
+        await AssertRenewedAsync("a block");
     }
 }
 

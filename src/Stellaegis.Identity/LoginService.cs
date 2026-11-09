@@ -217,19 +217,37 @@ public sealed class LoginService(
     /// <summary>
     /// The principal of a session that goes on, its account read again as it is now — a name or a language changed —,
     /// keeping from <paramref name="session"/> how and when the person proved who they are; <see langword="null"/> when
-    /// the account is gone, disabled or without a password since, or when the session says neither whose it is nor how
-    /// it was proved. A session that does not say when keeps saying nothing: an older session is not given the time
-    /// of its renewal.
+    /// the account is gone, disabled or without a password since, when its security stamp is not the session's — a new
+    /// password, a block, a change of the second factor or of the e-mail since —, or when the session says neither whose
+    /// it is nor how it was proved. A session that carries no stamp, signed in before Identity 9, is closed too. A
+    /// session that does not say when keeps saying nothing: an older session is not given the time of its renewal.
     /// </summary>
-    public async Task<ClaimsPrincipal?> RenewPrincipalAsync(
+    public Task<ClaimsPrincipal?> RenewPrincipalAsync(
         ClaimsPrincipal session, string authenticationType = DefaultAuthenticationType, CancellationToken cancellationToken = default)
+        => RenewAsync(session, authenticationType, adoptStamp: false, cancellationToken);
+
+    /// <summary>
+    /// As <see cref="RenewPrincipalAsync"/>, for the session that has just changed what renews the stamp — its password,
+    /// its second factor, its e-mail —, the person having proved their password for it: the session takes the new stamp
+    /// and goes on, while the account's other sessions close. Never for a session that did not make the change itself:
+    /// it would outlive what was meant to close it.
+    /// </summary>
+    public Task<ClaimsPrincipal?> RenewPrincipalAfterOwnChangeAsync(
+        ClaimsPrincipal session, string authenticationType = DefaultAuthenticationType, CancellationToken cancellationToken = default)
+        => RenewAsync(session, authenticationType, adoptStamp: true, cancellationToken);
+
+    private async Task<ClaimsPrincipal?> RenewAsync(ClaimsPrincipal session, string authenticationType, bool adoptStamp, CancellationToken cancellationToken)
     {
         Guard.NotNull(session);
         var methods = session.FindAll(AuthenticationMethods.ClaimType).Select(claim => claim.Value).ToList();
         if (methods.Count == 0 || !Guid.TryParse(session.FindFirst("sub")?.Value, out var userUniqueId))
             return null;
         var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        return HasSession(user) ? await BuildPrincipalAsync(user, methods, AuthenticationTime.Of(session), authenticationType, cancellationToken) : null;
+        if (!HasSession(user))
+            return null;
+        if (!adoptStamp && !string.Equals(session.FindFirst(SecurityStamps.ClaimType)?.Value, user.SecurityStamp, StringComparison.Ordinal))
+            return null;
+        return await BuildPrincipalAsync(user, methods, AuthenticationTime.Of(session), authenticationType, cancellationToken);
     }
 
     // An account without a password keeps no session: its password was removed because whoever held the session knew it.
@@ -258,6 +276,7 @@ public sealed class LoginService(
         claims.AddRange(methods.Select(method => new Claim(AuthenticationMethods.ClaimType, method)));
         if (authenticatedAt is { } at)
             claims.Add(AuthenticationTime.ToClaim(at));
+        claims.Add(new Claim(SecurityStamps.ClaimType, user.SecurityStamp));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType));
     }
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Stellaegis.Identity.AspNetCore;
 
 namespace Stellaegis.Identity.Server.Pages;
 
@@ -10,7 +11,7 @@ namespace Stellaegis.Identity.Server.Pages;
 /// stronger factor by the weaker one.
 /// </summary>
 [Authorize]
-internal sealed class AccountMfaModel(MfaService mfa, AccountService account, IdentityTexts texts, IIdentityMailer? mailer = null) : PageModel
+internal sealed class AccountMfaModel(MfaService mfa, AccountService account, CookieSignIn signIn, IdentityTexts texts, IIdentityMailer? mailer = null) : PageModel
 {
     [BindProperty]
     public string? Password { get; set; }
@@ -54,6 +55,7 @@ internal sealed class AccountMfaModel(MfaService mfa, AccountService account, Id
             await LoadAsync(userId, cancellationToken);
             return Page();
         }
+        await signIn.RefreshAfterOwnChangeAsync(HttpContext, cancellationToken);   // this session goes on, the others close
         TempData["Notice"] = "Account.Mfa.EmailEnabled";
         return Redirect("/account/mfa");
     }
@@ -65,6 +67,7 @@ internal sealed class AccountMfaModel(MfaService mfa, AccountService account, Id
         if (!await PasswordHoldsAsync(userId, cancellationToken))
             return Page();
         await mfa.DisableAsync(userId, cancellationToken);
+        await signIn.RefreshAfterOwnChangeAsync(HttpContext, cancellationToken);   // this session goes on, the others close
         TempData["Notice"] = "Account.Mfa.Disabled";
         return Redirect("/account/mfa");
     }

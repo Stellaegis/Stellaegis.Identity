@@ -127,6 +127,13 @@ internal sealed class SqlServerIdentityStore
         return await uow.Repo<UserRepository>().UpdateAsync(user, cancellationToken).ConfigureAwait(false);
     }
 
+    async Task<bool> IAuthUserStore.RenewSecurityStampAsync(Guid userUniqueId, string securityStamp, CancellationToken cancellationToken)
+    {
+        Guard.NotWhiteSpace(securityStamp);
+        await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await uow.Repo<UserRepository>().RenewSecurityStampAsync(userUniqueId, securityStamp, cancellationToken).ConfigureAwait(false);
+    }
+
     async Task<FailedLogin?> IAuthUserStore.RecordFailedLoginAsync(Guid userUniqueId, DateTimeOffset now, int maxAttempts, TimeSpan lockoutDuration, CancellationToken cancellationToken)
     {
         await using var uow = await _units.OpenAsync(cancellationToken).ConfigureAwait(false);

@@ -57,7 +57,17 @@ internal sealed class InMemoryAuthUserStore(InMemoryIdentityData data) : IAuthUs
     {
         if (!data.Users.TryGetValue(user.UserUniqueId, out var existing) || existing.IsDeleted)
             return Task.FromResult(false);
+        user.SecurityStamp = existing.SecurityStamp;   // never written by an update
         data.Users[user.UserUniqueId] = user;
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> RenewSecurityStampAsync(Guid userUniqueId, string securityStamp, CancellationToken cancellationToken = default)
+    {
+        Guard.NotWhiteSpace(securityStamp);
+        if (!data.Users.TryGetValue(userUniqueId, out var existing) || existing.IsDeleted)
+            return Task.FromResult(false);
+        existing.SecurityStamp = securityStamp;
         return Task.FromResult(true);
     }
 

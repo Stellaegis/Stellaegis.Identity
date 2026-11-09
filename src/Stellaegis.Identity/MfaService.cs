@@ -12,7 +12,7 @@ namespace Stellaegis.Identity;
 /// confirmed the setup included —, never one of an earlier step, and the secret is kept protected
 /// (<see cref="TotpSecretProtector"/>).
 /// </summary>
-public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, IOptions<IdentityOptions> options, TimeProvider clock)
+public sealed class MfaService(IMfaStore store, IAuthUserStore users, TotpSecretProtector protector, IOptions<IdentityOptions> options, TimeProvider clock)
 {
     /// <summary>Whether <paramref name="method"/> is one a person may enable in this installation.</summary>
     public bool Allows(string method) => options.Value.Mfa.Allows(method);
@@ -41,6 +41,7 @@ public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, I
             return Result.Failure(IdentityErrors.InvalidMfaCode);
         await store.EnableAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
         await store.TryUseStepAsync(userUniqueId, step, cancellationToken);   // the code that confirmed is spent too
+        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
         return Result.Success();
     }
 
@@ -75,6 +76,7 @@ public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, I
         if (!Allows(MfaMethod.Email))
             return Result.Failure(IdentityErrors.MfaMethodNotAllowed);
         await store.EnableEmailAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
+        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
         return Result.Success();
     }
 
@@ -82,9 +84,12 @@ public sealed class MfaService(IMfaStore store, TotpSecretProtector protector, I
     public async Task<string> GetMethodAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
         => (await store.GetAsync(userUniqueId, cancellationToken))?.Method ?? MfaMethod.Totp;
 
-    /// <summary>Disables the second factor and clears its secrets.</summary>
-    public Task DisableAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
-        => store.DisableAsync(userUniqueId, cancellationToken);
+    /// <summary>Disables the second factor and clears its secrets; the other sessions of the account close.</summary>
+    public async Task DisableAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
+    {
+        await store.DisableAsync(userUniqueId, cancellationToken);
+        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
+    }
 
     /// <summary>The <c>otpauth://</c> URI the enrollment QR code encodes, for <paramref name="email"/> under <paramref name="issuer"/>.</summary>
     public static string GetOtpAuthUri(string secretBase32, string email, string issuer = "Stellaegis")
