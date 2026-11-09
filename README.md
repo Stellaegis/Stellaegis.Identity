@@ -246,7 +246,7 @@ Stellaegis:Identity:EmailChange:RequireApprovalByPrevious  true: a change of e-m
 Stellaegis:Identity:EmailChange:ApprovalLifetime   7 days: the link by which the previous address approves the change
 Stellaegis:Identity:EmailChange:RevertLifetime     7 days: the link that restores the e-mail, when the change applied without approval
 Stellaegis:Identity:Links:PublicBaseUrl            the address of the request unless set; needed outside a request
-Stellaegis:Identity:Links:HandDelivery             false; true lets an administrator receive a link to hand over
+Stellaegis:Identity:Links:HandDelivery             false; true lets an administrator receive a link to hand over — a reset link of an active account once a second person approved it
 Stellaegis:Identity:SelfRegistration               Closed, or Open
 Stellaegis:Identity:Retention:LoginEvents          180 days, and never less
 Stellaegis:Identity:Retention:Expired              30 days past their expiry, and never less
@@ -322,6 +322,14 @@ active one; `/email` takes `{ "email" }` and sets the address of an account whos
 its person verifies it. `delivery` is `email`, the default, or `hand` when the host declares `Links:HandDelivery`: the link is
 then in the answer, shown this once. A host with neither a mailer nor the hand delivery could activate nobody, and
 `MapIdentityAdminEndpoints()` refuses it.
+
+**No administrator alone gets a reset link of an active account in hand.** Handed over, the link gives its holder
+the account — it is the way back for a person who lost both their mailbox and their password, and the way in for an
+administrator who would take an account. So it waits for a second person: the first call answers 202 with an
+`approval`, a second person grants it through the host's `IHandDeliveryApprovals` — `Stellaegis.Registry` implements
+it by its validations —, and the same call with `{ "delivery": "hand", "approval": … }` hands the link over, once. A
+host without that port never hands such a link over: 403 `Delivery.NoApprover`, the link goes by e-mail. An
+activation link is handed over as before: the account has nothing to protect until its person chose a password.
 
 The module declares these six operations, `IdentityOperations.All`, so that the startup check of Primitives
 refuses a route labelled with one the module does not declare, and so that a host harvests its catalogue from the

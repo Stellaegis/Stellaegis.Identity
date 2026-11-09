@@ -58,6 +58,15 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="VerificationThrottled"/>: a code went to that e-mail a moment ago, and no new one is issued yet.</summary>
     public const string VerificationThrottledCode = "Verification.Throttled";
 
+    /// <summary>The code of <see cref="HandDeliveryNeedsApproval"/>: a reset link handed over for an active account waits for a second person.</summary>
+    public const string HandDeliveryNeedsApprovalCode = "Delivery.ApprovalRequired";
+
+    /// <summary>The code of <see cref="HandDeliveryNotApproved"/>: the approval given is not one a second person granted for this account and this caller.</summary>
+    public const string HandDeliveryNotApprovedCode = "Delivery.NotApproved";
+
+    /// <summary>The code of <see cref="HandDeliveryUnapprovable"/>: nobody can approve a reset link handed over in this host.</summary>
+    public const string HandDeliveryUnapprovableCode = "Delivery.NoApprover";
+
     /// <summary>The code of <see cref="OwnAccount"/>: an administration route was called on the caller's own account.</summary>
     public const string OwnAccountCode = "Account.OwnAccount";
 
@@ -185,6 +194,21 @@ public static class IdentityErrors
     /// </summary>
     public static Error VerificationThrottled { get; } =
         Error.Conflict(VerificationThrottledCode, "A code was sent to this e-mail address a moment ago, and still works.");
+
+    /// <summary>
+    /// A reset link handed over for an active account gives its holder the account: it waits for the approval of a
+    /// second person (<see cref="IHandDeliveryApprovals"/>), asked first.
+    /// </summary>
+    public static Error HandDeliveryNeedsApproval { get; } =
+        Error.Forbidden(HandDeliveryNeedsApprovalCode, "Handing over a reset link for an active account needs the approval of a second person: ask for it first.");
+
+    /// <summary>The approval is unknown, not granted yet, granted by its requester, for another account or another caller, or spent.</summary>
+    public static Error HandDeliveryNotApproved { get; } =
+        Error.Forbidden(HandDeliveryNotApprovedCode, "This approval does not hand this link over: it is not granted by a second person, or it is spent.");
+
+    /// <summary>The host registers no <see cref="IHandDeliveryApprovals"/>: a reset link for an active account is sent by e-mail, never handed over.</summary>
+    public static Error HandDeliveryUnapprovable { get; } =
+        Error.Forbidden(HandDeliveryUnapprovableCode, "Nobody can approve handing over a reset link in this application: it is sent by e-mail.");
 
     /// <summary>
     /// An administration route acts on accounts of others, never on the caller's own: a person changes their account

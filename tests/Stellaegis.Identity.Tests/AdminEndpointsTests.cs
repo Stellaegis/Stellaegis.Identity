@@ -206,6 +206,44 @@ public sealed class AdminEndpointsTests
     }
 
     [Fact]
+    public async Task A_reset_link_in_hand_waits_for_a_second_person()
+    {
+        var approvals = new TestHandDeliveryApprovals();
+        await using var app = await StartAsync(MapPerOperation, configure: builder =>
+        {
+            builder.Services.Configure<IdentityOptions>(options => options.Links.HandDelivery = true);
+            builder.Services.AddSingleton<IHandDeliveryApprovals>(approvals);
+        });
+        var jane = await app.CreateAccountAsync("jane@acme.test");
+        var admin = app.ClientAs("admin", Everything);
+
+        var asked = await admin.PostAsJsonAsync($"/api/admin/identity/users/{jane:N}/password-reset", new IssueLinkRequest("hand"), Ct);
+        Assert.Equal(HttpStatusCode.Accepted, asked.StatusCode);
+        var approval = (await asked.Content.ReadFromJsonAsync<HandDeliveryPending>(Ct))!.Approval;
+
+        var early = await admin.PostAsJsonAsync($"/api/admin/identity/users/{jane:N}/password-reset", new IssueLinkRequest("hand", approval), Ct);
+        Assert.Equal(HttpStatusCode.Forbidden, early.StatusCode);
+        Assert.Equal(IdentityErrors.HandDeliveryNotApprovedCode, await early.CodeOfAsync(Ct));
+
+        approvals.Approve(approval, Actor.Parse("second"));
+        var given = await admin.PostAsJsonAsync($"/api/admin/identity/users/{jane:N}/password-reset", new IssueLinkRequest("hand", approval), Ct);
+        Assert.Equal(HttpStatusCode.OK, given.StatusCode);
+        Assert.StartsWith("http://localhost/reset-password?token=", (await given.Content.ReadFromJsonAsync<IssuedLink>(Ct))!.Link!.ToString());
+    }
+
+    [Fact]
+    public async Task Without_approvals_a_reset_link_is_never_handed_over()
+    {
+        await using var app = await StartAsync(MapPerOperation, configure: builder =>
+            builder.Services.Configure<IdentityOptions>(options => options.Links.HandDelivery = true));
+        var jane = await app.CreateAccountAsync("jane@acme.test");
+
+        var refused = await app.ClientAs("admin", Everything).PostAsJsonAsync($"/api/admin/identity/users/{jane:N}/password-reset", new IssueLinkRequest("hand"), Ct);
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Equal(IdentityErrors.HandDeliveryUnapprovableCode, await refused.CodeOfAsync(Ct));
+    }
+
+    [Fact]
     public async Task No_administration_route_acts_on_the_callers_own_account()
     {
         await using var app = await StartAsync(MapPerOperation);

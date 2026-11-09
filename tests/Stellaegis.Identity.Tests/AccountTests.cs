@@ -512,7 +512,8 @@ public sealed class AdministrationTests
     [Fact]
     public async Task A_link_handed_over_proves_nothing_and_no_reset_is_mailed_to_an_address_never_proven()
     {
-        using var host = new TestHost();
+        var approvals = new TestHandDeliveryApprovals();
+        using var host = new TestHost(host: services => services.AddSingleton<IHandDeliveryApprovals>(approvals));
         var administration = host.Get<AccountAdministrationService>();
         var created = (await administration.CreateAsync("jane@acme.test", "Jane", TokenDelivery.Hand, Admin)).Value;
         Assert.True((await host.Get<ActivationService>().ActivateAsync(created.ActivationToken, "Correct-Horse-9")).IsSuccess);
@@ -523,8 +524,10 @@ public sealed class AdministrationTests
         Assert.Null(await host.Get<PasswordResetService>().RequestResetAsync("jane@acme.test"));
         Assert.Equal(IdentityErrors.EmailNotVerified, (await administration.IssuePasswordResetAsync(created.UserUniqueId, TokenDelivery.Email, Admin)).Error);
 
-        // Handed over, the reset works, and proves the address no more.
-        var byHand = await administration.IssuePasswordResetAsync(created.UserUniqueId, TokenDelivery.Hand, Admin);
+        // Handed over, approved by a second person, the reset works, and proves the address no more.
+        var approval = (await administration.RequestHandDeliveryAsync(created.UserUniqueId, Admin)).Value;
+        approvals.Approve(approval, Actor.Parse("second"));
+        var byHand = await administration.IssuePasswordResetAsync(created.UserUniqueId, TokenDelivery.Hand, Admin, approval);
         Assert.True((await host.Get<PasswordResetService>().ResetPasswordAsync(byHand.Value.Token, "New-Horse-10")).IsSuccess);
         Assert.False((await users.GetByUniqueIdAsync(created.UserUniqueId))!.EmailVerified);
     }
@@ -602,6 +605,43 @@ public sealed class AdministrationTests
     }
 
     [Fact]
+    public async Task No_administrator_alone_gets_a_reset_link_of_an_active_account_in_hand()
+    {
+        using var unapprovable = new TestHost();
+        var jane = await unapprovable.CreateUserAsync();
+        var administration = unapprovable.Get<AccountAdministrationService>();
+        Assert.Equal(IdentityErrors.HandDeliveryUnapprovable, (await administration.RequestHandDeliveryAsync(jane, Admin)).Error);
+        Assert.Equal(IdentityErrors.HandDeliveryUnapprovable, (await administration.IssuePasswordResetAsync(jane, TokenDelivery.Hand, Admin)).Error);
+        Assert.True((await administration.IssuePasswordResetAsync(jane, TokenDelivery.Email, Admin)).IsSuccess);   // by e-mail, as ever
+
+        var approvals = new TestHandDeliveryApprovals();
+        using var host = new TestHost(host: services => services.AddSingleton<IHandDeliveryApprovals>(approvals));
+        jane = await host.CreateUserAsync();
+        var john = await host.CreateUserAsync("john@acme.test", displayName: "John");
+        administration = host.Get<AccountAdministrationService>();
+
+        Assert.Equal(IdentityErrors.HandDeliveryNeedsApproval, (await administration.IssuePasswordResetAsync(jane, TokenDelivery.Hand, Admin)).Error);
+        var approval = (await administration.RequestHandDeliveryAsync(jane, Admin)).Value;
+        Assert.Equal(IdentityErrors.HandDeliveryNotApproved, (await administration.IssuePasswordResetAsync(jane, TokenDelivery.Hand, Admin, approval)).Error);   // not granted yet
+
+        approvals.Approve(approval, Actor.Parse("second"));
+        Assert.Equal(IdentityErrors.HandDeliveryNotApproved, (await administration.IssuePasswordResetAsync(john, TokenDelivery.Hand, Admin, approval)).Error);   // another account
+        Assert.Equal(IdentityErrors.HandDeliveryNotApproved, (await administration.IssuePasswordResetAsync(jane, TokenDelivery.Hand, Actor.Parse("other"), approval)).Error);   // another caller
+        Assert.True((await administration.IssuePasswordResetAsync(jane, TokenDelivery.Hand, Admin, approval)).IsSuccess);
+        Assert.Equal(IdentityErrors.HandDeliveryNotApproved, (await administration.IssuePasswordResetAsync(jane, TokenDelivery.Hand, Admin, approval)).Error);   // spent
+    }
+
+    [Fact]
+    public async Task An_activation_link_is_handed_over_without_approval()
+    {
+        using var host = new TestHost();   // no approvals: the account has nothing to protect yet
+        var created = await host.Get<AccountAdministrationService>().CreateAsync("jane@acme.test", "Jane", TokenDelivery.Hand, Admin);
+
+        Assert.True(created.IsSuccess);
+        Assert.True((await host.Get<AccountAdministrationService>().IssueActivationAsync(created.Value.UserUniqueId, TokenDelivery.Hand, Admin)).IsSuccess);
+    }
+
+    [Fact]
     public async Task Deleting_keeps_the_account_blocked_at_the_door_under_its_identity()
     {
         using var host = new TestHost();
@@ -622,7 +662,10 @@ public sealed class AdministrationTests
     [Fact]
     public async Task The_failed_logins_the_second_factor_and_the_password_are_reset_by_the_administrator()
     {
-        using var host = new TestHost(o => { o.LoginPolicy.MaxFailedAttempts = 1; o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]; });
+        var approvals = new TestHandDeliveryApprovals();
+        using var host = new TestHost(
+            o => { o.LoginPolicy.MaxFailedAttempts = 1; o.Mfa.AllowedMethods = [MfaMethod.Totp, MfaMethod.Email]; },
+            services => services.AddSingleton<IHandDeliveryApprovals>(approvals));
         var id = await host.CreateUserAsync();
         var administration = host.Get<AccountAdministrationService>();
         await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "nope");
@@ -636,8 +679,10 @@ public sealed class AdministrationTests
         Assert.False(await host.Get<MfaService>().IsEnabledAsync(id));
         Assert.Equal(0, await host.Get<RecoveryCodeService>().CountRemainingAsync(id));
 
-        // The administrator issues a reset link; the person chooses the new password.
-        var reset = await administration.IssuePasswordResetAsync(id, TokenDelivery.Hand, Admin);
+        // The administrator issues a reset link, approved by a second person; the person chooses the new password.
+        var approval = (await administration.RequestHandDeliveryAsync(id, Admin)).Value;
+        approvals.Approve(approval, Actor.Parse("second"));
+        var reset = await administration.IssuePasswordResetAsync(id, TokenDelivery.Hand, Admin, approval);
         Assert.True(reset.IsSuccess);
         Assert.True((await host.Get<PasswordResetService>().ResetPasswordAsync(reset.Value.Token, "New-Horse-10")).IsSuccess);
         Assert.True((await host.Get<LoginService>().AuthenticateAsync("jane@acme.test", "New-Horse-10")).Succeeded);

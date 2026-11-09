@@ -13,7 +13,9 @@ namespace Stellaegis.Identity;
 /// <remarks>
 /// An administrator never chooses nor learns a password: an account is created without one, and its person chooses
 /// it by an activation link; a forgotten password is reset by a link too. The link is sent by e-mail, or handed over
-/// when the host declares it — the token is returned, and its delivery recorded, for the caller to do either.
+/// when the host declares it — the token is returned, and its delivery recorded, for the caller to do either. A reset
+/// link handed over for an active account gives its holder the account, so one administrator alone never gets it: a
+/// second person approves it first (<see cref="IHandDeliveryApprovals"/>), and without that port it is refused.
 /// </remarks>
 public sealed class AccountAdministrationService(
     IAuthUserStore users,
@@ -23,7 +25,8 @@ public sealed class AccountAdministrationService(
     IEventPublisher events,
     IOptions<IdentityOptions> options,
     TimeProvider clock,
-    ILogger<AccountAdministrationService> logger)
+    ILogger<AccountAdministrationService> logger,
+    IHandDeliveryApprovals? approvals = null)
 {
     /// <summary>The <see cref="UserBlockedEvent.Reason"/> of an account disabled by an administrator.</summary>
     public const string DisabledReason = "disabled";
@@ -87,22 +90,64 @@ public sealed class AccountAdministrationService(
     /// Issues a password reset token for an active account, by <paramref name="actor"/>, revoking the previous one:
     /// the person chooses the new password by its link. The administrator never sets it.
     /// </summary>
-    public async Task<Result<IssuedToken>> IssuePasswordResetAsync(Guid userUniqueId, TokenDelivery delivery, Actor actor, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// Handed over, the link needs <paramref name="approval"/>: an approval a second person granted for this account
+    /// and this actor, asked by <see cref="RequestHandDeliveryAsync"/>, which this call spends.
+    /// </remarks>
+    public async Task<Result<IssuedToken>> IssuePasswordResetAsync(
+        Guid userUniqueId, TokenDelivery delivery, Actor actor, Guid? approval = null, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(actor);
-        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
-        if (user is null || user.IsDeleted)
-            return Result.Failure<IssuedToken>(IdentityErrors.AccountNotFound);
-        if (!user.IsEnabled)
-            return Result.Failure<IssuedToken>(IdentityErrors.AccountBlocked);
-        if (!user.IsActivated)
-            return Result.Failure<IssuedToken>(IdentityErrors.AccountNotActivated);
+        var found = await ResettableAsync(userUniqueId, cancellationToken);
+        if (found.IsFailure)
+            return Result.Failure<IssuedToken>(found.Error!);
+        var user = found.Value;
         // A reset link by e-mail to an address never proven could reach whoever holds a mistyped one.
         if (delivery == TokenDelivery.Email && !user.EmailVerified)
             return Result.Failure<IssuedToken>(IdentityErrors.EmailNotVerified);
+        if (delivery == TokenDelivery.Hand)
+        {
+            if (approvals is null)
+                return Result.Failure<IssuedToken>(IdentityErrors.HandDeliveryUnapprovable);
+            if (approval is not { } granted)
+                return Result.Failure<IssuedToken>(IdentityErrors.HandDeliveryNeedsApproval);
+            if (!await approvals.TryConsumeAsync(granted, Subject.Parse(user.Subject), actor, cancellationToken))
+                return Result.Failure<IssuedToken>(IdentityErrors.HandDeliveryNotApproved);
+        }
         var token = await tokens.IssueAsync(user, AccountTokenPurpose.PasswordReset, delivery, actor, clock.GetUtcNow(), options.Value.PasswordReset.TokenLifetime, null, cancellationToken);
         logger.LogInformation("Password reset of {UserUniqueId} issued by {Actor}", userUniqueId, actor);
         return Result.Success(new IssuedToken(user.Email, token));
+    }
+
+    /// <summary>
+    /// Asks a second person to approve handing over a reset link of an active account to <paramref name="actor"/>, and
+    /// returns the approval to give <see cref="IssuePasswordResetAsync"/> once granted:
+    /// <see cref="IdentityErrors.HandDeliveryUnapprovable"/> when the host has no <see cref="IHandDeliveryApprovals"/>.
+    /// </summary>
+    public async Task<Result<Guid>> RequestHandDeliveryAsync(Guid userUniqueId, Actor actor, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(actor);
+        var found = await ResettableAsync(userUniqueId, cancellationToken);
+        if (found.IsFailure)
+            return Result.Failure<Guid>(found.Error!);
+        if (approvals is null)
+            return Result.Failure<Guid>(IdentityErrors.HandDeliveryUnapprovable);
+        var approval = await approvals.RequestAsync(Subject.Parse(found.Value.Subject), actor, cancellationToken);
+        logger.LogInformation("Hand delivery of a reset link of {UserUniqueId} asked by {Actor}, approval {Approval}", userUniqueId, actor, approval);
+        return Result.Success(approval);
+    }
+
+    // An account a reset link may be issued for, whatever its delivery.
+    private async Task<Result<AuthUser>> ResettableAsync(Guid userUniqueId, CancellationToken cancellationToken)
+    {
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken);
+        if (user is null || user.IsDeleted)
+            return Result.Failure<AuthUser>(IdentityErrors.AccountNotFound);
+        if (!user.IsEnabled)
+            return Result.Failure<AuthUser>(IdentityErrors.AccountBlocked);
+        if (!user.IsActivated)
+            return Result.Failure<AuthUser>(IdentityErrors.AccountNotActivated);
+        return Result.Success(user);
     }
 
     /// <summary>

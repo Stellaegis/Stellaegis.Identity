@@ -18,6 +18,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   answers with a handler on `OperationRequirement` and `Subject`, or declares `AllowAnyResource()` on the group. With
   neither, the host does not start; a refusal answers 404 `Account.NotFound`.
 - **No administration route acts on the caller's own account**: 403 `Account.OwnAccount`.
+- **A reset link of an active account is handed over only once a second person approved it.** Handed over, the link
+  gives its holder the account: one administrator alone could take any. The new port `IHandDeliveryApprovals`, which
+  the host's rights system implements: `AccountAdministrationService.RequestHandDeliveryAsync` asks, a second person
+  grants, `IssuePasswordResetAsync(…, approval)` spends it. The route answers 202 with `HandDeliveryPending` first, then
+  the link when called again with `IssueLinkRequest.Approval`. Without the port, a reset link is never handed over,
+  403 `Delivery.NoApprover`; an activation link still is.
 
 ## [8.0.0] — 2026-11-09
 

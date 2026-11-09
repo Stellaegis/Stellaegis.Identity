@@ -35,7 +35,7 @@ namespace Stellaegis.Identity.AspNetCore;
 ///   <item><c>POST identity/users/{id}/activation</c> — a new activation link for an account that waits for it, <c>users.create</c>, on that account</item>
 ///   <item><c>POST identity/users/{id}/block</c>, <c>/unblock</c> — <c>users.block</c>, on that account</item>
 ///   <item><c>POST identity/users/{id}/reset-failed-logins</c>, <c>/reset-mfa</c> — <c>users.recover</c>, on that account</item>
-///   <item><c>POST identity/users/{id}/password-reset</c> — a reset link for an active account, <c>users.recover</c>, on that account: the administrator never sets a password</item>
+///   <item><c>POST identity/users/{id}/password-reset</c> — a reset link for an active account, <c>users.recover</c>, on that account: the administrator never sets a password; handed over, it waits for a second person — 202 with the approval to have granted, then the same call with it</item>
 ///   <item><c>POST identity/users/{id}/email</c> — change the e-mail of an account whose mailbox is lost, not proven, <c>users.recover</c>, on that account</item>
 ///   <item><c>DELETE identity/users/{id}</c> — delete an account, <c>users.delete</c>, on that account</item>
 ///   <item><c>GET identity/security/blocked-users</c> — the subjects blocked at the door, <c>security.read</c></item>
@@ -175,7 +175,14 @@ public static class IdentityAdminEndpoints
                 var delivery = Delivery.Of(request?.Delivery, http, options.Value);
                 if (delivery.IsFailure)
                     return delivery.ToHttpResult();
-                var issued = await accounts.IssuePasswordResetAsync(id, delivery.Value, Callers.ActorOf(http), ct);
+                var actor = Callers.ActorOf(http);
+                // Handed over for an active account, the link waits for a second person: asked first, then given.
+                if (delivery.Value == TokenDelivery.Hand && request?.Approval is null)
+                {
+                    var pending = await accounts.RequestHandDeliveryAsync(id, actor, ct);
+                    return pending.IsFailure ? pending.ToHttpResult() : Results.Accepted((string?)null, new HandDeliveryPending(pending.Value));
+                }
+                var issued = await accounts.IssuePasswordResetAsync(id, delivery.Value, actor, request?.Approval, ct);
                 if (issued.IsFailure)
                     return issued.ToHttpResult();
                 var link = await Delivery.DeliverAsync(http, options.Value, delivery.Value, IdentityLinks.ResetPasswordPath, issued.Value.Email, issued.Value.Token, options.Value.PasswordReset.TokenLifetime, ct);
@@ -184,6 +191,7 @@ public static class IdentityAdminEndpoints
             .WithMetadata(IdentityOperations.UsersRecover)
             .ActsOnAccount()
             .Produces<IssuedLink>(StatusCodes.Status200OK)
+            .Produces<HandDeliveryPending>(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
@@ -317,7 +325,15 @@ public sealed record AccountCreated(Guid UserUniqueId, Uri? ActivationLink = nul
 
 /// <summary>How a link issued by an administrator reaches the person.</summary>
 /// <param name="Delivery"><c>email</c>, the default, or <c>hand</c>, when the host declares it.</param>
-public sealed record IssueLinkRequest(string? Delivery = null);
+/// <param name="Approval">For a reset link handed over: the approval a second person granted, as the first call answered it.</param>
+public sealed record IssueLinkRequest(string? Delivery = null, Guid? Approval = null);
+
+/// <summary>
+/// A reset link handed over waits for a second person: the approval to have granted — through the host's
+/// <c>IHandDeliveryApprovals</c> — and to send back in <see cref="IssueLinkRequest.Approval"/>.
+/// </summary>
+/// <param name="Approval">The approval asked.</param>
+public sealed record HandDeliveryPending(Guid Approval);
 
 /// <summary>The new e-mail of an account, set by an administrator: not proven until the person verifies it.</summary>
 /// <param name="Email">The address.</param>
