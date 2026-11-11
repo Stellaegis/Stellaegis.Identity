@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.2] — 2026-11-11
+
+The stores talk to their engine through its provider, and the adapters no longer reference Dapper. What the packages
+do is unchanged.
+
+### Changed
+
+- **`Stellaegis.Identity.PostgreSQL` and `Stellaegis.Identity.SqlServer` no longer reference Dapper.** Their
+  repositories run `NpgsqlCommand` and `SqlCommand`, each parameter under its declared type, each row read by the
+  names of its columns. Dapper still comes with `Stellaegis.Primitives.Data` 5.x, which both adapters reference.
+- **On SQL Server, a list of accounts is one parameter, read by `string_split`**, where Dapper wrote one parameter
+  per account: the statement keeps one plan whatever the length of the list. `string_split` asks for a database at
+  compatibility level 130 or above.
+
+### Updating from 9.0.1
+
+Take the version: a host has nothing to change.
+
 ## [9.0.1] — 2026-11-09
 
 On `Stellaegis.Primitives` 5.6.0, whose startup refuses a host it used to let through badly assembled; and an
