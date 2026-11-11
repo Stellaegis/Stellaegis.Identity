@@ -18,8 +18,8 @@ The library targets .NET 10 and is released under the MIT license.
 | Package | Contents | Depends on |
 | --- | --- | --- |
 | `Stellaegis.Identity` | The services — login, registration, account, password reset, e-mail verification, second factor, recovery codes, administration —, the ports of the stores, the in-memory stores, the module and its operations, the events, the passwords, the mailer port | `Stellaegis.Primitives`, `Stellaegis.Primitives.Hosting`, Otp.NET |
-| `Stellaegis.Identity.PostgreSQL` | The stores on PostgreSQL, and the `ident` schema declared as a module database for the installation and the verification | `Stellaegis.Primitives.Data`, Npgsql, Dapper |
-| `Stellaegis.Identity.SqlServer` | The same stores and the same schema on SQL Server | `Stellaegis.Primitives.Data`, Microsoft.Data.SqlClient, Dapper |
+| `Stellaegis.Identity.PostgreSQL` | The stores on PostgreSQL, and the `ident` schema declared as a module database for the installation and the verification | `Stellaegis.Primitives.Data`, Npgsql |
+| `Stellaegis.Identity.SqlServer` | The same stores and the same schema on SQL Server | `Stellaegis.Primitives.Data`, Microsoft.Data.SqlClient |
 | `Stellaegis.Identity.AspNetCore` | The cookie a person signs in with, the administration routes of the accounts under their operations, and the admission of actors on a resource server | `Stellaegis.Primitives.AspNetCore`, ASP.NET Core |
 | `Stellaegis.Identity.Client` | The HTTP source of the blocked accounts, for a resource server apart from the host that holds the accounts | `Stellaegis.Primitives.Hosting` |
 | `Stellaegis.Identity.Server` | The pages a person signs in and manages their account with, as a Razor class library the host mounts | `Stellaegis.Identity.AspNetCore`, ASP.NET Core |

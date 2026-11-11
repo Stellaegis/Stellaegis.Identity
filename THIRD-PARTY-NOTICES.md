@@ -13,7 +13,6 @@ Its packages reference the packages below, which NuGet installs alongside them, 
 | Npgsql | `Stellaegis.Identity.PostgreSQL` | PostgreSQL | <https://github.com/npgsql/npgsql> |
 | Microsoft.Data.SqlClient | `Stellaegis.Identity.SqlServer` | MIT | <https://github.com/dotnet/SqlClient> |
 | System.Security.Cryptography.Pkcs | `Stellaegis.Identity.SqlServer` (pinned above the version Microsoft.Data.SqlClient pulls in) | MIT | <https://github.com/dotnet/runtime> |
-| Dapper | `Stellaegis.Identity.PostgreSQL`, `Stellaegis.Identity.SqlServer` | Apache-2.0 | <https://github.com/DapperLib/Dapper> |
 | Microsoft.Extensions.\* | all packages | MIT | <https://github.com/dotnet> |
 
 `Stellaegis.Identity.AspNetCore` and `Stellaegis.Identity.Server` use the ASP.NET Core shared framework, which the

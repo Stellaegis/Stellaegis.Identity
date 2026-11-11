@@ -30,14 +30,14 @@ internal sealed class PostgreSqlIdentityStore
         _clock = Guard.NotNull(clock);
 
         var registry = new RepositoryRegistry<IdentityDatabase>()
-            .Add<UserRepository>((connection, transaction) => new UserRepository(connection, transaction))
-            .Add<LoginEventRepository>((connection, transaction) => new LoginEventRepository(connection, transaction))
-            .Add<AccountTokenRepository>((connection, transaction) => new AccountTokenRepository(connection, transaction))
-            .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository(connection, transaction))
-            .Add<MfaRepository>((connection, transaction) => new MfaRepository(connection, transaction))
-            .Add<AvatarRepository>((connection, transaction) => new AvatarRepository(connection, transaction))
-            .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository(connection, transaction))
-            .Add<LoginCodeRepository>((connection, transaction) => new LoginCodeRepository(connection, transaction));
+            .Add<UserRepository>((connection, transaction) => new UserRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<LoginEventRepository>((connection, transaction) => new LoginEventRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<AccountTokenRepository>((connection, transaction) => new AccountTokenRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<MfaRepository>((connection, transaction) => new MfaRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<AvatarRepository>((connection, transaction) => new AvatarRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()))
+            .Add<LoginCodeRepository>((connection, transaction) => new LoginCodeRepository((NpgsqlConnection)connection, () => (NpgsqlTransaction?)transaction()));
 
         _dataSource = NpgsqlDataSource.Create(value.ConnectionString);
         _units = new AdoUnitOfWorkFactory<IdentityDatabase>(_dataSource, registry);

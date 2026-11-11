@@ -34,14 +34,14 @@ internal sealed class SqlServerIdentityStore
         _clock = Guard.NotNull(clock);
 
         var registry = new RepositoryRegistry<IdentityDatabase>()
-            .Add<UserRepository>((connection, transaction) => new UserRepository(connection, transaction))
-            .Add<LoginEventRepository>((connection, transaction) => new LoginEventRepository(connection, transaction))
-            .Add<AccountTokenRepository>((connection, transaction) => new AccountTokenRepository(connection, transaction))
-            .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository(connection, transaction))
-            .Add<MfaRepository>((connection, transaction) => new MfaRepository(connection, transaction))
-            .Add<AvatarRepository>((connection, transaction) => new AvatarRepository(connection, transaction))
-            .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository(connection, transaction))
-            .Add<LoginCodeRepository>((connection, transaction) => new LoginCodeRepository(connection, transaction));
+            .Add<UserRepository>((connection, transaction) => new UserRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<LoginEventRepository>((connection, transaction) => new LoginEventRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<AccountTokenRepository>((connection, transaction) => new AccountTokenRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<EmailVerificationRepository>((connection, transaction) => new EmailVerificationRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<MfaRepository>((connection, transaction) => new MfaRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<AvatarRepository>((connection, transaction) => new AvatarRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<RecoveryCodeRepository>((connection, transaction) => new RecoveryCodeRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()))
+            .Add<LoginCodeRepository>((connection, transaction) => new LoginCodeRepository((SqlConnection)connection, () => (SqlTransaction?)transaction()));
 
         _units = new AdoUnitOfWorkFactory<IdentityDatabase>(_open, registry);
     }

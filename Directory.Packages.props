@@ -11,8 +11,7 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     <!-- Passwords and one-time codes -->
     <PackageVersion Include="Otp.NET" Version="1.4.1" />
-    <!-- PostgreSQL, and Dapper for both engines -->
-    <PackageVersion Include="Dapper" Version="2.1.89" />
+    <!-- PostgreSQL -->
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <!-- SQL Server -->
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />

@@ -134,6 +134,9 @@ public abstract class IdentityStoreTests(IIdentityDatabaseFixture database) : ID
 
         Assert.Contains(user.UserUniqueId, (await Users.ListByUniqueIdsAsync([user.UserUniqueId, Guid.NewGuid()], Ct)).Select(u => u.UserUniqueId));
         Assert.Empty(await Users.ListByUniqueIdsAsync([], Ct));
+        // A list written out longer than the 4000 characters of a string parameter: its last identifier is not cut.
+        Guid[] many = [.. Enumerable.Range(0, 150).Select(_ => Guid.NewGuid()), user.UserUniqueId];
+        Assert.Contains(user.UserUniqueId, (await Users.ListByUniqueIdsAsync(many, Ct)).Select(u => u.UserUniqueId));
         Assert.True(await Users.CountAsync(cancellationToken: Ct) >= 1);
         Assert.Contains((await Users.ListAsync(0, 1000, cancellationToken: Ct)).Select(u => u.UserUniqueId), id => id == user.UserUniqueId);
     }

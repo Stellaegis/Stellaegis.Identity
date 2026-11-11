@@ -5,11 +5,10 @@
     <RootNamespace>Stellaegis.Identity.PostgreSQL</RootNamespace>
     <PackageId>Stellaegis.Identity.PostgreSQL</PackageId>
     <Description>The PostgreSQL stores of Stellaegis.Identity: the accounts, their second factors, recovery codes, e-mail verifications, password reset tokens and login events in the schema ident, with the declaration of the database for its installation and its verification at startup.</Description>
-    <PackageTags>stellaegis;identity;accounts;postgresql;dapper</PackageTags>
+    <PackageTags>stellaegis;identity;accounts;postgresql</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Stellaegis.Primitives.Data" />
     <ProjectReference Include="..\Stellaegis.Identity\Stellaegis.Identity.csproj" />
