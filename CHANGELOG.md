@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.3] — 2026-11-16
+
+On `Stellaegis.Primitives` 6.0.0, whose `Stellaegis.Primitives.Data` no longer references Dapper: an application
+that takes the adapters of this package no longer receives Dapper through them. What the packages do is unchanged.
+
+### Changed
+
+- **`Stellaegis.Primitives` 6.0.0, Microsoft.Extensions 10.0.15 and `Microsoft.Data.SqlClient` 7.1.2.** Nothing
+  changes in this package's code. The adapters stopped using Dapper in 9.0.2; until this version it still came with
+  `Stellaegis.Primitives.Data` 5.x, which both adapters referenced.
+
+### Updating from 9.0.2
+
+Take the version: a host has nothing to change in what it asks of this package. The version brings Primitives 6.0.0
+to the host, and two things follow from that, both described in the CHANGELOG of Primitives, § *Updating from 5.6.0*:
+
+1. **The other packages of the family the host references take a version that runs without what
+   `Stellaegis.Primitives.Data` 6.0.0 removed.** That section lists the least version of each. An older PostgreSQL
+   or SQL Server adapter restores on Primitives 6 and fails at its first query.
+2. **Code of the host that used Dapper without referencing it now references it itself**: Dapper came through
+   these packages, and no longer does. Code that used `SnakeCaseTypeMap<T>`, `[ColumnMap]` or
+   `PrimitiveTypeHandlers` carries its own, or talks to its database through its provider.
+
 ## [9.0.2] — 2026-11-11
 
 The stores talk to their engine through its provider, and the adapters no longer reference Dapper. What the packages
