@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.2.0] — 2026-11-16
+
+An event at every renewal of the security stamp. Since 9.1.0 a refresh is refused once the stamp changed, event or
+not; an access token already issued still lived to its expiration — ten minutes by default — after a change of
+e-mail or of second factor, which no event said.
+
+### Added
+
+- **`UserSecurityStampRenewedEvent`**, published whenever the stamp of an account is renewed, from the one place that
+  renews it, with its reason: `PasswordReason`, `EmailReason`, `MfaReason`, `BlockedReason`. A host that holds a
+  token issuer revokes every token of the subject on it, and the access tokens already issued are refused at once.
+  The eleven renewals publish it; a reason added later reaches the same subscription. The README, § *Events*.
+
+### Changed
+
+- **A password changed or an account blocked publishes two events**, `UserSecurityStampRenewed` then
+  `UserPasswordChanged` or `UserBlocked` as before. Both stay contracts: a registry subscribes to `UserBlocked`.
+- **`MfaService` takes the `IEventPublisher`** in its constructor; the module registers it, and a host that resolves
+  the service from the container has nothing to change.
+
+### Updating from 9.1.0
+
+**Subscribe to `UserSecurityStampRenewed`** where the host revokes the tokens of a person:
+
+```csharp
+case UserSecurityStampRenewedEvent renewed:
+    await revoker.RevokeSubjectAsync(renewed.UserUniqueId.ToString("N"), ct);
+    break;
+```
+
+The subscription to `UserPasswordChanged` becomes redundant without being wrong: keep it or drop it. Keep the one to
+`UserBlocked`, which also feeds the blocked accounts of the admission.
+
 ## [9.1.0] — 2026-11-16
 
 A refresh is refused once what proves the person changed. The security stamp closed the other sessions of the
