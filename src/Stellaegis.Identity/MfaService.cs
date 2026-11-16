@@ -12,7 +12,7 @@ namespace Stellaegis.Identity;
 /// confirmed the setup included —, never one of an earlier step, and the secret is kept protected
 /// (<see cref="TotpSecretProtector"/>).
 /// </summary>
-public sealed class MfaService(IMfaStore store, IAuthUserStore users, TotpSecretProtector protector, IOptions<IdentityOptions> options, TimeProvider clock)
+public sealed class MfaService(IMfaStore store, IAuthUserStore users, TotpSecretProtector protector, IEventPublisher events, IOptions<IdentityOptions> options, TimeProvider clock)
 {
     /// <summary>Whether <paramref name="method"/> is one a person may enable in this installation.</summary>
     public bool Allows(string method) => options.Value.Mfa.Allows(method);
@@ -41,7 +41,7 @@ public sealed class MfaService(IMfaStore store, IAuthUserStore users, TotpSecret
             return Result.Failure(IdentityErrors.InvalidMfaCode);
         await store.EnableAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
         await store.TryUseStepAsync(userUniqueId, step, cancellationToken);   // the code that confirmed is spent too
-        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
+        await SecurityStamps.RenewAsync(users, events, clock, userUniqueId, UserSecurityStampRenewedEvent.MfaReason, cancellationToken);
         return Result.Success();
     }
 
@@ -76,7 +76,7 @@ public sealed class MfaService(IMfaStore store, IAuthUserStore users, TotpSecret
         if (!Allows(MfaMethod.Email))
             return Result.Failure(IdentityErrors.MfaMethodNotAllowed);
         await store.EnableEmailAsync(userUniqueId, clock.GetUtcNow(), cancellationToken);
-        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
+        await SecurityStamps.RenewAsync(users, events, clock, userUniqueId, UserSecurityStampRenewedEvent.MfaReason, cancellationToken);
         return Result.Success();
     }
 
@@ -88,7 +88,7 @@ public sealed class MfaService(IMfaStore store, IAuthUserStore users, TotpSecret
     public async Task DisableAsync(Guid userUniqueId, CancellationToken cancellationToken = default)
     {
         await store.DisableAsync(userUniqueId, cancellationToken);
-        await SecurityStamps.RenewAsync(users, userUniqueId, cancellationToken);
+        await SecurityStamps.RenewAsync(users, events, clock, userUniqueId, UserSecurityStampRenewedEvent.MfaReason, cancellationToken);
     }
 
     /// <summary>The <c>otpauth://</c> URI the enrollment QR code encodes, for <paramref name="email"/> under <paramref name="issuer"/>.</summary>

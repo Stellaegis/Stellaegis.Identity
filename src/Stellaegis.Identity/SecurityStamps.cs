@@ -21,7 +21,14 @@ public static class SecurityStamps
     /// <summary>A new stamp: 128 random bits, in lowercase hexadecimal.</summary>
     public static string New() => Guid.NewGuid().ToString("N");
 
-    // Renews the stamp of the account: its other sessions close at their next reading.
-    internal static Task<bool> RenewAsync(IAuthUserStore users, Guid userUniqueId, CancellationToken cancellationToken)
-        => users.RenewSecurityStampAsync(userUniqueId, New(), cancellationToken);
+    // Renews the stamp of the account — its other sessions close at their next reading, its refresh tokens are refused —
+    // and publishes UserSecurityStampRenewedEvent, so that a host revokes the access tokens already issued at once.
+    internal static async Task<bool> RenewAsync(
+        IAuthUserStore users, IEventPublisher events, TimeProvider clock, Guid userUniqueId, string reason, CancellationToken cancellationToken)
+    {
+        if (!await users.RenewSecurityStampAsync(userUniqueId, New(), cancellationToken))
+            return false;
+        await events.PublishAsync(new UserSecurityStampRenewedEvent { OccurredAt = clock.GetUtcNow(), UserUniqueId = userUniqueId, Reason = reason }, cancellationToken);
+        return true;
+    }
 }

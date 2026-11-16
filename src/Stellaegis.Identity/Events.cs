@@ -84,6 +84,47 @@ public sealed record UserPasswordChangedEvent : IEvent
     public required string Reason { get; init; }
 }
 
+/// <summary>
+/// Published whenever the security stamp of an account is renewed: a password changed, reset or removed, an e-mail
+/// changed, a second factor enrolled, enabled, disabled or reset, the account blocked. Whatever was obtained before no
+/// longer holds — the other sessions close at their next reading, and a token issuer refuses the next refresh by
+/// itself, the admission of the accounts reading the stamp. A host that holds an issuer revokes every token of the
+/// subject on it, so that the access tokens already issued are refused at once rather than at their expiration.
+/// Published from the one place that renews the stamp: a reason added later reaches the same subscription.
+/// </summary>
+/// <remarks>
+/// A password changed and an account blocked publish their own event as well, after this one —
+/// <see cref="UserPasswordChangedEvent"/>, <see cref="UserBlockedEvent"/> —: a host subscribed to both revokes twice,
+/// and the second revocation finds nothing left. A deleted account renews no stamp: it is refused as such, and
+/// publishes <see cref="UserBlockedEvent"/>.
+/// </remarks>
+public sealed record UserSecurityStampRenewedEvent : IEvent
+{
+    /// <summary>The <see cref="Reason"/> of a password changed by its person, reset by a link, or removed by the link that undoes a change of e-mail.</summary>
+    public const string PasswordReason = "password";
+
+    /// <summary>The <see cref="Reason"/> of an e-mail changed: confirmed by its person, approved by the previous address, or set by an administrator.</summary>
+    public const string EmailReason = "email";
+
+    /// <summary>The <see cref="Reason"/> of a second factor enrolled, enabled, disabled, or reset by an administrator.</summary>
+    public const string MfaReason = "mfa";
+
+    /// <summary>The <see cref="Reason"/> of an account disabled by an administrator.</summary>
+    public const string BlockedReason = "blocked";
+
+    /// <inheritdoc/>
+    public required DateTimeOffset OccurredAt { get; init; }
+
+    /// <summary>The identity of the account, which its <c>sub</c> claim carries.</summary>
+    public required Guid UserUniqueId { get; init; }
+
+    /// <summary>
+    /// What renewed the stamp, for the journal: <see cref="PasswordReason"/>, <see cref="EmailReason"/>,
+    /// <see cref="MfaReason"/> or <see cref="BlockedReason"/>. A subscriber acts the same on every one.
+    /// </summary>
+    public required string Reason { get; init; }
+}
+
 /// <summary>Published when a disabled account is enabled again.</summary>
 public sealed record UserUnblockedEvent : IEvent
 {

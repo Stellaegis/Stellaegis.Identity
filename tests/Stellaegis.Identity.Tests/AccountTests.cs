@@ -25,9 +25,13 @@ public sealed class AccountTests
         Assert.Equal(1, user.FailedLoginCount);   // the wrong one just typed; the three before went with the change
         Assert.Null(user.BlockedUntil);
         Assert.Equal(user.AsActor(), user.ModifiedBy);
-        var changed = Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events));
-        Assert.Equal(id, changed.UserUniqueId);
-        Assert.Equal(UserPasswordChangedEvent.ChangedReason, changed.Reason);
+        Assert.Collection(host.Events.Events,
+            renewed => Assert.Equal(UserSecurityStampRenewedEvent.PasswordReason, Assert.IsType<UserSecurityStampRenewedEvent>(renewed).Reason),
+            changed =>
+            {
+                Assert.Equal(id, Assert.IsType<UserPasswordChangedEvent>(changed).UserUniqueId);
+                Assert.Equal(UserPasswordChangedEvent.ChangedReason, ((UserPasswordChangedEvent)changed).Reason);
+            });
     }
 
     [Fact]
@@ -200,7 +204,9 @@ public sealed class AccountTests
         var reverted = await account.RevertEmailChangeAsync(first.RevertToken!);
         Assert.True(reverted.IsSuccess, reverted.Error?.ToString());
         Assert.Equal("jane@acme.test", reverted.Value.Email);
-        Assert.Equal(UserPasswordChangedEvent.RemovedReason, Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events)).Reason);
+        Assert.Collection(host.Events.Events,
+            renewed => Assert.Equal(UserSecurityStampRenewedEvent.PasswordReason, Assert.IsType<UserSecurityStampRenewedEvent>(renewed).Reason),
+            changed => Assert.Equal(UserPasswordChangedEvent.RemovedReason, Assert.IsType<UserPasswordChangedEvent>(changed).Reason));
         var user = (await host.Get<IAuthUserStore>().GetByUniqueIdAsync(id))!;
         Assert.Equal("jane@acme.test", user.Email);
         Assert.True(user.EmailVerified);
@@ -217,7 +223,9 @@ public sealed class AccountTests
         Assert.Equal(LoginStep.Failed, (await login.AuthenticateAsync("jane@acme.test", "Correct-Horse-9")).Step);
         host.Events.Events.Clear();
         Assert.True((await reset.ResetPasswordAsync(reverted.Value.ResetToken, "Another-Horse-7")).IsSuccess);
-        Assert.Equal(UserPasswordChangedEvent.ResetReason, Assert.IsType<UserPasswordChangedEvent>(Assert.Single(host.Events.Events)).Reason);
+        Assert.Collection(host.Events.Events,
+            renewed => Assert.Equal(UserSecurityStampRenewedEvent.PasswordReason, Assert.IsType<UserSecurityStampRenewedEvent>(renewed).Reason),
+            changed => Assert.Equal(UserPasswordChangedEvent.ResetReason, Assert.IsType<UserPasswordChangedEvent>(changed).Reason));
         Assert.True((await login.AuthenticateAsync("jane@acme.test", "Another-Horse-7")).Succeeded);
 
         // A second factor enrolled before the change stays through a revert.
@@ -595,12 +603,13 @@ public sealed class AdministrationTests
         Assert.True((await administration.BlockAsync(id, Admin)).IsSuccess);
         Assert.True((await administration.BlockAsync(id, Admin)).IsSuccess);
         Assert.Equal([id.ToString("N")], await source.GetBlockedSubjectsAsync());
-        var blocked = Assert.IsType<UserBlockedEvent>(Assert.Single(host.Events.Events));
-        Assert.Equal(AccountAdministrationService.DisabledReason, blocked.Reason);
+        Assert.Collection(host.Events.Events,   // blocked once: the second block changes nothing
+            renewed => Assert.Equal(UserSecurityStampRenewedEvent.BlockedReason, Assert.IsType<UserSecurityStampRenewedEvent>(renewed).Reason),
+            blocked => Assert.Equal(AccountAdministrationService.DisabledReason, Assert.IsType<UserBlockedEvent>(blocked).Reason));
 
         Assert.True((await administration.UnblockAsync(id, Admin)).IsSuccess);
         Assert.Empty(await source.GetBlockedSubjectsAsync());
-        Assert.IsType<UserUnblockedEvent>(host.Events.Events[1]);
+        Assert.IsType<UserUnblockedEvent>(host.Events.Events[2]);
         Assert.Equal(IdentityErrors.AccountNotFound, (await administration.BlockAsync(Guid.NewGuid(), Admin)).Error);
     }
 

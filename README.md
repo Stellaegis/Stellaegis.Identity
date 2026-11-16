@@ -24,7 +24,7 @@ The library targets .NET 10 and is released under the MIT license.
 | `Stellaegis.Identity.Client` | The HTTP source of the blocked accounts, for a resource server apart from the host that holds the accounts | `Stellaegis.Primitives.Hosting` |
 | `Stellaegis.Identity.Server` | The pages a person signs in and manages their account with, as a Razor class library the host mounts | `Stellaegis.Identity.AspNetCore`, ASP.NET Core |
 
-The six packages share one version. They started at the major version of Stellaegis.Primitives, 5; 9.1.0 runs
+The six packages share one version. They started at the major version of Stellaegis.Primitives, 5; 9.2.0 runs
 on Primitives 6.1.0.
 
 ## A host, in full
@@ -260,14 +260,31 @@ enterprise, a solution installed for one organization — opens nothing. `Open` 
 
 ### Events
 
-The module publishes five events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
+The module publishes six events through the `IEventPublisher` of Primitives — `UserRegistered`, `UserBlocked`
 with its reason, `UserUnblocked`, `UserProfileChanged` when what others see of the person changes, the name or
-the avatar, and `UserPasswordChanged` with its reason, changed, reset or removed —, records implementing `IEvent`. A
-registry that keeps a copy of the name and the avatar for the people who share a compartment with the person refreshes
-it on `UserProfileChanged`; an issuer revokes the refresh tokens and the authorizations of the subject on
-`UserPasswordChanged`, since what was issued on the former password is no longer the person's. It publishes to whatever bus the host
-registered, and nowhere when the host registered none; it subscribes to nothing. A host that wants a block to
-apply at once connects its bus to the admission (below).
+the avatar, `UserPasswordChanged` with its reason, changed, reset or removed, and `UserSecurityStampRenewed` —,
+records implementing `IEvent`. A registry that keeps a copy of the name and the avatar for the people who share a
+compartment with the person refreshes it on `UserProfileChanged`. It publishes to whatever bus the host registered,
+and nowhere when the host registered none; it subscribes to nothing. A host that wants a block to apply at once
+connects its bus to the admission (below).
+
+**`UserSecurityStampRenewed` is published at every renewal of the stamp**, from the one place that renews it, with
+its reason: `password` — changed, reset, or removed by the link that undoes a change of e-mail —, `email` —
+confirmed, approved by the previous address, set by an administrator —, `mfa` — enrolled, enabled, disabled, reset
+by an administrator —, `blocked`. Whatever was obtained before no longer holds: the cookies close at their next
+reading, and the refresh tokens of an issuer are refused at the next token request, event or not (§ *At a token
+request*). The event is the fast way: **a host that holds an issuer revokes every token of the subject on it**, so
+that the access tokens already issued are refused at once rather than at their expiration.
+
+```csharp
+case UserSecurityStampRenewedEvent renewed:
+    await revoker.RevokeSubjectAsync(renewed.UserUniqueId.ToString("N"), ct);
+    break;
+```
+
+A password changed and an account blocked publish their own event too, after this one: a host subscribed to
+`UserPasswordChanged` as well revokes twice, and the second revocation finds nothing left. A deletion renews no
+stamp — the account is refused as deleted — and publishes `UserBlocked`.
 
 ## The cookie
 
@@ -406,7 +423,8 @@ Without the mark — at the door, on every request — it reads nothing and admi
 `IAuthUserStore`, in the host that holds the accounts: a host that marks token requests without holding them, an
 issuer apart, has every token request refused, and the refusal logged as critical. A subject that is not an account
 id is not the accounts' to judge. Nothing is to subscribe for it: the account in the database decides, whatever the
-bus delivered; the subscriptions to the events stay the way to cut an access token before it expires.
+bus delivered; the subscriptions to the events stay the way to cut an access token before it expires —
+`UserSecurityStampRenewed`, § *Events*.
 
 ## Invitations
 
