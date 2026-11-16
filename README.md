@@ -24,8 +24,8 @@ The library targets .NET 10 and is released under the MIT license.
 | `Stellaegis.Identity.Client` | The HTTP source of the blocked accounts, for a resource server apart from the host that holds the accounts | `Stellaegis.Primitives.Hosting` |
 | `Stellaegis.Identity.Server` | The pages a person signs in and manages their account with, as a Razor class library the host mounts | `Stellaegis.Identity.AspNetCore`, ASP.NET Core |
 
-The six packages share one version. They started at the major version of Stellaegis.Primitives, 5; 9.0.3 runs
-on Primitives 6.0.0.
+The six packages share one version. They started at the major version of Stellaegis.Primitives, 5; 9.1.0 runs
+on Primitives 6.1.0.
 
 ## A host, in full
 

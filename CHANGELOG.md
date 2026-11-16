@@ -5,6 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.1.0] — 2026-11-16
+
+A refresh is refused once what proves the person changed. The security stamp closed the other sessions of the
+browser since 9.0.0, and left the tokens of an issuer valid: a refresh token outlived a new password for thirty days
+unless the host's bus delivered the event, and outlived a new e-mail or second factor in every case, since no event
+says them.
+
+### Added
+
+- **The admission of the accounts holds a token request against the account.** `AddStellaegisIdentityAdmission()`
+  registers it beside the blocked accounts, with nothing more to call. When a token issuer marks the principal of a
+  code exchanged or a token refreshed — `SessionClaims.TokenRequest` of `Stellaegis.Primitives` 6.1.0 —, the admission
+  reads the account and compares the stamp the issuer kept since the authorization. A stamp that changed, or none,
+  refuses with `Session.Stale` (`IdentityErrors.SessionStale`); an account blocked, deleted or unknown, with
+  `Account.Blocked`. Without the mark — at the door, on every request — it reads nothing. The README, § *The admission
+  of actors* and § *The cookie*, says the rest.
+
+### Changed
+
+- **`SecurityStamps.ClaimType` is `SessionClaims.SecurityStamp` of Primitives**, the same value,
+  `stellaegis.security_stamp`: a cookie already issued carries the claim a token issuer keeps. On `Stellaegis.Primitives`
+  6.1.0.
+
+### Updating from 9.0.3
+
+Take the version: a host has nothing to change in its code, and nothing changes until its token issuer marks token
+requests, which the next minor version of `Stellaegis.Issuer` does. Then, once:
+
+- **Every refresh token issued before is refused**, since it keeps no stamp. Each application goes back through the
+  authorization, without the login page when its session holds.
+- **A token issuer apart from the accounts has its token requests refused**: the stamp cannot be read where the
+  accounts are not. Every host of the family that composes an issuer holds the accounts in the same process.
+
 ## [9.0.3] — 2026-11-16
 
 On `Stellaegis.Primitives` 6.0.0, whose `Stellaegis.Primitives.Data` no longer references Dapper: an application
