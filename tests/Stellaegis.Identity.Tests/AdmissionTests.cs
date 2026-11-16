@@ -102,7 +102,7 @@ public sealed class AdmissionTests
 
         Assert.Equal(IdentityErrors.AccountBlockedCode, refused.Error!.Code);
         Assert.True(admitted.IsSuccess);
-        Assert.Single(app.Services.GetServices<IActorAdmission>());
+        Assert.Equal(2, app.Services.GetServices<IActorAdmission>().Count());   // the blocked accounts, and the stamp at a token request
     }
 
     [Fact]

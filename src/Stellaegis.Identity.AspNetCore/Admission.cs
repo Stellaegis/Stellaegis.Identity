@@ -90,6 +90,52 @@ public sealed class BlockedAccounts : IActorAdmission
 }
 
 /// <summary>
+/// Holds a token request against the account, as the cookie is held at its reading: the admission a token issuer asks
+/// when a code is exchanged or a token refreshed, the principal marked <see cref="SessionClaims.TokenRequest"/>. The
+/// stamp the issuer kept since the authorization, <see cref="SessionClaims.SecurityStamp"/>, must be the account's:
+/// one that changed — a new password, a block, a change of the second factor or of the e-mail — or none refuses with
+/// <see cref="IdentityErrors.SessionStale"/>, and the client goes back through the authorization. An account gone or
+/// no longer admitted refuses too. Without the mark — at the door, on every request — it reads nothing and admits.
+/// </summary>
+/// <remarks>
+/// It reads the account from <see cref="IAuthUserStore"/>, in the host that holds the accounts. A host that marks a
+/// token request without holding them — an issuer apart — is refused, and the refusal logged as critical: the stamp
+/// cannot be read there, and a refresh that cannot be held is not granted. A subject that is not an account id is not
+/// the accounts' to judge.
+/// </remarks>
+internal sealed class SessionStampAdmission(IServiceScopeFactory scopes, ILogger<SessionStampAdmission> logger) : IActorAdmission
+{
+    public async ValueTask<Result> AdmitAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
+    {
+        Guard.NotNull(principal);
+        if (principal.FindFirst(SessionClaims.TokenRequest) is null)
+            return Result.Success();
+        if (!Guid.TryParseExact(Callers.SubjectOf(principal), "N", out var userUniqueId))
+            return Result.Success();
+
+        using var scope = scopes.CreateScope();
+        if (scope.ServiceProvider.GetService<IAuthUserStore>() is not { } users)
+        {
+            logger.LogCritical(
+                "A token request for {Subject} is refused: this host marks token requests and does not hold the accounts, so the stamp of the session cannot be held against the account.",
+                userUniqueId);
+            return Result.Failure(IdentityErrors.SessionStale);
+        }
+        var user = await users.GetByUniqueIdAsync(userUniqueId, cancellationToken).ConfigureAwait(false);
+        if (user is null || user.IsBlockedAtDoor)
+            return Result.Failure(IdentityErrors.AccountBlocked);
+        var kept = principal.FindFirst(SessionClaims.SecurityStamp)?.Value;
+        if (!user.IsActivated || !string.Equals(kept, user.SecurityStamp, StringComparison.Ordinal))
+        {
+            logger.LogInformation("A token request for {Subject} is refused: {Reason}", userUniqueId,
+                kept is null ? "the token keeps no stamp" : user.IsActivated ? "the stamp of the account changed" : "the account has no password");
+            return Result.Failure(IdentityErrors.SessionStale);
+        }
+        return Result.Success();
+    }
+}
+
+/// <summary>
 /// Reads the blocked accounts from their source when the host starts — a restarted host would otherwise admit
 /// everyone until the first event —, then every <see cref="IdentityAdmissionOptions.ReconcileInterval"/>. A source
 /// out of reach is logged as critical and tried again at the next interval: the host keeps serving, with the
@@ -197,8 +243,8 @@ public static class AdmissionExtensions
     /// <summary>
     /// Registers the admission of actors: the blocked accounts kept in memory, read from
     /// <see cref="IBlockedUsersSource"/> at startup and then periodically, and its options bound from
-    /// <paramref name="sectionName"/>; and the <see cref="IActorAdmission"/> of the accounts, beside those of the
-    /// other modules. The host registers the source that fits it — local or HTTP —, enables the admission on its
+    /// <paramref name="sectionName"/>; and the two <see cref="IActorAdmission"/> of the accounts, beside those of the
+    /// other modules — the blocked accounts, and the stamp of the session held against the account at a token request. The host registers the source that fits it — local or HTTP —, enables the admission on its
     /// pipeline with <c>UseStellaegisActorAdmission()</c> of Primitives, and connects its bus to
     /// <see cref="BlockedAccounts"/> so that a block applies without waiting for the next reading.
     /// </summary>
@@ -229,6 +275,7 @@ public static class AdmissionExtensions
         {
             services.AddSingleton(AdmissionRegistered.Instance);
             services.AddStellaegisActorAdmission(provider => provider.GetRequiredService<BlockedAccounts>());
+            services.AddStellaegisActorAdmission<SessionStampAdmission>();
         }
         return services;
     }

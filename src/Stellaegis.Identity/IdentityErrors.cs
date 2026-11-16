@@ -22,6 +22,12 @@ public static class IdentityErrors
     /// <summary>The code of <see cref="AccountBlocked"/>: the account is disabled or deleted.</summary>
     public const string AccountBlockedCode = "Account.Blocked";
 
+    /// <summary>
+    /// The code of <see cref="SessionStale"/>: what proves the person changed since the session a token was issued
+    /// for, or the token keeps no stamp.
+    /// </summary>
+    public const string SessionStaleCode = "Session.Stale";
+
     /// <summary>The code of <see cref="InvalidCurrentPassword"/>: the password given to confirm the operation is wrong.</summary>
     public const string InvalidCurrentPasswordCode = "Password.InvalidCurrent";
 
@@ -149,6 +155,13 @@ public static class IdentityErrors
     /// <summary>The account is disabled or deleted.</summary>
     public static Error AccountBlocked { get; } =
         Error.Forbidden(AccountBlockedCode, "The account is blocked.");
+
+    /// <summary>
+    /// What proves the person — the password, the second factor, the e-mail — changed since the session a token was
+    /// issued for, or the token keeps no stamp: the person signs in again.
+    /// </summary>
+    public static Error SessionStale { get; } =
+        Error.Unauthorized(SessionStaleCode, "The session this token was issued for no longer holds: sign in again.");
 
     /// <summary>The password given to confirm the operation is wrong.</summary>
     public static Error InvalidCurrentPassword { get; } =

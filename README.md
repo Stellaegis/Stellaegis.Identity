@@ -299,6 +299,13 @@ otherwise. The stores write the stamp at the creation and replace it alone, `IAu
 an update of the account never writes it, so that one written from an account read a moment before cannot bring an
 old stamp back.
 
+**The tokens of a token issuer are held against the stamp too.** The claim of the stamp is
+`SessionClaims.SecurityStamp` of Primitives, `stellaegis.security_stamp`: a token issuer keeps it from the session,
+for the code and the refresh token, which only the issuer reads, never for a token a client or a service reads. When
+a code is exchanged or a token refreshed, the admission of the accounts compares it to the account's, below: the
+changes that close the other sessions refuse the refresh of their tokens as well, whether or not the host's bus
+delivered anything.
+
 ## The administration routes
 
 `MapIdentityAdminEndpoints()` maps the administration of the accounts, relative to the group it is called on,
@@ -383,6 +390,23 @@ the administration routes of the host that holds them, the token for the call co
 A block applies without waiting for the next reading when the host connects its bus: on `UserBlocked`, call
 `BlockedAccounts.Block(userUniqueId)`; on `UserUnblocked`, `Unblock`. In a single process, the example does it
 from its own `IEventPublisher`; with several, from a subscription to `Stellaegis.Backplane`.
+
+### At a token request
+
+`AddStellaegisIdentityAdmission()` registers a second admission, which holds a token request against the account. A
+token issuer marks the principal it asks about when a code is exchanged or a token refreshed,
+`SessionClaims.TokenRequest` of Primitives, and the principal carries the stamp the issuer kept since the
+authorization. The admission reads the account and refuses with `Session.Stale` when the stamp changed — the
+password changed, reset or removed, the second factor enrolled, disabled or reset, the e-mail changed —, or when the
+token keeps none, one issued before the issuer kept it among them; with `Account.Blocked` when the account is
+blocked, deleted or unknown. The issuer answers `invalid_grant`, and the client goes back through the authorization,
+without the login page when its session holds.
+
+Without the mark — at the door, on every request — it reads nothing and admits. It reads the account from
+`IAuthUserStore`, in the host that holds the accounts: a host that marks token requests without holding them, an
+issuer apart, has every token request refused, and the refusal logged as critical. A subject that is not an account
+id is not the accounts' to judge. Nothing is to subscribe for it: the account in the database decides, whatever the
+bus delivered; the subscriptions to the events stay the way to cut an access token before it expires.
 
 ## Invitations
 
